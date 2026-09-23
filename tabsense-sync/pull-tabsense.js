@@ -54,10 +54,24 @@ const DEFAULT_JUICE_CATEGORIES = ["العصائر", "عصائر", "المشرو�
 // احتياط لو تقرير المنتجات ما فيه عمود تصنيف أصلاً — بنعتمد على الاسم
 const JUICE_NAME_HINTS = ["عصير", "juice"];
 
-function formatDateObj(d) {
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const yyyy = d.getFullYear();
+const VALID_BRANCHES = ["الروضة", "الشاطئ", "عبداللطيف جميل"];
+
+// GitHub secrets حوّلت الاسم العربي لـ "????" من قبل، فالمتغير بملف الـ workflow (UTF-8) له الأولوية
+function resolveBranch() {
+  const candidate = String(process.env.TABSENSE_BRANCH || config.branch || "").trim();
+  if (!VALID_BRANCHES.includes(candidate)) {
+    throw new Error(`اسم الفرع غير صالح: "${candidate}". لازم يكون واحد من: ${VALID_BRANCHES.join("، ")}`);
+  }
+  return candidate;
+}
+const BRANCH = resolveBranch();
+
+// سيرفرات GitHub شغالة على UTC، واليوم لازم يتحسب بتوقيت الرياض
+function riyadhDateObj(daysAgo) {
+  const d = new Date(Date.now() - daysAgo * 86400000);
+  const [yyyy, mm, dd] = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(d).split("-");
   return { display: `${mm}/${dd}/${yyyy}`, iso: `${yyyy}-${mm}-${dd}` };
 }
 
@@ -67,13 +81,7 @@ function getTargetDates() {
     const parts = customDate.split("/");
     return [{ display: customDate, iso: `${parts[2]}-${parts[0]}-${parts[1]}` }];
   }
-
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(today.getDate() - 1);
-  const sunday = new Date("2026-09-20T12:00:00");
-
-  return [formatDateObj(sunday), formatDateObj(yesterday), formatDateObj(today)];
+  return [riyadhDateObj(1), riyadhDateObj(0)];
 }
 
 function normalizeArabic(s) {
@@ -303,10 +311,10 @@ async function run() {
       }
 
       if (!mappedRows.length) {
-        console.warn(`⚠️ تحذير: لم يتم العثور على مبيعات في تابسنس لفرع ${config.branch} في تاريخ ${iso} (أو الجدول فارغ لهذا اليوم). سيتم تخطي الإرسال لهذا التاريخ والانتقال للتالي.`);
+        console.warn(`⚠️ تحذير: لم يتم العثور على مبيعات في تابسنس لفرع ${BRANCH} في تاريخ ${iso} (أو الجدول فارغ لهذا اليوم). سيتم تخطي الإرسال لهذا التاريخ والانتقال للتالي.`);
       } else {
         // ---- 3) إرسال النتيجة لموقع برو هاوس ----
-        console.log(`🚀 جاري إرسال البيانات لموقع Pro House (فرع ${config.branch} - تاريخ ${iso})...`);
+        console.log(`🚀 جاري إرسال البيانات لموقع Pro House (فرع ${BRANCH} - تاريخ ${iso})...`);
         try {
           const res = await fetch(config.prohouseApiUrl, {
             method: "POST",
@@ -314,7 +322,7 @@ async function run() {
             body: JSON.stringify({
               action: "importSalesByCategory",
               integrationToken: config.integrationToken,
-              payload: { date: iso, branch: config.branch, rows: mappedRows }
+              payload: { date: iso, branch: BRANCH, rows: mappedRows }
             })
           });
           const json = await res.json();
@@ -326,15 +334,12 @@ async function run() {
         // نفس البيانات للنظام الجديد (Supabase)
         const supaUrl = config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co";
         const supaToken = config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36";
-        const targetBranches = config.allBranches ? ["الروضة", "الشاطئ", "عبداللطيف جميل"] : [config.branch || "عبداللطيف جميل"];
-
-        for (const b of targetBranches) {
-          try {
-            await sendToSupabase("import_sales", iso, b, mappedRows, supaUrl, supaToken);
-            console.log(`☁️ تم تحديث مبيعات التصنيفات على Supabase لفرع ${b}.`);
-          } catch (supaErr) {
-            console.warn(`⚠ تعذر تحديث Supabase (مبيعات التصنيفات لفرع ${b}):`, supaErr.message);
-          }
+        // تقرير تابسنس لفرع واحد، فما منكتبه لغير فرعه
+        try {
+          await sendToSupabase("import_sales", iso, BRANCH, mappedRows, supaUrl, supaToken);
+          console.log(`☁️ تم تحديث مبيعات التصنيفات على Supabase لفرع ${BRANCH}.`);
+        } catch (supaErr) {
+          console.warn(`⚠ تعذر تحديث Supabase (مبيعات التصنيفات لفرع ${BRANCH}):`, supaErr.message);
         }
       }
 
@@ -349,7 +354,7 @@ async function run() {
             body: JSON.stringify({
               action: "importJuiceSales",
               integrationToken: config.integrationToken,
-              payload: { date: iso, branch: config.branch, rows: juiceRows }
+              payload: { date: iso, branch: BRANCH, rows: juiceRows }
             })
           });
           const juiceJson = await juiceRes.json();
@@ -361,28 +366,24 @@ async function run() {
 
         const supaUrl = config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co";
         const supaToken = config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36";
-        const targetBranches = config.allBranches ? ["الروضة", "الشاطئ", "عبداللطيف جميل"] : [config.branch || "عبداللطيف جميل"];
-
-        for (const b of targetBranches) {
-          try {
-            await sendToSupabase("import_juice_sales", iso, b, juiceRows, supaUrl, supaToken);
-            console.log(`☁️ تم تحديث مبيعات العصيرات على Supabase لفرع ${b}.`);
-          } catch (supaErr) {
-            console.warn(`⚠ تعذر تحديث Supabase (مبيعات العصيرات لفرع ${b}):`, supaErr.message);
-          }
+        try {
+          await sendToSupabase("import_juice_sales", iso, BRANCH, juiceRows, supaUrl, supaToken);
+          console.log(`☁️ تم تحديث مبيعات العصيرات على Supabase لفرع ${BRANCH}.`);
+        } catch (supaErr) {
+          console.warn(`⚠ تعذر تحديث Supabase (مبيعات العصيرات لفرع ${BRANCH}):`, supaErr.message);
         }
       } else {
         console.log("🥤 ما لقينا منتجات عصيرات بتقرير المنتجات — تأكد من juiceCategories بـ config.json");
       }
 
       if (mappedRows.length || juiceRows.length) {
-        console.log(`🎉 تم سحب وإرسال بيانات ${iso} لفرع ${config.branch} بنجاح!`, mappedRows);
+        console.log(`🎉 تم سحب وإرسال بيانات ${iso} لفرع ${BRANCH} بنجاح!`, mappedRows);
 
         // ---- 5) إشعارات الواتساب السحابية من GitHub Actions ----
         if ((config.whatsappPhone || config.adminPhone) && (config.whatsappApiKey || config.whatsappToken)) {
           const targetPhone = config.whatsappPhone || config.adminPhone;
           const key = config.whatsappApiKey || config.whatsappToken;
-          const waText = encodeURIComponent(`📊 *تحديث سحابي أوتوماتيكي — Pro House*\n🏢 الفرع: ${config.branch}\n📅 التاريخ: ${iso}\n\n🎉 تم سحب وإرسال أحدث بيانات تابسنس بنجاح لفرع ${config.branch}.`);
+          const waText = encodeURIComponent(`📊 *تحديث سحابي أوتوماتيكي — Pro House*\n🏢 الفرع: ${BRANCH}\n📅 التاريخ: ${iso}\n\n🎉 تم سحب وإرسال أحدث بيانات تابسنس بنجاح لفرع ${BRANCH}.`);
           try {
             await fetch(`https://api.callmebot.com/whatsapp.php?phone=${targetPhone}&text=${waText}&apikey=${key}`);
             console.log("📲 تم إرسال إشعار الواتساب السحابي بنجاح!");
