@@ -12,7 +12,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=4.9.3">
+<link rel="stylesheet" href="css/style.css?v=5.0.0">
 <script>
 if ('serviceWorker' in navigator) {
   let refreshing = false;
@@ -35,6 +35,27 @@ if ('serviceWorker' in navigator) {
 </script>
 </head>
 <body>
+
+<div id="phSplash" class="ph-splash" aria-hidden="true">
+  <div class="ph-splash-stage">
+    <div class="ph-splash-halo"></div>
+    <div class="ph-splash-blob"></div>
+    <img class="ph-splash-logo" src="assets/logo.png" alt="">
+  </div>
+  <div class="ph-splash-bar"><span></span></div>
+</div>
+<script>
+(function () {
+  var el = document.getElementById("phSplash");
+  var seen = false;
+  try { seen = sessionStorage.getItem("ph_splash_seen") === "1"; sessionStorage.setItem("ph_splash_seen", "1"); } catch (e) {}
+  if (seen || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { el.remove(); return; }
+  setTimeout(function () {
+    el.classList.add("out");
+    setTimeout(function () { el.remove(); }, 600);
+  }, 1700);
+})();
+</script>
 
 <div id="loginView" class="login-view hidden">
   <div class="login-card">
@@ -302,27 +323,27 @@ if ('serviceWorker' in navigator) {
 
 <div class="toast" id="toast"></div>
 
-<script src="js/config.js?v=4.9.3"></script>
-<script src="js/supabase-engine.js?v=4.9.3"></script>
-<script src="js/shared.js?v=4.9.3"></script>
-<script src="js/auth.js?v=4.9.3"></script>
-<script src="js/sync.js?v=4.9.3"></script>
-<script src="js/items.js?v=4.9.3"></script>
-<script src="js/camera.js?v=4.9.3"></script>
-<script src="js/branches.js?v=4.9.3"></script>
-<script src="js/receiving.js?v=4.9.3"></script>
-<script src="js/remaining.js?v=4.9.3"></script>
-<script src="js/waste.js?v=4.9.3"></script>
-<script src="js/users.js?v=4.9.3"></script>
-<script src="js/audit.js?v=4.9.3"></script>
-<script src="js/forecast.js?v=4.9.3"></script>
-<script src="js/tomorrow.js?v=4.9.3"></script>
-<script src="js/juices.js?v=4.9.3"></script>
-<script src="js/checklist.js?v=4.9.3"></script>
-<script src="js/report.js?v=4.9.3"></script>
-<script src="js/settings.js?v=4.9.3"></script>
-<script src="js/dashboard.js?v=4.9.3"></script>
-<script src="js/main.js?v=4.9.3"></script>
+<script src="js/config.js?v=5.0.0"></script>
+<script src="js/supabase-engine.js?v=5.0.0"></script>
+<script src="js/shared.js?v=5.0.0"></script>
+<script src="js/auth.js?v=5.0.0"></script>
+<script src="js/sync.js?v=5.0.0"></script>
+<script src="js/items.js?v=5.0.0"></script>
+<script src="js/camera.js?v=5.0.0"></script>
+<script src="js/branches.js?v=5.0.0"></script>
+<script src="js/receiving.js?v=5.0.0"></script>
+<script src="js/remaining.js?v=5.0.0"></script>
+<script src="js/waste.js?v=5.0.0"></script>
+<script src="js/users.js?v=5.0.0"></script>
+<script src="js/audit.js?v=5.0.0"></script>
+<script src="js/forecast.js?v=5.0.0"></script>
+<script src="js/tomorrow.js?v=5.0.0"></script>
+<script src="js/juices.js?v=5.0.0"></script>
+<script src="js/checklist.js?v=5.0.0"></script>
+<script src="js/report.js?v=5.0.0"></script>
+<script src="js/settings.js?v=5.0.0"></script>
+<script src="js/dashboard.js?v=5.0.0"></script>
+<script src="js/main.js?v=5.0.0"></script>
 
 </body>
 </html>
