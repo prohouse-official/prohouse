@@ -54,7 +54,7 @@ function getAllRemainingActiveItems(receivingData) {
   });
 
   // 4. استبعاد الأصناف المحذوفة في الاستلام أو في المتبقي
-  const recRemoved = new Set((recData && Array.isArray(recData.removedItemIds)) ? recData.removedItemIds : []);
+  const recRemoved = new Set((recData && Array.isArray(recData.removedItemIds)) ? recData.removedItemIds : ((recData && recData.meta && Array.isArray(recData.meta.removedItemIds)) ? recData.meta.removedItemIds : []));
   const extraIds = new Set(currentRemainingExtraItems.map(it => it.id));
 
   const result = [];
@@ -141,6 +141,8 @@ function mergeFreshRemainingData(freshRem) {
   if (freshRem.meta) currentRemainingMeta = freshRem.meta;
   if (Array.isArray(freshRem.removedItemIds)) {
     freshRem.removedItemIds.forEach(id => currentRemainingRemovedIds.add(id));
+  } else if (freshRem.meta && Array.isArray(freshRem.meta.removedItemIds)) {
+    freshRem.meta.removedItemIds.forEach(id => currentRemainingRemovedIds.add(id));
   }
   (freshRem.items || []).forEach(it => {
     const existing = currentRemainingData[it.itemId];
@@ -1196,6 +1198,14 @@ function onRemoveRemainingItem(itemId, itemName) {
   renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
   saveRemainingLocalDebounced();
   updateSaveBarRemainingStatus();
+
+  if (typeof SupaEngine !== "undefined" && typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) {
+    SupaEngine.saveRemainingReport({
+      date: currentRemainingDate,
+      branch: currentRemainingBranch,
+      removedItemIds: Array.from(currentRemainingRemovedIds)
+    }).catch(e => console.warn("Auto sync remaining removal error:", e));
+  }
 }
 
 function openAddRemainingItemModal(category) {

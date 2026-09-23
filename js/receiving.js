@@ -35,29 +35,33 @@ async function loadReceivingData(date, branch) {
   currentReceivingExtraItems = [];
   currentReceivingRemovedIds = new Set();
   
-  if (dayData && dayData.items) {
-    dayData.items.forEach(it => {
-      currentReceivingData[it.itemId] = {
-        received: it.received !== undefined && it.received !== null ? String(it.received) : "",
-        notes: it.notes || "",
-        cookName: it.cookName || "",
-        status: it.status || computeReceivingItemStatus(it.received, currentReceivingOrdered[it.itemId])
-      };
-
-      const existingInCatalog = Items.current.some(catalogIt => catalogIt.id === it.itemId);
-      if (!existingInCatalog && (it.isCustom || String(it.itemId).startsWith("custom_rec_") || it.itemName)) {
-        currentReceivingExtraItems.push({
-          id: it.itemId,
-          name: it.itemName,
-          unit: it.unit || "جرام",
-          category: it.category || "عام",
-          isCustom: true
-        });
-      }
-    });
-
+  if (dayData) {
     if (Array.isArray(dayData.removedItemIds)) {
       dayData.removedItemIds.forEach(id => currentReceivingRemovedIds.add(id));
+    } else if (dayData.meta && Array.isArray(dayData.meta.removedItemIds)) {
+      dayData.meta.removedItemIds.forEach(id => currentReceivingRemovedIds.add(id));
+    }
+
+    if (Array.isArray(dayData.items)) {
+      dayData.items.forEach(it => {
+        currentReceivingData[it.itemId] = {
+          received: it.received !== undefined && it.received !== null ? String(it.received) : "",
+          notes: it.notes || "",
+          cookName: it.cookName || "",
+          status: it.status || computeReceivingItemStatus(it.received, currentReceivingOrdered[it.itemId])
+        };
+
+        const existingInCatalog = Items.current.some(catalogIt => catalogIt.id === it.itemId);
+        if (!existingInCatalog && (it.isCustom || String(it.itemId).startsWith("custom_rec_") || it.itemName)) {
+          currentReceivingExtraItems.push({
+            id: it.itemId,
+            name: it.itemName,
+            unit: it.unit || "جرام",
+            category: it.category || "عام",
+            isCustom: true
+          });
+        }
+      });
     }
   }
 
@@ -571,8 +575,17 @@ function onRemoveReceivingItem(itemId, itemName) {
 
   showToast(`🗑️ تم استبعاد الصنف من استلام اليوم`);
   renderReceivingView();
-  saveLocalDebounced();
+  flushReceivingSave();
   updateSaveBarReceivingStatus();
+
+  // مزامنة فورية بالخلفية لضمان بقاء الاستبعاد وحفظه فوراً في Supabase
+  if (typeof SupaEngine !== "undefined" && typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) {
+    SupaEngine.saveDay({
+      date: currentReceivingDate,
+      branch: currentReceivingBranch,
+      removedItemIds: Array.from(currentReceivingRemovedIds)
+    }).catch(e => console.warn("Auto sync removed item error:", e));
+  }
 }
 
 function openAddReceivingItemModal(category) {

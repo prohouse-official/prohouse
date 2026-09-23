@@ -244,12 +244,29 @@ const SupaEngine = (() => {
 
   function mapMeta(m) {
     if (!m) return null;
+    let removedItemIds = [];
+    if (m.removed_item_ids) {
+      if (Array.isArray(m.removed_item_ids)) {
+        removedItemIds = m.removed_item_ids;
+      } else if (typeof m.removed_item_ids === "string") {
+        try { removedItemIds = JSON.parse(m.removed_item_ids); } catch(e){}
+      }
+    }
+    if ((!removedItemIds || !removedItemIds.length) && m.payments_report_link && typeof m.payments_report_link === "string" && m.payments_report_link.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(m.payments_report_link);
+        if (parsed && Array.isArray(parsed._removedItemIds)) {
+          removedItemIds = parsed._removedItemIds;
+        }
+      } catch(e){}
+    }
     return {
       date: m.date,
       branch: m.branch,
       employeeName: m.employee_name,
       salesReportLink: m.sales_report_link,
       paymentsReportLink: m.payments_report_link,
+      removedItemIds: Array.isArray(removedItemIds) ? removedItemIds : [],
       savedAt: m.saved_at,
       updatedAt: m.updated_at
     };
@@ -262,31 +279,76 @@ const SupaEngine = (() => {
       query(`day_meta?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`)
     ]);
 
+    const mappedMeta = meta && meta[0] ? mapMeta(meta[0]) : null;
+    const removedItemIds = (mappedMeta && Array.isArray(mappedMeta.removedItemIds)) ? mappedMeta.removedItemIds : [];
+
     return {
       date,
       branch,
-      meta: meta && meta[0] ? mapMeta(meta[0]) : null,
-      items: (entries || []).map(mapEntry)
+      meta: mappedMeta,
+      items: (entries || []).map(mapEntry),
+      removedItemIds: removedItemIds
     };
   }
 
   async function saveDay(payload) {
-    const { date, branch, items, employeeName, salesReportLink, paymentsReportLink } = payload;
+    const { date, branch, items, employeeName, salesReportLink, paymentsReportLink, removedItemIds } = payload;
+    const remIds = Array.isArray(removedItemIds) ? removedItemIds : [];
 
-    // حفظ أو تحديث الميتا
-    if (employeeName || salesReportLink || paymentsReportLink) {
+    // حفظ أو تحديث الميتا وقائمة الأصناف المستبعدة
+    let existingMetaRes = null;
+    try {
+      existingMetaRes = await query(`day_meta?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
+    } catch(e) {}
+
+    const existingMetaRow = (existingMetaRes && existingMetaRes[0]) || {};
+    let currentChecklist = {};
+    let paymentsLink = paymentsReportLink !== undefined ? paymentsReportLink : (existingMetaRow.payments_report_link || "");
+    if (paymentsLink && paymentsLink.startsWith("{")) {
+      try { currentChecklist = JSON.parse(paymentsLink); } catch(e){}
+    }
+
+    if (remIds.length > 0 || currentChecklist._removedItemIds) {
+      currentChecklist._removedItemIds = remIds;
+      paymentsLink = JSON.stringify(currentChecklist);
+    }
+
+    const metaBody = {
+      date,
+      branch,
+      employee_name: employeeName !== undefined ? employeeName : (existingMetaRow.employee_name || ""),
+      sales_report_link: salesReportLink !== undefined ? salesReportLink : (existingMetaRow.sales_report_link || ""),
+      payments_report_link: paymentsLink,
+      updated_at: new Date().toISOString()
+    };
+
+    if (existingMetaRow.hasOwnProperty("removed_item_ids") || remIds.length >= 0) {
+      metaBody.removed_item_ids = remIds;
+    }
+
+    try {
       await query("day_meta", {
         method: "POST",
         headers: { "Prefer": "resolution=merge-duplicates" },
-        body: JSON.stringify({
-          date,
-          branch,
-          employee_name: employeeName || "",
-          sales_report_link: salesReportLink || "",
-          payments_report_link: paymentsReportLink || "",
-          updated_at: new Date().toISOString()
-        })
+        body: JSON.stringify(metaBody)
       });
+    } catch (err) {
+      if (metaBody.removed_item_ids !== undefined) {
+        delete metaBody.removed_item_ids;
+        await query("day_meta", {
+          method: "POST",
+          headers: { "Prefer": "resolution=merge-duplicates" },
+          body: JSON.stringify(metaBody)
+        }).catch(e => console.warn("day_meta save retry error:", e));
+      }
+    }
+
+    // إزالة الأصناف المستبعدة نهائياً من daily_entries لهذا اليوم والفرع
+    if (remIds.length > 0) {
+      const idList = remIds.map(id => `"${encodeURIComponent(id)}"`).join(",");
+      await query(`daily_entries?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&item_id=in.(${idList})`, {
+        method: "DELETE"
+      }).catch(e => console.warn("delete removed daily_entries error:", e));
     }
 
     if (items && items.length) {
@@ -305,8 +367,7 @@ const SupaEngine = (() => {
         saved_at: new Date().toISOString()
       }));
 
-      // on_conflict: التحديث يصير على مفتاح (اليوم + الفرع + الصنف) — بدونه إعادة
-      // حفظ أي صنف كانت تفشل بخطأ duplicate key (409) والتعديلات بتضيع
+      // on_conflict: التحديث يصير على مفتاح (اليوم + الفرع + الصنف)
       await query("daily_entries?on_conflict=date,branch,item_id", {
         method: "POST",
         headers: { "Prefer": "resolution=merge-duplicates" },
@@ -317,10 +378,60 @@ const SupaEngine = (() => {
     return { date, branch, savedAt: new Date().toISOString() };
   }
 
-  // حفظ تقرير المتبقي: بيحدّث أعمدة المتبقي فقط على نفس صف اليوم —
-  // ما بيمسّ أرقام الاستلام المحفوظة (قبل هيك كان بيروح لحفظ الاستلام وبيصفّرها)
+  // حفظ تقرير المتبقي: بيحدّث أعمدة المتبقي فقط على نفس صف اليوم
   async function saveRemainingReport(payload) {
-    const { date, branch, items } = payload;
+    const { date, branch, items, removedItemIds } = payload;
+    const remIds = Array.isArray(removedItemIds) ? removedItemIds : [];
+
+    if (remIds.length > 0) {
+      // إزالة الأصناف المستبعدة من daily_entries لهذا اليوم والفرع
+      const idList = remIds.map(id => `"${encodeURIComponent(id)}"`).join(",");
+      await query(`daily_entries?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&item_id=in.(${idList})`, {
+        method: "DELETE"
+      }).catch(e => console.warn("delete remaining daily_entries error:", e));
+
+      // حفظ قائمة الاستبعاد في day_meta
+      try {
+        let existingMetaRes = await query(`day_meta?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
+        const existingMetaRow = (existingMetaRes && existingMetaRes[0]) || {};
+        let currentChecklist = {};
+        let paymentsLink = existingMetaRow.payments_report_link || "";
+        if (paymentsLink && paymentsLink.startsWith("{")) {
+          try { currentChecklist = JSON.parse(paymentsLink); } catch(e){}
+        }
+        currentChecklist._removedItemIds = remIds;
+
+        const metaBody = {
+          date,
+          branch,
+          employee_name: existingMetaRow.employee_name || "",
+          sales_report_link: existingMetaRow.sales_report_link || "",
+          payments_report_link: JSON.stringify(currentChecklist),
+          updated_at: new Date().toISOString()
+        };
+        if (existingMetaRow.hasOwnProperty("removed_item_ids") || remIds.length >= 0) {
+          metaBody.removed_item_ids = remIds;
+        }
+
+        try {
+          await query("day_meta", {
+            method: "POST",
+            headers: { "Prefer": "resolution=merge-duplicates" },
+            body: JSON.stringify(metaBody)
+          });
+        } catch(err) {
+          delete metaBody.removed_item_ids;
+          await query("day_meta", {
+            method: "POST",
+            headers: { "Prefer": "resolution=merge-duplicates" },
+            body: JSON.stringify(metaBody)
+          }).catch(e => console.warn("saveRemainingReport day_meta retry error:", e));
+        }
+      } catch(e) {
+        console.warn("saveRemainingReport day_meta error:", e);
+      }
+    }
+
     if (items && items.length) {
       await ensureItemsExist(items, branch);
       const rows = items.map(it => ({

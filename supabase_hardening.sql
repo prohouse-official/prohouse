@@ -16,11 +16,12 @@
 create extension if not exists pgcrypto;
 
 -- ==========================================================================
--- 1) أعمدة المتبقي الناقصة (كانت بتضيع القيم بسبب غيابها)
+-- 1) أعمدة المتبقي والاستبعاد الناقصة (كانت بتضيع القيم بسبب غيابها)
 -- ==========================================================================
 alter table daily_entries add column if not exists remaining numeric;
 alter table daily_entries add column if not exists remaining_weight numeric;
 alter table daily_entries add column if not exists remaining_sauce numeric;
+alter table day_meta add column if not exists removed_item_ids jsonb default '[]'::jsonb;
 
 -- ==========================================================================
 -- 2) إصلاح الأرقام السرية المزروعة

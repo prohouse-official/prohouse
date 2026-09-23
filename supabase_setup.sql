@@ -65,10 +65,12 @@ CREATE TABLE IF NOT EXISTS day_meta (
     employee_name TEXT,
     sales_report_link TEXT,
     payments_report_link TEXT,
+    removed_item_ids JSONB DEFAULT '[]'::jsonb,
     saved_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()),
     PRIMARY KEY (date, branch)
 );
+ALTER TABLE day_meta ADD COLUMN IF NOT EXISTS removed_item_ids JSONB DEFAULT '[]'::jsonb;
 
 -- 6. جدول طلبيات الغد (TomorrowOrders)
 CREATE TABLE IF NOT EXISTS tomorrow_orders (

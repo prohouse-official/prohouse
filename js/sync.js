@@ -72,6 +72,12 @@ const Sync = (() => {
       try {
         const result = await readFromSupabase(action, p);
         if (result !== undefined) {
+          const currentLocal = cacheGet(ck);
+          if (currentLocal && currentLocal.value && Array.isArray(currentLocal.value.removedItemIds) && currentLocal.value.removedItemIds.length > 0) {
+            if (result && (!result.removedItemIds || result.removedItemIds.length === 0)) {
+              result.removedItemIds = currentLocal.value.removedItemIds;
+            }
+          }
           cacheSet(ck, result);
           if (onFresh) onFresh(result);
           return result;
