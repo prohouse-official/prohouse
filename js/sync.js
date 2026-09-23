@@ -32,143 +32,76 @@ const Sync = (() => {
     localStorage.setItem("ph_cache:" + key, JSON.stringify({ value, fetchedAt: Date.now() }));
   }
 
-  const inFlightReads = new Map();
+  // ---- طلبات القراءة (GET) — دايماً من السيرفر ----
+  // ما في عرض من الكاش المحلي: كان يخلّي الجوال يعرض نسخة قديمة بدل البيانات المحفوظة فعلاً.
+  // cacheSet بيضل لأن شاشات تانية بتقرأ آخر نتيجة جابها السيرفر بنفس الجلسة.
+  async function readFromSupabase(action, p) {
+    switch (action) {
+      case "getItems": return await SupaEngine.getItems(p.all === "1");
+      case "getDay": return await SupaEngine.getDay(p.date, p.branch);
+      case "getTomorrowOrder": return await SupaEngine.getTomorrowOrder(p.date, p.branch);
+      case "getWasteReport": return await SupaEngine.getWasteReport(p.date, p.branch);
+      case "getJuices": return await SupaEngine.getJuices(p.all === "1");
+      case "getJuiceDay": return await SupaEngine.getJuiceDay(p.date, p.branch);
+      case "getSettings": return await SupaEngine.getSettings();
+      case "getEmployees": return await SupaEngine.getEmployees();
+      case "getSalesByCategory": return await SupaEngine.getSalesByCategory(p.start, p.end, p.branch);
+      case "getReport": return await SupaEngine.getReport(p.start, p.end, p.branch);
+      case "getDashboard": return await SupaEngine.getDashboard(p.date);
+      case "getFlaggedItems": return await SupaEngine.getFlaggedItems(p.start, p.end, (typeof Auth !== "undefined" && Auth.role && Auth.role() === "manager") ? Auth.branches() : null);
+      case "getRemainingReport": return await SupaEngine.getDay(p.date, p.branch);
+      case "getInspectionPhotos": return await SupaEngine.getInspectionPhotos(p.date, p.branch);
+      case "getChecklist": return await SupaEngine.getChecklist(p.date, p.branch);
+      default: return undefined;
+    }
+  }
 
-  // ---- طلبات القراءة (GET) — فائقة السرعة مع SupaEngine ----
+  function reportReadError(action, e) {
+    const offline = e.name === "AbortError" || e.name === "TypeError" || !navigator.onLine;
+    const msg = offline ? "ما في اتصال بالإنترنت" : String(e.message || e).replace(/^(Error:\s*)+/, "");
+    console.error("فشل قراءة " + action + ": " + msg);
+    lastReadError = { action, msg, at: Date.now() };
+    if (typeof showToast === "function") showToast("⚠ تعذّر جلب البيانات — " + msg);
+  }
+
   async function get(action, params, cacheKey, onFresh) {
     const ck = cacheKey || action;
-    const cached = cacheGet(ck);
+    const p = params || {};
 
-    // إذا كانت البيانات مخزنة محلياً بالكاش، اعرضها فوراً وبشكل فوري (0ms) للواجهة
-    if (cached && cached.value !== null && cached.value !== undefined) {
-      // نتحقق إذا كان المفتاح قيد الجلب بالخلفية أصلاً لتفادي تكرار الطلبات وتجميد الجوال
-      if (typeof SupaEngine !== "undefined" && typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) {
-        if (!inFlightReads.has(ck)) {
-          const bgPromise = (async () => {
-            try {
-              let result = null;
-              const p = params || {};
-              switch (action) {
-                case "getItems": result = await SupaEngine.getItems(p.all === "1"); break;
-                case "getDay": result = await SupaEngine.getDay(p.date, p.branch); break;
-                case "getTomorrowOrder": result = await SupaEngine.getTomorrowOrder(p.date, p.branch); break;
-                case "getWasteReport": result = await SupaEngine.getWasteReport(p.date, p.branch); break;
-                case "getJuices": result = await SupaEngine.getJuices(p.all === "1"); break;
-                case "getJuiceDay": result = await SupaEngine.getJuiceDay(p.date, p.branch); break;
-                case "getSettings": result = await SupaEngine.getSettings(); break;
-                case "getEmployees": result = await SupaEngine.getEmployees(); break;
-                case "getSalesByCategory": result = await SupaEngine.getSalesByCategory(p.start, p.end, p.branch); break;
-                case "getReport": result = await SupaEngine.getReport(p.start, p.end, p.branch); break;
-                case "getDashboard": result = await SupaEngine.getDashboard(p.date); break;
-                case "getFlaggedItems": result = await SupaEngine.getFlaggedItems(p.start, p.end, (typeof Auth !== "undefined" && Auth.role && Auth.role() === "manager") ? Auth.branches() : null); break;
-                case "getRemainingReport": result = await SupaEngine.getDay(p.date, p.branch); break;
-                case "getInspectionPhotos": result = await SupaEngine.getInspectionPhotos(p.date, p.branch); break;
-                case "getChecklist": result = await SupaEngine.getChecklist(p.date, p.branch); break;
-              }
-              if (result !== null) {
-                // حماية تامة لمدخلات المستخدم: لا نلغي أي بيانات عبأها المستخدم محلياً
-                const currentLocal = cacheGet(ck);
-                if (action === "getDay" && currentLocal && currentLocal.value && currentLocal.value.items) {
-                  const localFilled = currentLocal.value.items.filter(i => i.received !== "" && i.received != null);
-                  if (localFilled.length > 0 && (!result.items || result.items.length === 0)) {
-                    return; // الحفاظ على مدخلات المستخدم ومنع تصفيرها
-                  }
-                }
-                cacheSet(ck, result);
-                if (onFresh) onFresh(result);
-              }
-            } catch (e) {
-              /* تجاهل أخطاء التحديث بالخلفية */
-            } finally {
-              inFlightReads.delete(ck);
-            }
-          })();
-          inFlightReads.set(ck, bgPromise);
-        }
-      }
-      return cached.value;
-    }
-
-    // إذا كان متاحاً محرك Supabase، نستخدمه مباشرةً وتكون الاستجابة في بضع ملي ثوانٍ!
     if (typeof SupaEngine !== "undefined" && typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) {
-      let handled = true;
       try {
-        let result = null;
-        const p = params || {};
-        switch (action) {
-          case "getItems": result = await SupaEngine.getItems(p.all === "1"); break;
-          case "getDay": result = await SupaEngine.getDay(p.date, p.branch); break;
-          case "getTomorrowOrder": result = await SupaEngine.getTomorrowOrder(p.date, p.branch); break;
-          case "getWasteReport": result = await SupaEngine.getWasteReport(p.date, p.branch); break;
-          case "getJuices": result = await SupaEngine.getJuices(p.all === "1"); break;
-          case "getJuiceDay": result = await SupaEngine.getJuiceDay(p.date, p.branch); break;
-          case "getSettings": result = await SupaEngine.getSettings(); break;
-          case "getEmployees": result = await SupaEngine.getEmployees(); break;
-          case "getSalesByCategory": result = await SupaEngine.getSalesByCategory(p.start, p.end, p.branch); break;
-          case "getReport": result = await SupaEngine.getReport(p.start, p.end, p.branch); break;
-          case "getDashboard": result = await SupaEngine.getDashboard(p.date); break;
-          case "getFlaggedItems": result = await SupaEngine.getFlaggedItems(p.start, p.end, (typeof Auth !== "undefined" && Auth.role && Auth.role() === "manager") ? Auth.branches() : null); break;
-          case "getRemainingReport": result = await SupaEngine.getDay(p.date, p.branch); break;
-          case "getInspectionPhotos": result = await SupaEngine.getInspectionPhotos(p.date, p.branch); break;
-          case "getChecklist": result = await SupaEngine.getChecklist(p.date, p.branch); break;
-          default:
-            handled = false;
-            console.warn("Action not handled directly in SupaEngine:", action);
-        }
-
-        if (handled) {
+        const result = await readFromSupabase(action, p);
+        if (result !== undefined) {
           cacheSet(ck, result);
           if (onFresh) onFresh(result);
           return result;
         }
-      } catch (err) {
-        console.warn("SupaEngine get fallback:", action, err);
-        if (handled) {
-          if (cached && cached.value !== null && cached.value !== undefined) {
-            return cached.value;
-          }
-          return null;
-        }
-      }
-    }
-
-    // نطلق طلب التحديث بالخلفية بدون تعطيل واجهة المستخدم (مع Apps Script)
-    const fetchPromise = (async () => {
-      if (!API_URL) return null;
-      try {
-        const qs = new URLSearchParams({ action, token: Auth.getToken(), ...(params || {}) }).toString();
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), 30000);
-        const res = await fetch(API_URL + "?" + qs, { signal: controller.signal });
-        clearTimeout(t);
-        const json = await res.json();
-        if (!json.ok) {
-          if (isAuthError(json.error)) forceReLogin();
-          throw new Error(json.error || "server error");
-        }
-        cacheSet(ck, json.data);
-        if (onFresh) onFresh(json.data);
-        return json.data;
+        console.warn("Action not handled directly in SupaEngine:", action);
       } catch (e) {
-        const offline = e.name === "AbortError" || e.name === "TypeError" || !navigator.onLine;
-        if (!offline) {
-          const msg = String(e.message || e).replace(/^(Error:\s*)+/, "");
-          console.error("فشل قراءة " + action + ": " + msg);
-          lastReadError = { action, msg, at: Date.now() };
-          if (typeof showToast === "function") showToast("⚠ " + action + ": " + msg);
-        } else {
-          console.debug("Sync.get offline note:", action, e.message || e);
-        }
+        reportReadError(action, e);
         return null;
       }
-    })();
-
-    if (cached && cached.value !== null && cached.value !== undefined) {
-      return cached.value;
     }
 
-    const fresh = await fetchPromise;
-    return fresh !== null ? fresh : (cached ? cached.value : null);
+    if (!API_URL) return null;
+    try {
+      const qs = new URLSearchParams({ action, token: Auth.getToken(), ...p }).toString();
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 30000);
+      const res = await fetch(API_URL + "?" + qs, { signal: controller.signal });
+      clearTimeout(t);
+      const json = await res.json();
+      if (!json.ok) {
+        if (isAuthError(json.error)) forceReLogin();
+        throw new Error(json.error || "server error");
+      }
+      cacheSet(ck, json.data);
+      if (onFresh) onFresh(json.data);
+      return json.data;
+    } catch (e) {
+      reportReadError(action, e);
+      return null;
+    }
   }
 
   // ---- طلبات الكتابة (POST) — فائقة السرعة مع SupaEngine ----
@@ -304,6 +237,9 @@ const Sync = (() => {
       flushing = false;
     }
   }
+
+  // بيانات محفوظة من أيام الشغل بدون نت — ما عاد تنقرأ، فمنمسحها لحتى ما تاخد مساحة
+  clearReadCache();
 
   window.addEventListener("online", flushQueue);
   setInterval(flushQueue, 45000);

@@ -12,25 +12,14 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=5.0.0">
+<link rel="stylesheet" href="css/style.css?v=5.1.0">
 <script>
+// الشغل بدون نت انلغى: منشيل أي Service Worker قديم ومنمسح ملفاته لحتى الجهاز يجيب أحدث نسخة دايماً
 if ('serviceWorker' in navigator) {
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true;
-      window.location.reload();
-    }
-  });
-
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then((reg) => {
-      // فحص التحديث فوراً عند كل فتح للتطبيق
-      reg.update().catch(() => null);
-    }).catch(err => {
-      console.warn('Service Worker registration failed:', err);
-    });
-  });
+  navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+}
+if ('caches' in window) {
+  caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
 }
 </script>
 </head>
@@ -227,7 +216,7 @@ if ('serviceWorker' in navigator) {
     </div>
 
     <main class="app-main">
-      <div id="offlineBanner" class="offline-banner hidden">غير متصل بالإنترنت — بتشتغل ببيانات محفوظة محلياً وبتتزامن لما يرجع النت</div>
+      <div id="offlineBanner" class="offline-banner hidden">⚠ ما في اتصال بالإنترنت — ما رح تنحفظ ولا تنعرض بيانات لحد ما يرجع النت</div>
 
       <div id="dashboardView" class="view"></div>
       <div id="branchesView" class="view hidden"></div>
@@ -323,27 +312,27 @@ if ('serviceWorker' in navigator) {
 
 <div class="toast" id="toast"></div>
 
-<script src="js/config.js?v=5.0.0"></script>
-<script src="js/supabase-engine.js?v=5.0.0"></script>
-<script src="js/shared.js?v=5.0.0"></script>
-<script src="js/auth.js?v=5.0.0"></script>
-<script src="js/sync.js?v=5.0.0"></script>
-<script src="js/items.js?v=5.0.0"></script>
-<script src="js/camera.js?v=5.0.0"></script>
-<script src="js/branches.js?v=5.0.0"></script>
-<script src="js/receiving.js?v=5.0.0"></script>
-<script src="js/remaining.js?v=5.0.0"></script>
-<script src="js/waste.js?v=5.0.0"></script>
-<script src="js/users.js?v=5.0.0"></script>
-<script src="js/audit.js?v=5.0.0"></script>
-<script src="js/forecast.js?v=5.0.0"></script>
-<script src="js/tomorrow.js?v=5.0.0"></script>
-<script src="js/juices.js?v=5.0.0"></script>
-<script src="js/checklist.js?v=5.0.0"></script>
-<script src="js/report.js?v=5.0.0"></script>
-<script src="js/settings.js?v=5.0.0"></script>
-<script src="js/dashboard.js?v=5.0.0"></script>
-<script src="js/main.js?v=5.0.0"></script>
+<script src="js/config.js?v=5.1.0"></script>
+<script src="js/supabase-engine.js?v=5.1.0"></script>
+<script src="js/shared.js?v=5.1.0"></script>
+<script src="js/auth.js?v=5.1.0"></script>
+<script src="js/sync.js?v=5.1.0"></script>
+<script src="js/items.js?v=5.1.0"></script>
+<script src="js/camera.js?v=5.1.0"></script>
+<script src="js/branches.js?v=5.1.0"></script>
+<script src="js/receiving.js?v=5.1.0"></script>
+<script src="js/remaining.js?v=5.1.0"></script>
+<script src="js/waste.js?v=5.1.0"></script>
+<script src="js/users.js?v=5.1.0"></script>
+<script src="js/audit.js?v=5.1.0"></script>
+<script src="js/forecast.js?v=5.1.0"></script>
+<script src="js/tomorrow.js?v=5.1.0"></script>
+<script src="js/juices.js?v=5.1.0"></script>
+<script src="js/checklist.js?v=5.1.0"></script>
+<script src="js/report.js?v=5.1.0"></script>
+<script src="js/settings.js?v=5.1.0"></script>
+<script src="js/dashboard.js?v=5.1.0"></script>
+<script src="js/main.js?v=5.1.0"></script>
 
 </body>
 </html>
