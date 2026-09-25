@@ -3046,3 +3046,13 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .cook-name-row span{ font-size:13px; font-weight:900; white-space:nowrap; }
 .cook-name-row input{ flex:1; min-width:0; min-height:44px; font-size:16px; font-weight:800; border:1px solid var(--line-strong); border-radius:12px; padding:0 12px; background:#fff; font-family:inherit; }
 .cook-name-row input:focus{ outline:none; border-color:var(--yellow-dark); box-shadow:0 0 0 3px rgba(247,220,78,.35); }
+
+/* ==================== بطاقات الفروع بالرئيسية (سحب لليمين/اليسار) ==================== */
+.home-swiper{ display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; margin:0 -16px; padding:0 16px 4px; scrollbar-width:none; }
+.home-swiper::-webkit-scrollbar{ display:none; }
+.home-slide{ flex:0 0 88%; scroll-snap-align:center; }
+.home-slide:only-child{ flex-basis:100%; }
+.home-slide .day-steps-card{ margin-bottom:0; height:100%; }
+.home-dots{ display:flex; justify-content:center; gap:8px; margin:10px 0 16px; }
+.home-dot{ width:9px; height:9px; border-radius:999px; border:0; padding:0; background:var(--line-strong); cursor:pointer; transition:width .2s ease, background .2s ease; }
+.home-dot.active{ width:22px; background:var(--yellow-dark); }
