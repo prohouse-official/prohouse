@@ -344,6 +344,114 @@ function isOptionalItem(it) {
 function isChefSlot(it) {
   return isOptionalItem(it) && /الشيف\s*\d+\s*$/.test(String(it.name || ""));
 }
+const CHEF_SLOT_CATS = ["دجاج", "لحم", "بحري"];
+// صنف شيف = خانة شيف اختيارية، أو صنف ثابت اسمه "... الشيف 1" (لحم الشيف 1، سمك الشيف 1)
+function isChefItem(it) {
+  return !!(it && usesChefSlots(it.category) && /الشيف\s*\d+\s*$/.test(String(it.name || "")));
+}
+// "بيكانت" ← "دجاج بيكانت" (الاسم الكامل بينحفظ مع التصنيف)
+function normalizeCookName(category, name) {
+  const v = String(name || "").trim().replace(/\s+/g, " ");
+  if (!v) return "";
+  return v.startsWith(String(category || "").trim()) ? v : `${category} ${v}`;
+}
+
+// ذاكرة أسماء الطبخات: من السجل (آخر 120 يوم) + اللي بينكتب بهالجلسة
+const chefNameMemory = {};
+let chefNameMemoryLoaded = null;
+function rememberCookName(category, name) {
+  if (!category || !name) return;
+  (chefNameMemory[category] = chefNameMemory[category] || new Set()).add(name);
+}
+function loadChefNameMemory() {
+  if (chefNameMemoryLoaded) return chefNameMemoryLoaded;
+  chefNameMemoryLoaded = (typeof SupaEngine !== "undefined" && SupaEngine.getRecentCookNames
+    ? SupaEngine.getRecentCookNames().then(rows => rows.forEach(r => {
+        const it = Items.byId(r.itemId);
+        if (it) rememberCookName(it.category, normalizeCookName(it.category, r.cookName));
+      }))
+    : Promise.resolve()).catch(() => {});
+  return chefNameMemoryLoaded;
+}
+function chefNameDatalistHtml(category) {
+  const id = "chefdl-" + CHEF_SLOT_CATS.indexOf(category);
+  const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  return `<datalist id="${id}">${chefDishOptions(category).map(n => `<option value="${esc(n)}"></option>`).join("")}</datalist>`;
+}
+function usesChefSlots(category) { return CHEF_SLOT_CATS.includes(String(category || "").trim()); }
+
+function chefSlotsFor(category, branch) {
+  return (Items.current || [])
+    .filter(it => it.category === category && isChefSlot(it))
+    .filter(it => { const b = itemBranches(it); return !b.length || !branch || b.includes(branch); })
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "ar", { numeric: true }));
+}
+
+// أسماء الطبخات اللي انسجلت قبل بهالتصنيف (دجاج بيكانت، بالكريمة، تكا…)
+function chefDishOptions(category, extraNames) {
+  const names = new Set();
+  (Items.current || []).forEach(it => {
+    if (it.category !== category || !isOptionalItem(it) || isChefSlot(it) || /الشيف/.test(it.name)) return;
+    names.add(String(it.name).trim());
+  });
+  (extraNames || []).forEach(n => { if (n && String(n).trim().startsWith(category)) names.add(String(n).trim()); });
+  (chefNameMemory[category] || []).forEach(n => names.add(n));
+  return Array.from(names).sort((a, b) => a.localeCompare(b, "ar"));
+}
+
+function focusEntryById(id) {
+  const inp = document.getElementById(id);
+  if (inp) { inp.scrollIntoView({ block: "center", behavior: "smooth" }); inp.focus({ preventScroll: true }); }
+}
+
+// نافذة اختيار الطبخة: بتعبّي أول خانة شيف فاضية (1 ثم 2 ثم 3)
+async function openChefPicker({ category, branch, isUsed, extraNames, onPick }) {
+  await loadChefNameMemory();
+  const slots = chefSlotsFor(category, branch);
+  const free = slots.filter(it => !isUsed(it.id));
+  if (!free.length) {
+    phAlert(slots.length ? `كل خانات ${category} الشيف (${slots.length}) مستخدمة.` : `ما فيه خانات شيف لتصنيف ${category}.`);
+    return;
+  }
+  const slot = free[0];
+  const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const options = chefDishOptions(category, extraNames);
+  const wrap = document.createElement("div");
+  wrap.className = "ph-dialog";
+  wrap.innerHTML = `
+    <div class="ph-dialog-card chef-picker" role="dialog" aria-modal="true">
+      <img class="ph-dialog-logo" src="assets/logo.png" alt="">
+      <div class="ph-dialog-title">➕ ${esc(slot.name)}</div>
+      <div class="ph-dialog-msg">اختار الطبخة:</div>
+      <div class="chef-picker-list">
+        ${options.map(n => `<button type="button" class="chef-opt" data-name="${esc(n)}">${esc(n)}</button>`).join("")}
+        <button type="button" class="chef-opt plain" data-name="">${esc(slot.name)} (بدون اسم)</button>
+      </div>
+      <input class="ph-dialog-input chef-new" type="text" inputmode="text" placeholder="أو اكتب اسم طبخة جديدة">
+      <div class="ph-dialog-actions">
+        <button type="button" class="ph-dialog-ok chef-add-new">إضافة</button>
+        <button type="button" class="ph-dialog-cancel">إلغاء</button>
+      </div>
+    </div>`;
+  const close = () => { wrap.classList.add("closing"); setTimeout(() => wrap.remove(), 160); };
+  const pick = (name) => {
+    close();
+    const full = normalizeCookName(category, name);
+    rememberCookName(category, full);
+    onPick(slot, full);
+  };
+  wrap.querySelectorAll(".chef-opt").forEach(b => b.addEventListener("click", () => pick(b.dataset.name)));
+  wrap.querySelector(".chef-add-new").addEventListener("click", () => {
+    const v = wrap.querySelector(".chef-new").value.trim();
+    if (!v) { showToast("اكتب اسم الطبخة أو اختار من القائمة"); return; }
+    pick(v);
+  });
+  wrap.querySelector(".ph-dialog-cancel").addEventListener("click", close);
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+  document.body.appendChild(wrap);
+  requestAnimationFrame(() => wrap.classList.add("open"));
+}
+
 // "دجاج الشيف 1" + "دجاج بيكانت" ← "دجاج الشيف 1 (بيكانت)"
 function chefSlotName(it, cookName) {
   const dish = String(cookName || "").trim();

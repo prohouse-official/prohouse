@@ -5,6 +5,7 @@ let currentReceivingBranch = "";
 let currentReceivingData = {}; // itemId -> { received, notes, status, cookName }
 let currentReceivingOrdered = {}; // itemId -> orderedQty from yesterday's production order
 let currentReceivingExtraItems = []; // [{ id, name, unit, category, isCustom: true }]
+let currentReceivingAddedIds = new Set(); // خانات الشيف اللي انضافت من شاشة الاستلام
 let currentReceivingRemovedIds = new Set(); // set of removed item ids
 let isReceivingSaving = false;
 let receivingActiveFilter = "all"; // 'all', 'unreceived', 'mismatch'
@@ -22,7 +23,7 @@ const receivingAutosave = createAutosaver({
       const d = currentReceivingData[it.id];
       if (!d || blank(d.received)) return false;
       const base = receivingBaseline[it.id] || {};
-      return String(d.received) !== String(base.received ?? "") || String(d.notes || "") !== String(base.notes || "");
+      return String(d.received) !== String(base.received ?? "") || String(d.notes || "") !== String(base.notes || "") || String(d.cookName || "") !== String(base.cookName || "");
     });
     const items = changed.map(it => {
       const d = currentReceivingData[it.id];
@@ -34,7 +35,7 @@ const receivingAutosave = createAutosaver({
     return {
       date, branch, items,
       payload: { date, branch, employeeName: emp ? emp.name : "", items, removedItemIds: Array.from(currentReceivingRemovedIds) },
-      commit() { items.forEach(i => { receivingBaseline[i.itemId] = { received: i.received, notes: i.notes }; }); }
+      commit() { items.forEach(i => { receivingBaseline[i.itemId] = { received: i.received, notes: i.notes, cookName: i.cookName }; }); }
     };
   },
   send: (job) => Sync.postOnce("saveDay", job.payload),
@@ -60,7 +61,7 @@ async function loadReceivingData(date, branch) {
   const view = document.getElementById("receivingView");
   if (view) view.innerHTML = '<div class="loader"><div class="spinner"></div> جاري تحميل بيانات تقرير الاستلام…</div>';
 
-  await Items.load();
+  await Promise.all([Items.load(), loadChefNameMemory()]);
 
   // 1) جلب كمية الطلب المعتمدة ليوم date من طلبية أمس (T-1)
   const requested = await loadRequestedOrder(currentReceivingDate, currentReceivingBranch);
@@ -71,6 +72,7 @@ async function loadReceivingData(date, branch) {
   const dayData = await Sync.get("getDay", { date: currentReceivingDate, branch: currentReceivingBranch }, "day:" + currentReceivingDate + ":" + currentReceivingBranch);
   currentReceivingData = {};
   currentReceivingExtraItems = [];
+  currentReceivingAddedIds = new Set();
   currentReceivingRemovedIds = new Set();
   receivingBaseline = {};
   receivingDataKey = { date: currentReceivingDate, branch: currentReceivingBranch };
@@ -90,7 +92,7 @@ async function loadReceivingData(date, branch) {
           cookName: it.cookName || "",
           status: it.status || computeReceivingItemStatus(it.received, currentReceivingOrdered[it.itemId])
         };
-        receivingBaseline[it.itemId] = { received: currentReceivingData[it.itemId].received, notes: currentReceivingData[it.itemId].notes };
+        receivingBaseline[it.itemId] = { received: currentReceivingData[it.itemId].received, notes: currentReceivingData[it.itemId].notes, cookName: currentReceivingData[it.itemId].cookName };
 
         const existingInCatalog = Items.current.some(catalogIt => catalogIt.id === it.itemId);
         if (!existingInCatalog && (it.isCustom || String(it.itemId).startsWith("custom_rec_") || it.itemName)) {
@@ -147,12 +149,12 @@ function getAllReceivingActiveItems() {
     if (isOptionalItem(it)) {
       const d = currentReceivingData[it.id];
       const hasReceived = d && d.received !== "" && Number(d.received) > 0;
-      return hasReceived || currentReceivingOrdered[it.id] !== undefined;
+      return hasReceived || currentReceivingOrdered[it.id] !== undefined || currentReceivingAddedIds.has(it.id);
     }
     return true;
   }).map(it => {
     const d = currentReceivingData[it.id];
-    return isChefSlot(it) && d && d.cookName ? { ...it, name: chefSlotName(it, d.cookName) } : it;
+    return isChefItem(it) && d && d.cookName ? { ...it, name: chefSlotName(it, d.cookName) } : it;
   });
 
   const extraItems = currentReceivingExtraItems.filter(it => !currentReceivingRemovedIds.has(it.id));
@@ -395,6 +397,16 @@ function renderReceivingView() {
             </div>
           </div>
 
+          ${(() => {
+            const def = Items.byId(it.id);
+            if (!isChefItem(def)) return "";
+            const v = String(recData.cookName || "").replace(new RegExp("^" + def.category + "\\s+"), "");
+            return `<label class="cook-name-row">
+              <span>🍳 اسم الطبخة</span>
+              <input type="text" list="chefdl-${CHEF_SLOT_CATS.indexOf(def.category)}" value="${v.replace(/"/g, "&quot;")}" placeholder="اكتب أو اختار (مثلاً: بيكانت)"
+                     onchange="onReceivingCookNameChange('${it.id}', this.value)">
+            </label>`;
+          })()}
           <!-- سطر الإدخال المخصص للجوال (Touch Input Row) -->
           <div class="rec-input-action-row">
             <div class="rec-input-wrapper">
@@ -442,13 +454,13 @@ function renderReceivingView() {
 
     // زر إضافة صنف تحت كل قسم
     html += `
-        <button type="button" class="rec-add-item-btn" onclick="openAddReceivingItemModal('${String(cat).replace(/'/g, "\\'")}')">
-          ➕ إضافة صنف في قسم (${cat})
+        <button type="button" class="rec-add-item-btn" onclick="${usesChefSlots(cat) ? "openReceivingChefPicker" : "openAddReceivingItemModal"}('${String(cat).replace(/'/g, "\\'")}')">
+          ➕ ${usesChefSlots(cat) ? "إضافة صنف " + cat : "إضافة صنف في قسم (" + cat + ")"}
         </button>
       </div></div></div>`;
   });
 
-  view.innerHTML = html;
+  view.innerHTML = html + CHEF_SLOT_CATS.map(chefNameDatalistHtml).join("");
   filterReceivingCardsUI();
   updateEntryProgress(view);
 }
@@ -911,4 +923,36 @@ async function saveReceivingReportData() {
     isReceivingSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 حفظ تقرير الاستلام"; }
   }, 800);
+}
+
+
+// خانات الشيف من شاشة الاستلام (نفس خيارات طلبية الغد)
+function openReceivingChefPicker(category) {
+  const shown = new Set(getAllReceivingActiveItems().map(it => it.id));
+  openChefPicker({
+    category,
+    branch: currentReceivingBranch,
+    isUsed: (id) => shown.has(id),
+    extraNames: Object.values(currentReceivingData).map(d => d && d.cookName),
+    onPick(slot, name) {
+      currentReceivingAddedIds.add(slot.id);
+      currentReceivingData[slot.id] = { ...(currentReceivingData[slot.id] || { received: "", notes: "", status: "لم يصل" }), cookName: name };
+      renderReceivingView();
+      focusEntryById("recinput-" + slot.id);
+    }
+  });
+}
+
+
+function onReceivingCookNameChange(itemId, value) {
+  const def = Items.byId(itemId);
+  if (!def) return;
+  const full = normalizeCookName(def.category, value);
+  if (!currentReceivingData[itemId]) currentReceivingData[itemId] = { received: "", notes: "", cookName: "", status: "لم يصل" };
+  currentReceivingData[itemId].cookName = full;
+  rememberCookName(def.category, full);
+  const card = document.querySelector(`.receiving-item-card[data-item-id="${itemId}"] .rec-item-name`);
+  if (card) card.textContent = chefSlotName(def, full);
+  flushReceivingSave();
+  updateSaveBarReceivingStatus();
 }

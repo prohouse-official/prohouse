@@ -13,7 +13,6 @@ let tomorrowActiveFilter = "all"; // 'all', 'unfilled', 'protein', 'sauce'
 let currentTomorrowExtraItems = [];
 let currentTomorrowRemovedIds = new Set();
 let currentTomorrowAddedIds = new Set(); // خانات الشيف/الطبخات اللي انضافت لطلبية هاليوم
-const CHEF_SLOT_CATS = ["دجاج", "لحم", "بحري"];
 
 function getAllTomorrowActiveItems() {
   const branch = currentTomorrowBranch || Branch.get();
@@ -25,7 +24,7 @@ function getAllTomorrowActiveItems() {
     if (branches.length && branch && !branches.includes(branch)) return;
     if (isOptionalItem(it) && !currentTomorrowAddedIds.has(it.id) && !currentTomorrowOrder[it.id]) return;
     const ord = currentTomorrowOrder[it.id];
-    itemsMap.set(it.id, isChefSlot(it) && ord && ord.cookName ? { ...it, name: chefSlotName(it, ord.cookName) } : { ...it });
+    itemsMap.set(it.id, isChefItem(it) && ord && ord.cookName ? { ...it, name: chefSlotName(it, ord.cookName) } : { ...it });
   });
 
   // 2. الأصناف المستلمة اليوم من الاستلام (تشمل أي صنف إضافي أضافه الشيف أو الفرع)
@@ -295,6 +294,16 @@ function renderTomorrowView() {
           </div>
         </div>
 
+        ${(() => {
+          const def = Items.byId(item.id);
+          if (!isChefItem(def)) return "";
+          const v = String(entry.cookName || "").replace(new RegExp("^" + def.category + "\\s+"), "");
+          return `<label class="cook-name-row">
+            <span>🍳 اسم الطبخة</span>
+            <input type="text" list="chefdl-${CHEF_SLOT_CATS.indexOf(def.category)}" value="${v.replace(/"/g, "&quot;")}" placeholder="اكتب أو اختار" ${ro}
+                   onchange="onTomorrowCookNameChange('${item.id}', this.value)">
+          </label>`;
+        })()}
         <!-- مصفوفة الوضع التشغيلي اليومي -->
         <div class="tom-matrix-row">
           <div class="tom-matrix-cell">
@@ -368,6 +377,7 @@ function renderTomorrowView() {
     });
   }
 
+  view.insertAdjacentHTML("beforeend", CHEF_SLOT_CATS.map(chefNameDatalistHtml).join(""));
   currentTomorrowGroups = groups;
   filterTomorrowCardsUI();
 }
@@ -549,6 +559,7 @@ async function loadTomorrowOrder(dateStr) {
 
   const view = document.getElementById("tomorrowView");
   if (view) view.innerHTML = '<div class="loader"><div class="spinner"></div> جاري تحميل بيانات اليوم واقتراحات المطبخ…</div>';
+  loadChefNameMemory();
   currentTomorrowOrder = {};
   currentTomorrowAddedIds = new Set();
 
@@ -902,27 +913,6 @@ async function renderWeekdayAverage(el, date, branch) {
 }
 
 
-// ---- خانات الشيف: اختيار الطبخة ----
-function chefSlotsFor(category) {
-  const branch = currentTomorrowBranch || Branch.get();
-  return (Items.current || [])
-    .filter(it => it.category === category && isChefSlot(it))
-    .filter(it => { const b = itemBranches(it); return !b.length || !branch || b.includes(branch); })
-    .sort((a, b) => String(a.name).localeCompare(String(b.name), "ar", { numeric: true }));
-}
-
-// أسماء الطبخات اللي انسجلت قبل بهالتصنيف (دجاج بيكانت، بالكريمة، تكا…)
-function chefDishOptions(category) {
-  const names = new Set();
-  (Items.current || []).forEach(it => {
-    if (it.category !== category || !isOptionalItem(it) || isChefSlot(it)) return;
-    if (/الشيف/.test(it.name)) return;
-    names.add(String(it.name).trim());
-  });
-  Object.values(currentTomorrowOrder).forEach(o => { if (o && o.cookName) names.add(o.cookName); });
-  return Array.from(names).sort((a, b) => a.localeCompare(b, "ar"));
-}
-
 function chefSlotSuggestion(category, groupItems) {
   const avg = (typeof weekdayAvgGrams === "function") ? weekdayAvgGrams(currentTomorrowDate, currentTomorrowBranch) : null;
   if (!avg || !avg[category]) return null;
@@ -946,51 +936,31 @@ function chefSlotSuggestion(category, groupItems) {
 
 function openChefSlotPicker(category) {
   if (Auth.isViewOnlyTomorrow()) return;
-  const slots = chefSlotsFor(category);
-  const free = slots.filter(it => !currentTomorrowAddedIds.has(it.id) && !currentTomorrowOrder[it.id]);
-  if (!free.length) {
-    phAlert(slots.length ? `كل خانات ${category} الشيف (${slots.length}) مستخدمة بهالطلبية.` : `ما فيه خانات شيف لتصنيف ${category}.`);
-    return;
-  }
-  const slot = free[0];
-  const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const options = chefDishOptions(category);
-  const wrap = document.createElement("div");
-  wrap.className = "ph-dialog";
-  wrap.innerHTML = `
-    <div class="ph-dialog-card chef-picker" role="dialog" aria-modal="true">
-      <img class="ph-dialog-logo" src="assets/logo.png" alt="">
-      <div class="ph-dialog-title">➕ ${esc(slot.name)}</div>
-      <div class="ph-dialog-msg">اختار الطبخة:</div>
-      <div class="chef-picker-list">
-        ${options.map(n => `<button type="button" class="chef-opt" data-name="${esc(n)}">${esc(n)}</button>`).join("")}
-        <button type="button" class="chef-opt plain" data-name="">${esc(slot.name)} (بدون اسم)</button>
-      </div>
-      <input class="ph-dialog-input chef-new" type="text" inputmode="text" placeholder="أو اكتب اسم طبخة جديدة">
-      <div class="ph-dialog-actions">
-        <button type="button" class="ph-dialog-ok chef-add-new">إضافة</button>
-        <button type="button" class="ph-dialog-cancel">إلغاء</button>
-      </div>
-    </div>`;
-  const close = () => { wrap.classList.add("closing"); setTimeout(() => wrap.remove(), 160); };
-  const pick = (name) => {
-    close();
-    currentTomorrowAddedIds.add(slot.id);
-    currentTomorrowOrder[slot.id] = { qty: "", notes: "", cookName: String(name || "").trim() };
-    tomorrowCategoryCollapsed[category] = false;
-    renderTomorrowView();
-    saveTomorrowNow(false);
-    const inp = document.getElementById("tominput-" + slot.id);
-    if (inp) { inp.scrollIntoView({ block: "center", behavior: "smooth" }); inp.focus({ preventScroll: true }); }
-  };
-  wrap.querySelectorAll(".chef-opt").forEach(b => b.addEventListener("click", () => pick(b.dataset.name)));
-  wrap.querySelector(".chef-add-new").addEventListener("click", () => {
-    const v = wrap.querySelector(".chef-new").value.trim();
-    if (!v) { showToast("اكتب اسم الطبخة أو اختار من القائمة"); return; }
-    pick(v.startsWith(category) ? v : `${category} ${v}`);
+  openChefPicker({
+    category,
+    branch: currentTomorrowBranch || Branch.get(),
+    isUsed: (id) => currentTomorrowAddedIds.has(id) || !!currentTomorrowOrder[id],
+    extraNames: Object.values(currentTomorrowOrder).map(o => o && o.cookName),
+    onPick(slot, name) {
+      currentTomorrowAddedIds.add(slot.id);
+      currentTomorrowOrder[slot.id] = { qty: "", notes: "", cookName: name };
+      tomorrowCategoryCollapsed[category] = false;
+      renderTomorrowView();
+      saveTomorrowNow(false);
+      focusEntryById("tominput-" + slot.id);
+    }
   });
-  wrap.querySelector(".ph-dialog-cancel").addEventListener("click", close);
-  wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
-  document.body.appendChild(wrap);
-  requestAnimationFrame(() => wrap.classList.add("open"));
+}
+
+
+function onTomorrowCookNameChange(itemId, value) {
+  const def = Items.byId(itemId);
+  if (!def || Auth.isViewOnlyTomorrow()) return;
+  const full = normalizeCookName(def.category, value);
+  if (!currentTomorrowOrder[itemId]) currentTomorrowOrder[itemId] = { qty: "", notes: "", cookName: "" };
+  currentTomorrowOrder[itemId].cookName = full;
+  rememberCookName(def.category, full);
+  const title = document.querySelector(`#tomcard-${itemId} .rec-item-name`);
+  if (title) title.textContent = chefSlotName(def, full);
+  scheduleTomorrowAutoSave();
 }
