@@ -283,7 +283,7 @@ async function startApp() {
   updateOfflineBanner();
   updateSyncBadge({ pending: Sync.getQueue().length });
   loadSettings();
-  await Items.load();
+  await Promise.all([Items.load(), ActiveBranches.refresh()]);
   initReceivingTab();
   initRemainingTab();
   initDashboardTab();

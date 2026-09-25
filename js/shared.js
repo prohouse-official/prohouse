@@ -44,11 +44,64 @@ function mealsCount(grams) {
   return (n / MEAL_WEIGHT_G).toFixed(1);
 }
 
+// ---- الفروع الشغّالة فعلياً (سجّلت استلام آخر 14 يوم) ----
+const ActiveBranches = {
+  KEY: "ph_active_branches",
+  list() {
+    try { return JSON.parse(localStorage.getItem(this.KEY)) || []; } catch (e) { return []; }
+  },
+  async refresh() {
+    if (typeof SupaEngine === "undefined" || typeof SUPABASE_URL === "undefined" || !SUPABASE_URL) return;
+    try {
+      const since = addDaysStr(todayStr(), -14);
+      localStorage.setItem(this.KEY, JSON.stringify(await SupaEngine.getActiveBranches(since)));
+    } catch (e) { /* منضل على آخر قائمة معروفة */ }
+  }
+};
+
+// الفروع المسموحة بدون الفروع اللي ما عم تستعمل النظام (إذا ما عرفنا مين شغّال، منرجع الكل)
+function workingBranchList() {
+  const allowed = allowedBranchList();
+  const active = ActiveBranches.list().filter(b => allowed.includes(b));
+  return active.length ? active : allowed;
+}
+
 // ---- الفرع الحالي ----
+// آخر فرع اختاره المستخدم، بس إذا كان فرع مش شغّال منفتح على فرع شغّال بدالو
 const Branch = {
-  get() { return localStorage.getItem("ph_branch") || ""; },
+  get() {
+    const saved = localStorage.getItem("ph_branch") || "";
+    const working = workingBranchList();
+    if (saved && working.includes(saved)) return saved;
+    return working[0] || saved;
+  },
   set(name) { localStorage.setItem("ph_branch", name); }
 };
+
+// ---- حماية من مسح أرقام محفوظة بالغلط ----
+// قبل الحفظ منقارن مع اللي عالسيرفر: إذا صنف إلو رقم محفوظ ورح ينحفظ فاضي/صفر، منسأل أول
+async function confirmNoDataLoss(kind, date, branch, itemsPayload) {
+  if (typeof SupaEngine === "undefined" || typeof SUPABASE_URL === "undefined" || !SUPABASE_URL) return true;
+  let server;
+  try { server = await SupaEngine.getDay(date, branch); } catch (e) { return true; }
+  const byId = new Map(((server && server.items) || []).map(r => [r.itemId, r]));
+  const isBlank = (v) => v === "" || v === null || v === undefined;
+  const lost = [];
+  itemsPayload.forEach(it => {
+    const row = byId.get(it.itemId);
+    if (!row) return;
+    if (kind === "received") {
+      const old = Number(row.received) || 0;
+      if (old > 0 && (isBlank(it.received) || Number(it.received) === 0)) lost.push(`• ${it.itemName}: ${old} ← 0`);
+    } else {
+      const old = [row.remainingWeight, row.remaining, row.remainingSauce].find(v => !isBlank(v));
+      if (!isBlank(old) && isBlank(it.remaining) && isBlank(it.remainingWeight) && isBlank(it.remainingSauce)) lost.push(`• ${it.itemName}: ${old} ← فاضي`);
+    }
+  });
+  if (!lost.length) return true;
+  const sample = lost.slice(0, 4).join("\n") + (lost.length > 4 ? "\n…" : "");
+  return confirm(`⚠️ انتبه: الحفظ رح يمسح أرقام محفوظة لـ ${lost.length} صنف:\n${sample}\n\nإذا الشاشة عم تعرض أصفار بالغلط، اكبس "إلغاء" وحدّث الصفحة.\nمتأكد بدك تحفظ؟`);
+}
 
 function branchList() {
   const raw = (typeof currentSettings !== "undefined" && currentSettings.branches) || DEFAULT_BRANCHES_FALLBACK;

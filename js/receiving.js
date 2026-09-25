@@ -793,6 +793,13 @@ async function saveReceivingReportData() {
     savedAt: new Date().toISOString()
   };
 
+  if (!(await confirmNoDataLoss("received", payload.date, payload.branch, itemsPayload))) {
+    isReceivingSaving = false;
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 حفظ تقرير الاستلام"; }
+    showToast("تم إلغاء الحفظ — الأرقام المحفوظة ما انمسّت");
+    return;
+  }
+
   Sync.cacheSet("day:" + currentReceivingDate + ":" + currentReceivingBranch, { 
     date: currentReceivingDate, 
     branch: currentReceivingBranch, 
