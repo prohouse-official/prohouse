@@ -97,23 +97,41 @@ function normalizeArabic(s) {
   return String(s || "").replace(/[إأآ]/g, "ا").trim();
 }
 
-// إرسال لـ Supabase: إذا كانت مفاتيح supabaseUrl/supabaseToken موجودة
-// بـ config.json بينبعث الملف نفسه للنظام الجديد كمان
-async function sendToSupabase(rpcName, iso, branch, rows, customUrl, customToken) {
-  const finalUrl = customUrl || config.supabaseUrl;
-  const finalToken = customToken || config.supabaseToken;
-  if (!finalUrl || !finalToken) return false;
-  const url = String(finalUrl).replace(/\/$/, "") + "/rest/v1/rpc/" + rpcName;
-  const anonKey = config.supabaseAnonKey || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhZHRpbmZkd3Vjd3J4bG13eG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NTM4MDgsImV4cCI6MjEwNTEyOTgwOH0.jMtjOIBQIuv0N0Q4ms9LJ5ys3h3lfakND4pVQXNbU2w";
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": anonKey,
-      "Authorization": "Bearer " + anonKey
-    },
-    body: JSON.stringify({ p_token: finalToken, p_date: iso, p_branch: branch, p_rows: rows })
-  });
+// إرسال لـ Supabase.
+// على GitHub Actions: منستعمل هوية التشغيل الموقّعة من GitHub (OIDC) — ما في أي مفتاح سري بالكود.
+// تشغيل محلي: بيحتاج supabaseToken بـ config.json (ما في قيمة افتراضية بالكود).
+const SUPA_URL_DEFAULT = "https://sadtinfdwucwrxlmwxov.supabase.co";
+const ANON_KEY_DEFAULT = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhZHRpbmZkd3Vjd3J4bG13eG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NTM4MDgsImV4cCI6MjEwNTEyOTgwOH0.jMtjOIBQIuv0N0Q4ms9LJ5ys3h3lfakND4pVQXNbU2w";
+let oidcCache = null;
+async function githubOidcToken() {
+  const url = process.env.ACTIONS_ID_TOKEN_REQUEST_URL, bearer = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+  if (!url || !bearer) return null;
+  if (oidcCache && oidcCache.exp > Date.now() + 60000) return oidcCache.value;
+  const res = await fetch(url + "&audience=prohouse-ingest", { headers: { Authorization: "bearer " + bearer } });
+  if (!res.ok) throw new Error("GitHub OIDC [" + res.status + "]");
+  const value = (await res.json()).value;
+  oidcCache = { value, exp: Date.now() + 4 * 60 * 1000 };
+  return value;
+}
+
+async function sendToSupabase(rpcName, iso, branch, rows) {
+  const base = String(config.supabaseUrl || SUPA_URL_DEFAULT).replace(/\/$/, "");
+  const anonKey = config.supabaseAnonKey || ANON_KEY_DEFAULT;
+  const headers = { "Content-Type": "application/json", "apikey": anonKey, "Authorization": "Bearer " + anonKey };
+  const oidc = await githubOidcToken();
+  let res;
+  if (oidc) {
+    res = await fetch(base + "/functions/v1/tabsense-ingest", {
+      method: "POST", headers: { ...headers, "x-github-oidc": oidc },
+      body: JSON.stringify({ rpc: rpcName, date: iso, branch, rows })
+    });
+  } else {
+    if (!config.supabaseToken) throw new Error("ما في supabaseToken بـ config.json (تشغيل محلي)");
+    res = await fetch(base + "/rest/v1/rpc/" + rpcName, {
+      method: "POST", headers,
+      body: JSON.stringify({ p_token: config.supabaseToken, p_date: iso, p_branch: branch, p_rows: rows })
+    });
+  }
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     throw new Error("Supabase " + rpcName + " فشل [" + res.status + "]: " + t.slice(0, 200));
@@ -288,9 +306,7 @@ async function run() {
       const productRows = products.filter(p => p.name && p.qty > 0);
       if (productRows.length) {
         try {
-          await sendToSupabase("import_product_sales", iso, BRANCH, productRows,
-            config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co",
-            config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36");
+          await sendToSupabase("import_product_sales", iso, BRANCH, productRows);
           console.log(`🧾 تم حفظ مبيعات ${productRows.length} منتج ليوم ${iso}.`);
         } catch (prodErr) {
           console.warn("⚠ تعذر حفظ مبيعات المنتجات:", prodErr.message);
@@ -340,9 +356,7 @@ async function run() {
         await prepareReportPageAndSetDate(page, MODIFIER_REPORT_URL, display);
         const modifierRows = await extractModifierRows(page);
         if (modifierRows.length) {
-          await sendToSupabase("import_modifier_sales", iso, BRANCH, modifierRows,
-            config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co",
-            config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36");
+          await sendToSupabase("import_modifier_sales", iso, BRANCH, modifierRows);
           const grams = modifierGramsByCategory(modifierRows);
           Object.entries(grams).forEach(([cat, g]) => {
             const meals = Math.round((g / MEAL_WEIGHT_G) * 100) / 100;
@@ -379,11 +393,9 @@ async function run() {
         }
 
         // نفس البيانات للنظام الجديد (Supabase)
-        const supaUrl = config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co";
-        const supaToken = config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36";
         // تقرير تابسنس لفرع واحد، فما منكتبه لغير فرعه
         try {
-          await sendToSupabase("import_sales", iso, BRANCH, mappedRows, supaUrl, supaToken);
+          await sendToSupabase("import_sales", iso, BRANCH, mappedRows);
           console.log(`☁️ تم تحديث مبيعات التصنيفات على Supabase لفرع ${BRANCH}.`);
         } catch (supaErr) {
           console.warn(`⚠ تعذر تحديث Supabase (مبيعات التصنيفات لفرع ${BRANCH}):`, supaErr.message);
@@ -396,9 +408,7 @@ async function run() {
         const paymentRows = await extractPaymentRows(page);
         console.log(`💳 طرق الدفع ليوم ${iso}:`, paymentRows);
         if (paymentRows.length) {
-          await sendToSupabase("import_payments", iso, BRANCH, paymentRows,
-            config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co",
-            config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36");
+          await sendToSupabase("import_payments", iso, BRANCH, paymentRows);
           console.log(`☁️ تم تحديث مبيعات طرق الدفع على Supabase لفرع ${BRANCH}.`);
         }
       } catch (payErr) {
@@ -425,11 +435,8 @@ async function run() {
         } catch (jErr) {
           console.warn("⚠ خطأ شبكة أثناء إرسال مبيعات العصيرات:", jErr.message);
         }
-
-        const supaUrl = config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co";
-        const supaToken = config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36";
         try {
-          await sendToSupabase("import_juice_sales", iso, BRANCH, juiceRows, supaUrl, supaToken);
+          await sendToSupabase("import_juice_sales", iso, BRANCH, juiceRows);
           console.log(`☁️ تم تحديث مبيعات العصيرات على Supabase لفرع ${BRANCH}.`);
         } catch (supaErr) {
           console.warn(`⚠ تعذر تحديث Supabase (مبيعات العصيرات لفرع ${BRANCH}):`, supaErr.message);
