@@ -3056,3 +3056,7 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .home-dots{ display:flex; justify-content:center; gap:8px; margin:10px 0 16px; }
 .home-dot{ width:9px; height:9px; border-radius:999px; border:0; padding:0; background:var(--line-strong); cursor:pointer; transition:width .2s ease, background .2s ease; }
 .home-dot.active{ width:22px; background:var(--yellow-dark); }
+
+/* بحث منتجات تابسنس بالتقرير */
+.ts-prod-search{ width:100%; min-height:46px; margin:4px 0 10px; padding:0 14px; font-size:16px; border:1px solid var(--line-strong); border-radius:14px; font-family:inherit; background:#fff; }
+.order-table .total-row td{ background:var(--yellow-tint); }

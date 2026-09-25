@@ -688,6 +688,17 @@ const SupaEngine = (() => {
     }));
   }
 
+  // تفاصيل تابسنس للفترة: مبيعات كل منتج + الإضافات + طرق الدفع (طرق الدفع بترجع للمالك بس)
+  async function getTabsenseDetails(start, end) {
+    const range = `date=gte.${start}&date=lte.${end}`;
+    const [products, modifiers, payments] = await Promise.all([
+      query(`tabsense_product_sales?select=date,branch,product,qty&${range}`).catch(() => []),
+      query(`tabsense_modifier_sales?select=date,branch,modifier,option,qty&${range}`).catch(() => []),
+      query(`tabsense_payments?select=date,branch,channel,amount,transactions&${range}`).catch(() => [])
+    ]);
+    return { products: products || [], modifiers: modifiers || [], payments: payments || [] };
+  }
+
   async function getReport(start, end, branchFilter) {
     let bf = "";
     if (branchFilter && branchFilter.length) {
@@ -1033,6 +1044,7 @@ const SupaEngine = (() => {
     saveSettings,
     getEmployees,
     getSalesByCategory,
+    getTabsenseDetails,
     getReport,
     getFlaggedItems,
     getDashboard,
