@@ -12,6 +12,8 @@ let currentTomorrowTodaySales = {}; // category -> soldQty
 let tomorrowActiveFilter = "all"; // 'all', 'unfilled', 'protein', 'sauce'
 let currentTomorrowExtraItems = [];
 let currentTomorrowRemovedIds = new Set();
+let currentTomorrowAddedIds = new Set(); // خانات الشيف/الطبخات اللي انضافت لطلبية هاليوم
+const CHEF_SLOT_CATS = ["دجاج", "لحم", "بحري"];
 
 function getAllTomorrowActiveItems() {
   const branch = currentTomorrowBranch || Branch.get();
@@ -21,11 +23,14 @@ function getAllTomorrowActiveItems() {
   (Items.current || []).forEach(it => {
     const branches = itemBranches(it);
     if (branches.length && branch && !branches.includes(branch)) return;
-    itemsMap.set(it.id, { ...it });
+    if (isOptionalItem(it) && !currentTomorrowAddedIds.has(it.id) && !currentTomorrowOrder[it.id]) return;
+    const ord = currentTomorrowOrder[it.id];
+    itemsMap.set(it.id, isChefSlot(it) && ord && ord.cookName ? { ...it, name: chefSlotName(it, ord.cookName) } : { ...it });
   });
 
   // 2. الأصناف المستلمة اليوم من الاستلام (تشمل أي صنف إضافي أضافه الشيف أو الفرع)
   Object.keys(currentTomorrowTodayReceived).forEach(id => {
+    if (isOptionalItem(Items.byId(id))) return;
     if (!itemsMap.has(id)) {
       const itemDef = Items.byId(id);
       itemsMap.set(id, {
@@ -41,6 +46,7 @@ function getAllTomorrowActiveItems() {
 
   // 3. الأصناف المتبقية الليلة
   Object.keys(currentTomorrowTodayRemaining).forEach(id => {
+    if (isOptionalItem(Items.byId(id))) return;
     if (!itemsMap.has(id)) {
       const itemDef = Items.byId(id);
       itemsMap.set(id, {
@@ -172,9 +178,6 @@ function renderTomorrowView() {
           ⚡ تطبيق كل المقترحات الذكية
         </button>
       ` : ''}
-      <button type="button" class="tom-whatsapp-btn" onclick="exportTomorrowOrderWhatsApp()">
-        📱 إرسال الطلبية للمطبخ (واتساب)
-      </button>
       ${renderCompactToggleBtnHtml()}
     </div>
 
@@ -263,6 +266,12 @@ function renderTomorrowView() {
         }
       }
 
+      // خانة الشيف: الباقي من متوسط التصنيف بعد الأصناف الثابتة، مقسوم على خانات الشيف المطلوبة
+      if (isChefSlot(Items.byId(item.id) || item)) {
+        const slotSug = chefSlotSuggestion(item.category, group.items);
+        if (slotSug) { smartSuggestedQty = slotSug.qty; suggestReason = slotSug.reason; }
+      }
+
       const card = document.createElement("div");
       card.className = "item-card tomorrow-item-card";
       card.id = "tomcard-" + item.id;
@@ -270,6 +279,7 @@ function renderTomorrowView() {
       card.dataset.filled = String(isFilled);
       card.dataset.isprotein = String(isProtein);
       card.dataset.issauce = String(isSauce);
+      if (isChefSlot(Items.byId(item.id) || item)) card.dataset.slot = "1";
 
       card.innerHTML = `
         <!-- رأس الصنف -->
@@ -343,8 +353,9 @@ function renderTomorrowView() {
       const addBtn = document.createElement("button");
       addBtn.type = "button";
       addBtn.className = "rec-add-item-btn";
-      addBtn.textContent = `➕ إضافة صنف في قسم (${group.category})`;
-      addBtn.onclick = () => openAddTomorrowItemModal(group.category);
+      const usesSlots = CHEF_SLOT_CATS.includes(String(group.category).trim());
+      addBtn.textContent = usesSlots ? `➕ إضافة صنف ${group.category}` : `➕ إضافة صنف في قسم (${group.category})`;
+      addBtn.onclick = () => (usesSlots ? openChefSlotPicker(group.category) : openAddTomorrowItemModal(group.category));
       inner.appendChild(addBtn);
     }
 
@@ -539,6 +550,7 @@ async function loadTomorrowOrder(dateStr) {
   const view = document.getElementById("tomorrowView");
   if (view) view.innerHTML = '<div class="loader"><div class="spinner"></div> جاري تحميل بيانات اليوم واقتراحات المطبخ…</div>';
   currentTomorrowOrder = {};
+  currentTomorrowAddedIds = new Set();
 
   // جلب طلبية الغد المحفوظة
   const cacheKey = "tomorrow:" + dateStr + ":" + currentTomorrowBranch;
@@ -581,7 +593,7 @@ function applyTomorrowData(list) {
   if (!list || !list.length) return;
   const map = {};
   list.forEach(it => { 
-    map[it.itemId] = { qty: it.qty, notes: it.notes }; 
+    map[it.itemId] = { qty: it.qty, notes: it.notes, cookName: it.cookName || "" };
     if (!Items.byId(it.itemId) && !currentTomorrowExtraItems.some(x => x.id === it.itemId)) {
       currentTomorrowExtraItems.push({
         id: it.itemId,
@@ -603,7 +615,10 @@ function saveTomorrowNow(showStatus) {
 
   const allActiveItems = getAllTomorrowActiveItems();
   const items = allActiveItems
-    .filter(it => currentTomorrowOrder[it.id] && currentTomorrowOrder[it.id].qty !== "")
+    .filter(it => {
+      const o = currentTomorrowOrder[it.id];
+      return o && (o.qty !== "" || (currentTomorrowAddedIds.has(it.id) || o.cookName));
+    })
     .map(it => ({ 
       itemId: it.id, 
       itemName: it.name, 
@@ -611,7 +626,8 @@ function saveTomorrowNow(showStatus) {
       category: it.category || "عام",
       isCustom: !!it.isCustom,
       qty: currentTomorrowOrder[it.id].qty, 
-      notes: currentTomorrowOrder[it.id].notes || "" 
+      notes: currentTomorrowOrder[it.id].notes || "",
+      cookName: currentTomorrowOrder[it.id].cookName || ""
     }));
 
   const payload = { 
@@ -671,7 +687,8 @@ async function onRemoveTomorrowItem(itemId, itemName) {
   const confirmed = await phConfirm(`هل أنت متأكد من استبعاد الصنف "${itemName || ''}" من طلبية الغد؟`, { ok: "شيله", danger: true });
   if (!confirmed) return;
 
-  currentTomorrowRemovedIds.add(itemId);
+  if (isOptionalItem(Items.byId(itemId))) currentTomorrowAddedIds.delete(itemId);
+  else currentTomorrowRemovedIds.add(itemId);
   currentTomorrowExtraItems = currentTomorrowExtraItems.filter(it => it.id !== itemId);
   delete currentTomorrowOrder[itemId];
 
@@ -808,6 +825,8 @@ function toggleTomorrowNote(itemId) {
 const WD_CATS = [["دجاج", "🍗"], ["لحم", "🥩"], ["بحري", "🐟"]];
 const WD_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 const wdCache = {};
+const wdAvgByKey = {};
+function weekdayAvgGrams(date, branch) { return wdAvgByKey[date + "|" + branch] || null; }
 
 function weekdayAverageDates(date) {
   // أيام نفس اليوم من الأسبوع بهالشهر قبل تاريخ الطلبية، وإذا أقل من يومين منكمّل من الأسابيع اللي قبل (لحد 4)
@@ -855,6 +874,9 @@ async function renderWeekdayAverage(el, date, branch) {
       });
       return { cat, icon, grams: Math.round(avgDishes * MEAL_WEIGHT_G), dishes: avgDishes, actual: n ? Math.round(used / n) : null };
     });
+    const firstTime = !wdAvgByKey[key];
+    wdAvgByKey[key] = Object.fromEntries(rows.map(r => [r.cat, r.grams]));
+    if (firstTime && document.querySelector('.tomorrow-item-card[data-slot="1"]')) { renderTomorrowView(); return; }
     const fmt = (g) => g.toLocaleString("en-US");
     const dayList = (list) => list.slice().sort().map(dt => Number(dt.slice(8))).join("، ");
     if (!soldDays.length) {
@@ -877,4 +899,98 @@ async function renderWeekdayAverage(el, date, branch) {
   } catch (e) {
     el.innerHTML = `<div class="wd-avg-title">📊 متوسط الاستهلاك</div><div class="wd-avg-sub">⚠ تعذّر الحساب — ${e.message || e}</div>`;
   }
+}
+
+
+// ---- خانات الشيف: اختيار الطبخة ----
+function chefSlotsFor(category) {
+  const branch = currentTomorrowBranch || Branch.get();
+  return (Items.current || [])
+    .filter(it => it.category === category && isChefSlot(it))
+    .filter(it => { const b = itemBranches(it); return !b.length || !branch || b.includes(branch); })
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "ar", { numeric: true }));
+}
+
+// أسماء الطبخات اللي انسجلت قبل بهالتصنيف (دجاج بيكانت، بالكريمة، تكا…)
+function chefDishOptions(category) {
+  const names = new Set();
+  (Items.current || []).forEach(it => {
+    if (it.category !== category || !isOptionalItem(it) || isChefSlot(it)) return;
+    if (/الشيف/.test(it.name)) return;
+    names.add(String(it.name).trim());
+  });
+  Object.values(currentTomorrowOrder).forEach(o => { if (o && o.cookName) names.add(o.cookName); });
+  return Array.from(names).sort((a, b) => a.localeCompare(b, "ar"));
+}
+
+function chefSlotSuggestion(category, groupItems) {
+  const avg = (typeof weekdayAvgGrams === "function") ? weekdayAvgGrams(currentTomorrowDate, currentTomorrowBranch) : null;
+  if (!avg || !avg[category]) return null;
+  let fixedPlanned = 0;
+  let slotCount = 0;
+  groupItems.forEach(it => {
+    const def = Items.byId(it.id) || it;
+    if (isChefSlot(def)) { slotCount++; return; }
+    const o = currentTomorrowOrder[it.id];
+    if (o && o.qty !== "" && o.qty != null) fixedPlanned += Number(o.qty) || 0;
+    else {
+      const r = currentTomorrowRecommendations[it.id];
+      if (r && r.qty) fixedPlanned += Number(r.qty) || 0;
+    }
+  });
+  if (!slotCount) return null;
+  const left = Math.max(0, avg[category] - fixedPlanned);
+  const qty = Math.round(left / slotCount / 50) * 50;
+  return { qty, reason: `باقي متوسط ${category} (${avg[category].toLocaleString("en-US")} جم) بعد الثابت ÷ ${slotCount}` };
+}
+
+function openChefSlotPicker(category) {
+  if (Auth.isViewOnlyTomorrow()) return;
+  const slots = chefSlotsFor(category);
+  const free = slots.filter(it => !currentTomorrowAddedIds.has(it.id) && !currentTomorrowOrder[it.id]);
+  if (!free.length) {
+    phAlert(slots.length ? `كل خانات ${category} الشيف (${slots.length}) مستخدمة بهالطلبية.` : `ما فيه خانات شيف لتصنيف ${category}.`);
+    return;
+  }
+  const slot = free[0];
+  const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const options = chefDishOptions(category);
+  const wrap = document.createElement("div");
+  wrap.className = "ph-dialog";
+  wrap.innerHTML = `
+    <div class="ph-dialog-card chef-picker" role="dialog" aria-modal="true">
+      <img class="ph-dialog-logo" src="assets/logo.png" alt="">
+      <div class="ph-dialog-title">➕ ${esc(slot.name)}</div>
+      <div class="ph-dialog-msg">اختار الطبخة:</div>
+      <div class="chef-picker-list">
+        ${options.map(n => `<button type="button" class="chef-opt" data-name="${esc(n)}">${esc(n)}</button>`).join("")}
+        <button type="button" class="chef-opt plain" data-name="">${esc(slot.name)} (بدون اسم)</button>
+      </div>
+      <input class="ph-dialog-input chef-new" type="text" inputmode="text" placeholder="أو اكتب اسم طبخة جديدة">
+      <div class="ph-dialog-actions">
+        <button type="button" class="ph-dialog-ok chef-add-new">إضافة</button>
+        <button type="button" class="ph-dialog-cancel">إلغاء</button>
+      </div>
+    </div>`;
+  const close = () => { wrap.classList.add("closing"); setTimeout(() => wrap.remove(), 160); };
+  const pick = (name) => {
+    close();
+    currentTomorrowAddedIds.add(slot.id);
+    currentTomorrowOrder[slot.id] = { qty: "", notes: "", cookName: String(name || "").trim() };
+    tomorrowCategoryCollapsed[category] = false;
+    renderTomorrowView();
+    saveTomorrowNow(false);
+    const inp = document.getElementById("tominput-" + slot.id);
+    if (inp) { inp.scrollIntoView({ block: "center", behavior: "smooth" }); inp.focus({ preventScroll: true }); }
+  };
+  wrap.querySelectorAll(".chef-opt").forEach(b => b.addEventListener("click", () => pick(b.dataset.name)));
+  wrap.querySelector(".chef-add-new").addEventListener("click", () => {
+    const v = wrap.querySelector(".chef-new").value.trim();
+    if (!v) { showToast("اكتب اسم الطبخة أو اختار من القائمة"); return; }
+    pick(v.startsWith(category) ? v : `${category} ${v}`);
+  });
+  wrap.querySelector(".ph-dialog-cancel").addEventListener("click", close);
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+  document.body.appendChild(wrap);
+  requestAnimationFrame(() => wrap.classList.add("open"));
 }

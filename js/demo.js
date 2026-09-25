@@ -12,7 +12,7 @@
   if (!on) return;
 
   const AJL = "عبداللطيف جميل";
-  const DB_KEY = "ph_demo_db_v1";
+  const DB_KEY = "ph_demo_db_v2";
   const riyadh = (offset) => {
     const d = new Date(Date.now() + offset * 86400000);
     return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(d);
@@ -23,21 +23,24 @@
   };
 
   function seed() {
+    // [id, تصنيف، اسم، وحدة، اختياري]
     const cat = [
-      ["d1", "دجاج", "دجاج بالكريمة", "جرام"], ["d2", "دجاج", "دجاج زعفران", "جرام"], ["d3", "دجاج", "دجاج تكا", "جرام"],
-      ["d4", "دجاج", "دجاج الشيف", "جرام"], ["d5", "دجاج", "دجاج باربكيو", "جرام"],
-      ["l1", "لحم", "لحم الشيف 1", "جرام"], ["l2", "لحم", "لحم الشيف 2", "جرام"],
-      ["s1", "بحري", "سالمون", "جرام"], ["s2", "بحري", "جمبري بروفنسال", "جرام"],
+      ["d1", "دجاج", "دجاج تندر", "جرام"], ["d2", "دجاج", "دجاج باربكيو", "جرام"], ["d3", "دجاج", "دجاج بينك صوص", "جرام"],
+      ["d11", "دجاج", "دجاج الشيف 1", "جرام", 1], ["d12", "دجاج", "دجاج الشيف 2", "جرام", 1], ["d13", "دجاج", "دجاج الشيف 3", "جرام", 1],
+      ["d21", "دجاج", "دجاج بيكانت", "جرام", 1], ["d22", "دجاج", "دجاج بالكريمة", "جرام", 1], ["d23", "دجاج", "دجاج تكا", "جرام", 1],
+      ["l1", "لحم", "لحم الشيف 1", "جرام"], ["l2", "لحم", "لحم الشيف 2", "جرام", 1], ["l3", "لحم", "لحم الشيف 3", "جرام", 1],
+      ["s1", "بحري", "سالمون", "جرام"], ["s3", "بحري", "سمك الشيف 1", "جرام"], ["s4", "بحري", "جمبري داينمت", "جرام"],
+      ["s6", "بحري", "سمك الشيف 2", "جرام", 1], ["s7", "بحري", "سمك الشيف 3", "جرام", 1], ["s2", "بحري", "جمبري بروفنسال", "جرام", 1],
       ["f1", "فطور", "ساندويتش روستيد", "ساندويتش"], ["f2", "فطور", "ساندويتش تونا", "ساندويتش"], ["f3", "فطور", "بيض مسلوق", "حبة"],
       ["sl1", "السلطات", "سلطة سيزر", "طاسة"], ["sl2", "السلطات", "سلطة فتوش", "طاسة"],
       ["k1", "كارب", "رز أبيض", "1/2"], ["h1", "الحلويات", "كوكيز", "حبة"]
     ];
-    const items = cat.map(([id, category, name, unit], i) => ({ id, category, name, unit, has_custom_name: false, branches: "", active: true, sort_order: i, unit_factor: 1 }));
+    const items = cat.map(([id, category, name, unit, opt], i) => ({ id, category, name, unit, has_custom_name: /الشيف \d/.test(name), optional: !!opt, branches: "", active: true, sort_order: i, unit_factor: 1 }));
     const daily_entries = [];
     const tabsense_sales = [];
     [-1, -2].forEach(off => {
       const date = riyadh(off);
-      items.forEach((it, i) => {
+      items.filter(it => !it.optional).forEach((it, i) => {
         const grams = it.unit === "جرام";
         const rec = grams ? 1400 + ((i * 233) % 1500) : 3 + (i % 6);
         daily_entries.push({ id: daily_entries.length + 1, date, branch: AJL, item_id: it.id, item_name: it.name, unit: it.unit, confirmed: true,
@@ -66,7 +69,7 @@
 
   const KEYS = {
     daily_entries: ["date", "branch", "item_id"], day_meta: ["date", "branch"], items: ["id"], settings: ["key"], juices: ["id"],
-    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], custody_closings: ["date", "branch"],
+    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], custody_closings: ["date", "branch"],
     push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"], tabsense_payments: ["date", "branch", "channel"]
   };
 

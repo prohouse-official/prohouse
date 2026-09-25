@@ -63,8 +63,9 @@ async function loadReceivingData(date, branch) {
   await Items.load();
 
   // 1) جلب كمية الطلب المعتمدة ليوم date من طلبية أمس (T-1)
-  const orderedMap = await loadRequestedQty(currentReceivingDate, currentReceivingBranch);
-  currentReceivingOrdered = orderedMap || {};
+  const requested = await loadRequestedOrder(currentReceivingDate, currentReceivingBranch);
+  currentReceivingOrdered = requested.qty || {};
+  const orderedCookNames = requested.cook || {};
 
   // 2) جلب السجل المحفوظ لهذا اليوم والفرع
   const dayData = await Sync.get("getDay", { date: currentReceivingDate, branch: currentReceivingBranch }, "day:" + currentReceivingDate + ":" + currentReceivingBranch);
@@ -105,6 +106,12 @@ async function loadReceivingData(date, branch) {
     }
   }
 
+  // خانات الشيف: اسم الطبخة بيجي من الطلبية إذا الاستلام لسا ما سجّله
+  Object.entries(orderedCookNames).forEach(([id, cook]) => {
+    if (!currentReceivingData[id]) currentReceivingData[id] = { received: "", notes: "", cookName: "", status: "لم يصل" };
+    if (!currentReceivingData[id].cookName) currentReceivingData[id].cookName = cook;
+  });
+
   // 3) استعادة البيانات من طابور المزامنة المحلي (Sync Queue) إذا كان هناك حفظ معلّق
   try {
     const queue = Sync.getQueue ? Sync.getQueue() : [];
@@ -135,7 +142,17 @@ function getAllReceivingActiveItems() {
   const baseItems = Items.current.filter(it => {
     if (currentReceivingRemovedIds.has(it.id)) return false;
     const branches = itemBranches(it);
-    return !branches.length || branches.includes(currentReceivingBranch);
+    if (branches.length && !branches.includes(currentReceivingBranch)) return false;
+    // الاختياري بيطلع بس إذا انطلب لهاليوم أو انسجل استلامه
+    if (isOptionalItem(it)) {
+      const d = currentReceivingData[it.id];
+      const hasReceived = d && d.received !== "" && Number(d.received) > 0;
+      return hasReceived || currentReceivingOrdered[it.id] !== undefined;
+    }
+    return true;
+  }).map(it => {
+    const d = currentReceivingData[it.id];
+    return isChefSlot(it) && d && d.cookName ? { ...it, name: chefSlotName(it, d.cookName) } : it;
   });
 
   const extraItems = currentReceivingExtraItems.filter(it => !currentReceivingRemovedIds.has(it.id));

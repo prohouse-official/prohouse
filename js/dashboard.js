@@ -4,6 +4,7 @@
 
 function branchVisibleItems(branch) {
   return Items.current.filter(item => {
+    if (isOptionalItem(item)) return false; // خانات الشيف ما بتنحسب بالعدّ الثابت
     const list = (item.branches || "").split(",").map(s => s.trim()).filter(Boolean);
     return list.length === 0 || list.includes(branch);
   });
