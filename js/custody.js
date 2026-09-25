@@ -127,7 +127,9 @@ function renderCustodyView(payments) {
       <button type="button" class="cust-close-btn" id="custodyCloseBtn">${closed ? "💾 حفظ التعديل" : "🔒 إغلاق العهدة"}</button>
     </div>
     ${Auth.canSeeSales() ? custodyOwnerCardHtml(c, payments) : ""}
+    ${Auth.isOwner() ? '<div id="custodyMonthCard" class="cust-owner"><div class="cust-owner-title">📅 ملخص الشهر</div><div class="cust-missing">جاري التحميل…</div></div>' : ""}
   `;
+  if (Auth.isOwner()) renderCustodyMonth();
 
   view.querySelectorAll("[data-field]").forEach(inp => inp.addEventListener("input", () => {
     currentCustody[inp.dataset.field] = inp.dataset.field === "notes" ? inp.value : toNum(inp.value);
@@ -225,4 +227,53 @@ function initCustodyTab() {
       loadCustody(currentCustodyDate, currentCustodyBranch);
     });
   }
+}
+
+
+// ---- ملخص الشهر (للمالك): كل يوم فيه مبيعات أو إغلاق — انسكر؟ وفرق الكاش والشبكة ----
+async function renderCustodyMonth() {
+  const el = document.getElementById("custodyMonthCard");
+  if (!el) return;
+  const month = currentCustodyDate.slice(0, 7);
+  const start = month + "-01";
+  const [y, m] = month.split("-").map(Number);
+  const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); // آخر يوم بالشهر
+  let data;
+  try { data = await SupaEngine.getCustodyRange(start, end, currentCustodyBranch); }
+  catch (e) { el.querySelector(".cust-missing").textContent = "⚠ تعذّر جلب الملخص"; return; }
+  const byDay = {};
+  data.payments.forEach(p => { (byDay[p.date] = byDay[p.date] || { pays: [], closing: null }).pays.push(p); });
+  data.closings.forEach(c => { (byDay[c.date] = byDay[c.date] || { pays: [], closing: null }).closing = c; });
+  const days = Object.keys(byDay).sort().reverse();
+  if (!days.length) { el.querySelector(".cust-missing").textContent = "ما فيه مبيعات ولا إغلاقات بهالشهر للحين."; return; }
+  const cell = (diff) => diff === null ? '<span class="cust-diff neutral">—</span>' : diffPillHtml(diff);
+  let closedCount = 0, cashTotal = 0, cardTotal = 0;
+  const rows = days.map(d => {
+    const { pays, closing } = byDay[d];
+    const label = new Date(d + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "short", day: "numeric", month: "numeric" });
+    if (!closing || !closing.closed_at) {
+      return `<tr data-date="${d}"><td>${label}</td><td colspan="2"><span class="cust-diff short">ما انقفلت</span></td></tr>`;
+    }
+    closedCount++;
+    const r = custodyReconciliation({ ...closing, expenses: closing.expenses || [] }, pays);
+    if (pays.length) { cashTotal += r.cashDiff || 0; cardTotal += r.cardDiff || 0; }
+    return `<tr data-date="${d}"><td>${label}</td><td>${pays.length ? cell(r.cashDiff) : '<span class="cust-diff neutral">بلا مبيعات</span>'}</td><td>${pays.length ? cell(r.cardDiff) : "—"}</td></tr>`;
+  }).join("");
+  el.innerHTML = `
+    <div class="cust-owner-title">📅 ملخص الشهر · ${closedCount}/${days.length} يوم انقفلت</div>
+    <div class="cust-month-sum">
+      <span>مجموع فرق الكاش: ${cell(cashTotal)}</span>
+      <span>مجموع فرق الشبكة: ${cell(cardTotal)}</span>
+    </div>
+    <table class="cust-month">
+      <thead><tr><th>اليوم</th><th>الكاش</th><th>الشبكة</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="cust-missing">اضغط على أي يوم لتفتحه.</div>`;
+  el.querySelectorAll("tr[data-date]").forEach(tr => tr.addEventListener("click", () => {
+    const dateEl = document.getElementById("custodyDateInput");
+    if (dateEl) dateEl.value = tr.dataset.date;
+    loadCustody(tr.dataset.date, currentCustodyBranch);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }));
 }

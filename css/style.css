@@ -3060,3 +3060,11 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 /* بحث منتجات تابسنس بالتقرير */
 .ts-prod-search{ width:100%; min-height:46px; margin:4px 0 10px; padding:0 14px; font-size:16px; border:1px solid var(--line-strong); border-radius:14px; font-family:inherit; background:#fff; }
 .order-table .total-row td{ background:var(--yellow-tint); }
+
+/* ملخص شهر العهدة (للمالك) */
+.cust-month{ width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
+.cust-month th{ text-align:right; font-size:12px; color:var(--muted); font-weight:800; padding:6px 4px; border-bottom:1px solid var(--line); }
+.cust-month td{ padding:8px 4px; border-bottom:1px solid var(--line); }
+.cust-month tr[data-date]{ cursor:pointer; }
+.cust-month tr[data-date]:active td{ background:var(--yellow-tint); }
+.cust-month-sum{ display:flex; flex-wrap:wrap; gap:8px 14px; font-size:13px; font-weight:800; margin-top:4px; }
