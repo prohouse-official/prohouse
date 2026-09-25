@@ -14,6 +14,10 @@ on:
 jobs:
   tabsense-sync:
     runs-on: ubuntu-latest
+    # id-token: هوية التشغيل الموقّعة من GitHub — الموقع بيقبل المبيعات بس منها (بدل مفتاح سري بالكود)
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout Repository
