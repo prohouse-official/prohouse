@@ -346,6 +346,35 @@ function takeSavedPlace() {
   } catch (e) { return null; }
 }
 window.addEventListener("pagehide", savePlace);
+
+// التطبيق مفتوح بالخلفية من امبارح: لما يرجع الموظف الصبح كانت الشاشات تضل على تاريخ امبارح
+// ويسجّل استلام اليوم على امبارح. إذا الجوال كان مسكّر أكتر من ساعتين وتغيّر اليوم،
+// كل شاشة كانت على "اليوم" بتنقل لليوم الجديد. (ما منغيّر شي والموظف شغّال عالشاشة قبل/بعد ١٢ بالليل)
+let hiddenAt = 0, screensDay = todayStr(); // screensDay = اليوم اللي الشاشات فتحت عليه كـ"اليوم"
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
+  const now = todayStr();
+  if (!hiddenAt || now === screensDay || Date.now() - hiddenAt < 2 * 3600 * 1000) return;
+  const old = screensDay;
+  screensDay = now;
+  rollScreensToToday(old, now);
+});
+function rollScreensToToday(oldDay, newDay) {
+  const setInput = (id, v) => { const el = document.getElementById(id); if (el) { el.value = v; if (el._phRefresh) el._phRefresh(); } };
+  if (currentReceivingDate === oldDay) { currentReceivingDate = newDay; setInput("receivingDateInput", newDay); }
+  if (currentRemainingDate === oldDay) { currentRemainingDate = newDay; setInput("remainingDateInput", newDay); }
+  if (typeof currentCustodyDate !== "undefined" && currentCustodyDate === oldDay) { currentCustodyDate = newDay; setInput("custodyDateInput", newDay); }
+  if (typeof currentOpeningDate !== "undefined" && currentOpeningDate === oldDay) { currentOpeningDate = newDay; setInput("openingDateInput", newDay); }
+  if (typeof currentJuiceDate !== "undefined" && currentJuiceDate === oldDay) { currentJuiceDate = newDay; setInput("juiceDateInput", newDay); }
+  if (typeof currentWasteDate !== "undefined" && currentWasteDate === oldDay) currentWasteDate = newDay;
+  if (typeof currentTomorrowDate !== "undefined" && currentTomorrowDate === addDaysStr(oldDay, 1)) {
+    currentTomorrowDate = addDaysStr(newDay, 1); setInput("tomorrowDateInput", currentTomorrowDate);
+  }
+  if (!(Auth.getEmployee && Auth.getEmployee())) return;
+  setActiveTab(lastActiveTab);
+  if (lastActiveTab === "juices" && typeof loadJuiceDay === "function") loadJuiceDay(currentJuiceDate);
+  if (lastActiveTab === "tomorrow" && typeof loadTomorrowOrder === "function") loadTomorrowOrder(currentTomorrowDate);
+}
 // الشاشات بتبدأ على تاريخ اليوم وقت التشغيل، فمنرجّع اليوم اللي كان مفتوح بعدها
 function restorePlaceDates(place) {
   const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "");

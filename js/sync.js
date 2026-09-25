@@ -19,7 +19,9 @@ const Sync = (() => {
     catch (e) { return []; }
   }
   function setQueue(q) {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+    // طابور الحفظ أهم من الكاش: إذا الذاكرة مليانة منفضّي الكاش ومنعيد
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
+    catch (e) { pruneCache(true); localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); }
     emitStatus();
   }
 
@@ -29,9 +31,40 @@ const Sync = (() => {
       return raw ? JSON.parse(raw) : null;
     } catch (e) { return null; }
   }
-  function cacheSet(key, value) {
-    localStorage.setItem("ph_cache:" + key, JSON.stringify({ value, fetchedAt: Date.now() }));
+  // الكاش المحلي كان يكبر للأبد (كل يوم انفتح بينحفظ). لما تمتلي ذاكرة الجوال (~5MB)
+  // كان الحفظ يفشل ويطلع خطأ، فكل الشاشات تقول "فشل التحميل" رغم إن السيرفر ردّ صح.
+  const CACHE_MAX_CHARS = 400000;           // نتيجة أكبر من هيك (تقرير شهور) ما منخزّنها
+  const CACHE_MAX_AGE = 3 * 86400000;       // الكاش الأقدم من ٣ أيام بينمسح
+  function cacheEntries() {
+    const out = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k || !k.startsWith("ph_cache:")) continue;
+      let at = 0;
+      try { at = (JSON.parse(localStorage.getItem(k)) || {}).fetchedAt || 0; } catch (e) { /* تالف */ }
+      out.push({ k, at });
+    }
+    return out.sort((a, b) => a.at - b.at);
   }
+  function pruneCache(dropHalf) {
+    try {
+      const list = cacheEntries();
+      const old = list.filter(e => Date.now() - e.at > CACHE_MAX_AGE);
+      const drop = dropHalf ? list.slice(0, Math.max(old.length, Math.ceil(list.length / 2))) : old;
+      drop.forEach(e => localStorage.removeItem(e.k));
+    } catch (e) { /* ما في مشكلة */ }
+  }
+  function cacheSet(key, value) {
+    let raw;
+    try { raw = JSON.stringify({ value, fetchedAt: Date.now() }); } catch (e) { return; }
+    if (raw.length > CACHE_MAX_CHARS) { localStorage.removeItem("ph_cache:" + key); return; }
+    try { localStorage.setItem("ph_cache:" + key, raw); }
+    catch (e) {
+      pruneCache(true);
+      try { localStorage.setItem("ph_cache:" + key, raw); } catch (e2) { /* الكاش مو ضروري */ }
+    }
+  }
+  pruneCache(false);
 
   // ---- طلبات القراءة (GET) — دايماً من السيرفر ----
   // ما في عرض من الكاش المحلي: كان يخلّي الجوال يعرض نسخة قديمة بدل البيانات المحفوظة فعلاً.

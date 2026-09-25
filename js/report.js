@@ -338,8 +338,9 @@ function renderReport(data) {
 
   const dayLinks = filtered.days.map(d => {
     const links = [];
-    if (d.meta && d.meta.salesReportLink) links.push(`<a href="${d.meta.salesReportLink}" target="_blank" rel="noopener">📈 مبيعات ${d.branch} — ${d.date}</a>`);
-    if (d.meta && d.meta.paymentsReportLink) links.push(`<a href="${d.meta.paymentsReportLink}" target="_blank" rel="noopener">💳 مدفوعات ${d.branch} — ${d.date}</a>`);
+    const isUrl = (v) => typeof v === "string" && /^https?:\/\//.test(v); // الحقول هاي صارت فيها صور وقائمة الفحص، مو روابط
+    if (d.meta && isUrl(d.meta.salesReportLink)) links.push(`<a href="${d.meta.salesReportLink}" target="_blank" rel="noopener">📈 مبيعات ${d.branch} — ${d.date}</a>`);
+    if (d.meta && isUrl(d.meta.paymentsReportLink)) links.push(`<a href="${d.meta.paymentsReportLink}" target="_blank" rel="noopener">💳 مدفوعات ${d.branch} — ${d.date}</a>`);
     return links.join("");
   }).filter(Boolean).join("");
 
