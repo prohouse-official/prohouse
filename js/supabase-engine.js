@@ -880,6 +880,18 @@ const SupaEngine = (() => {
     return (await photosFn({ action: "delete", date, branch, id: String(photoId) })).photos || [];
   }
 
+  // نماذج قوقل اللي الموقع بيبعتها لحاله (نموذج الصوص)
+  async function sendGoogleForm(body) {
+    const res = await fetch(SUPABASE_URL + "/functions/v1/forms", { method: "POST", headers: getHeaders(), body: JSON.stringify(body) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok || !out.ok) throw new Error(out.error || `forms [${res.status}]`);
+    return out;
+  }
+  async function getLastFormSubmission(form, date, branch) {
+    const rows = await query(`form_submissions?select=payload,ok,sent_at,sent_by&form=eq.${form}&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&ok=is.true&order=sent_at.desc&limit=1`);
+    return (rows && rows[0]) || null;
+  }
+
   async function migratePhotosToStorage() {
     return await photosFn({ action: "migrate" });
   }
@@ -974,6 +986,8 @@ const SupaEngine = (() => {
     getPayments,
     getCustodyRange,
     migratePhotosToStorage,
+    sendGoogleForm,
+    getLastFormSubmission,
     restoreEntryRows,
     saveDay,
     saveRemainingReport,

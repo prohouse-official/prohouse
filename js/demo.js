@@ -140,7 +140,10 @@
       const select = u.searchParams.get("select");
       const offset = Number(u.searchParams.get("offset")) || 0;
       const limit = u.searchParams.has("limit") ? Number(u.searchParams.get("limit")) : Infinity;
-      return [200, table.filter(r => matches(r, params)).slice(offset, offset + limit).map(r => pick(r, select))];
+      let rows = table.filter(r => matches(r, params));
+      const ord = (u.searchParams.get("order") || "").split(",")[0].split(".");
+      if (ord[0] && ord[1] === "desc") rows = rows.slice().sort((a, b) => String(b[ord[0]]).localeCompare(String(a[ord[0]])));
+      return [200, rows.slice(offset, offset + limit).map(r => pick(r, select))];
     }
     if (method === "DELETE") {
       db[path] = table.filter(r => !matches(r, params));
@@ -180,6 +183,13 @@
         out = { photos: handle("POST", "https://demo.supabase.co/rest/v1/rpc/delete_inspection_photo", { p_date: body.date, p_branch: body.branch, p_id: body.id })[1] };
       } else out = { moved: 0 };
       return new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    if (/supabase\.co\/functions\/v1\/forms/.test(url)) {
+      let body = {}; try { body = JSON.parse(init.body || "{}"); } catch (e) {}
+      const { form, date, branch, ...payload } = body;
+      db.form_submissions = db.form_submissions || [];
+      db.form_submissions.push({ form, date, branch, payload, ok: true, sent_at: new Date().toISOString() }); persist();
+      return new Response(JSON.stringify({ ok: true, payload }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
     if (/supabase\.co\/functions\//.test(url)) {
       return new Response('{"sent":1,"gone":0,"failed":0}', { status: 200, headers: { "Content-Type": "application/json" } });
