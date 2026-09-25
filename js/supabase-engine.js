@@ -125,6 +125,7 @@ const SupaEngine = (() => {
       name: r.name,
       unit: r.unit,
       hasCustomName: r.has_custom_name,
+      optional: !!r.optional,
       branches: r.branches,
       active: r.active,
       sortOrder: r.sort_order,
@@ -140,6 +141,7 @@ const SupaEngine = (() => {
       name: payload.name,
       unit: payload.unit,
       has_custom_name: !!payload.hasCustomName,
+      optional: !!payload.optional,
       branches: payload.branches || "",
       active: payload.active !== false,
       sort_order: payload.sortOrder || 0,
@@ -472,6 +474,7 @@ const SupaEngine = (() => {
       unit: r.unit,
       qty: r.qty,
       notes: r.notes,
+      cookName: r.cook_name || "",
       employeeName: r.employee_name
     }));
   }
@@ -493,6 +496,7 @@ const SupaEngine = (() => {
         unit: it.unit || "",
         qty: it.qty === "" || it.qty == null ? 0 : Number(it.qty),
         notes: it.notes || "",
+        cook_name: it.cookName || "",
         employee_name: employeeName || "",
         saved_at: new Date().toISOString()
       }));

@@ -3032,3 +3032,11 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .wd-avg-dishes{ font-size:12px; color:var(--muted); }
 .wd-avg-actual{ font-size:11.5px; font-weight:800; color:#137A50; background:#EEF8F2; border-radius:999px; padding:2px 8px; }
 .wd-avg-note{ font-size:11.5px; color:var(--muted); margin-top:8px; }
+
+/* ==================== اختيار طبخة الشيف ==================== */
+.chef-picker{ max-width:380px; }
+.chef-picker .ph-dialog-msg{ margin-bottom:10px; }
+.chef-picker-list{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; max-height:40vh; overflow:auto; margin-bottom:12px; }
+.chef-opt{ min-height:46px; padding:0 16px; border-radius:999px; border:1.5px solid #E6CB3A; background:var(--yellow-tint); font-family:inherit; font-size:15px; font-weight:800; cursor:pointer; }
+.chef-opt.plain{ border-color:var(--line-strong); background:#fff; color:var(--muted); }
+.chef-opt:active{ transform:scale(.97); }

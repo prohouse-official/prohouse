@@ -98,10 +98,22 @@ function getAllRemainingActiveItems(receivingData) {
   const recRemoved = new Set((recData && Array.isArray(recData.removedItemIds)) ? recData.removedItemIds : ((recData && recData.meta && Array.isArray(recData.meta.removedItemIds)) ? recData.meta.removedItemIds : []));
   const extraIds = new Set(currentRemainingExtraItems.map(it => it.id));
 
+  // الاختياري (خانات الشيف والطبخات المتغيرة) بيطلع بس إذا انستلم اليوم أو انسجل متبقيه
+  const recById = {};
+  if (recData && Array.isArray(recData.items)) recData.items.forEach(r => { recById[r.itemId || r.id] = r; });
   const result = [];
   itemsMap.forEach((item, id) => {
     if (currentRemainingRemovedIds.has(id)) return;
     if (recRemoved.has(id) && !extraIds.has(id)) return;
+    const def = Items.byId(id);
+    if (def && isOptionalItem(def) && !extraIds.has(id)) {
+      const r = recById[id];
+      const received = r && Number(r.received) > 0;
+      const d = currentRemainingData[id];
+      const counted = d && [d.remaining, d.remainingWeight, d.remainingSauce].some(v => v !== "" && v !== null && v !== undefined);
+      if (!received && !counted) return;
+      if (isChefSlot(def) && r && r.cookName && item.name === def.name) item.name = chefSlotName(def, r.cookName);
+    }
     const cat = String(item.category || "").trim();
     if (cat.includes("كارب") || cat.toLowerCase().includes("carb")) return;
     result.push(item);

@@ -325,10 +325,32 @@ function cssId(str) { return str.replace(/[^a-zA-Z0-9_؀-ۿ]/g, "_"); }
 // ---- الكمية المطلوبة من طلبية الغد ----
 // (من طلبية الغد يلي انحطت أمس مستهدفة هالتاريخ + هالفرع بالظبط)
 async function loadRequestedQty(date, branch) {
+  return (await loadRequestedOrder(date, branch)).qty;
+}
+
+// الطلبية المعتمدة لهاليوم: الكميات + اسم الطبخة لخانات الشيف
+async function loadRequestedOrder(date, branch) {
   const data = await Sync.get("getTomorrowOrder", { date, branch }, "tomorrow:" + date + ":" + branch);
-  const map = {};
-  (data || []).forEach(it => { map[it.itemId] = it.qty; });
-  return map;
+  const qty = {}, cook = {};
+  (data || []).forEach(it => { qty[it.itemId] = it.qty; if (it.cookName) cook[it.itemId] = it.cookName; });
+  return { qty, cook };
+}
+
+// ---- الأصناف الثابتة والاختيارية ----
+// الصنف الاختياري (مثل دجاج الشيف 1/2/3 أو طبخة بتنعمل أحياناً) ما بيطلع إلا باليوم اللي انطلب فيه
+function isOptionalItem(it) {
+  return !!(it && (it.optional === true || it.optional === "TRUE" || it.optional === "true"));
+}
+function isChefSlot(it) {
+  return isOptionalItem(it) && /الشيف\s*\d+\s*$/.test(String(it.name || ""));
+}
+// "دجاج الشيف 1" + "دجاج بيكانت" ← "دجاج الشيف 1 (بيكانت)"
+function chefSlotName(it, cookName) {
+  const dish = String(cookName || "").trim();
+  if (!dish) return it.name;
+  const cat = String(it.category || "").trim();
+  const short = dish.replace(new RegExp("^" + cat + "\\s+"), "").trim() || dish;
+  return `${it.name} (${short})`;
 }
 
 // ---- وضع العرض المدمج بسطر واحد لتقليل السكرول للجوال (Compact View Mode) ----
