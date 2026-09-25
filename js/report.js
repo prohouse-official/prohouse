@@ -116,15 +116,17 @@ async function runReport() {
     localStorage.removeItem("ph_cache:tabsense:" + start + ":" + end);
   } catch (e) {}
 
-  const [data, salesData] = await Promise.all([
+  const [data, salesData, tsDetails] = await Promise.all([
     Sync.get("getReport", { start, end }, cacheKey),
-    Sync.get("getSalesByCategory", { start, end }, "tabsense:" + start + ":" + end)
+    Sync.get("getSalesByCategory", { start, end }, "tabsense:" + start + ":" + end),
+    SupaEngine.getTabsenseDetails(start, end).catch(() => null)
   ]);
 
   const reportObj = data || { days: [], totals: [], flaggedCount: 0 };
   if (salesData && Array.isArray(salesData)) {
     reportObj.tabsenseSales = salesData;
   }
+  reportObj.tsDetails = tsDetails;
 
   lastReportData = reportObj;
   renderReport(reportObj);
@@ -277,7 +279,7 @@ function renderReport(data) {
   lastFilteredDays = filtered.days;
 
   if (reportType === "tabsense") {
-    view.innerHTML = renderTabSenseSalesBlock(data);
+    view.innerHTML = renderTabSenseSalesBlock(data) + renderTabsenseDetailsBlock(data && data.tsDetails);
     return;
   }
 
@@ -716,4 +718,89 @@ async function exportTomorrowReportExcel() {
   });
 
   await downloadWorkbook(workbook, `طلبية_الغد_${lastTomorrowReportDate}.xlsx`);
+}
+
+
+// ---- تفاصيل تابسنس: الكاش ومدى لكل يوم، الإضافات، ومبيعات كل منتج ----
+function renderTabsenseDetailsBlock(d) {
+  if (!d) return "";
+  const branch = document.getElementById("reportBranchFilter").value;
+  const inBranch = (r) => !branch || r.branch === branch;
+  const fmt = (n) => Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const dayLabel = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "short", day: "numeric", month: "numeric" });
+  let html = "";
+
+  // 1) الكاش ومدى لكل يوم (للمالك)
+  const pays = (d.payments || []).filter(inBranch);
+  if (pays.length) {
+    const byDay = {};
+    pays.forEach(p => {
+      const row = byDay[p.date] || (byDay[p.date] = { cash: 0, card: 0 });
+      if (CASH_CHANNEL.test(p.channel)) row.cash += Number(p.amount || 0);
+      else row.card += Number(p.amount || 0);
+    });
+    const days = Object.keys(byDay).sort();
+    const tot = days.reduce((a, k) => ({ cash: a.cash + byDay[k].cash, card: a.card + byDay[k].card }), { cash: 0, card: 0 });
+    html += `
+      <div class="cat-title">💳 المبيعات حسب طريقة الدفع (ر.س)</div>
+      <div class="order-table-wrap" style="margin-bottom:20px;">
+        <table class="order-table">
+          <thead><tr><th>اليوم</th><th>كاش</th><th>شبكة/مدى</th><th>المجموع</th></tr></thead>
+          <tbody>
+            ${days.map(k => `<tr><td class="cat-cell">${dayLabel(k)}</td><td>${fmt(byDay[k].cash)}</td><td>${fmt(byDay[k].card)}</td><td><strong>${fmt(byDay[k].cash + byDay[k].card)}</strong></td></tr>`).join("")}
+            <tr class="total-row"><td class="cat-cell"><strong>المجموع (${days.length} يوم)</strong></td><td><strong>${fmt(tot.cash)}</strong></td><td><strong>${fmt(tot.card)}</strong></td><td><strong>${fmt(tot.cash + tot.card)}</strong></td></tr>
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // 2) الإضافات (+50 جم …)
+  const mods = (d.modifiers || []).filter(inBranch);
+  if (mods.length) {
+    const byName = {};
+    mods.forEach(m => { const k = m.option || m.modifier; byName[k] = (byName[k] || 0) + Number(m.qty || 0); });
+    const names = Object.keys(byName).sort((a, b) => byName[b] - byName[a]);
+    const grams = (name) => { const m = String(name).match(/(\d+)/); if (!m) return null; const n = Number(m[1]); return /^\s*\+/.test(name) ? n : (n > MEAL_WEIGHT_G ? n - MEAL_WEIGHT_G : null); };
+    html += `
+      <div class="cat-title">➕ الإضافات (محسوبة ضمن استهلاك التصنيف)</div>
+      <div class="order-table-wrap" style="margin-bottom:20px;">
+        <table class="order-table">
+          <thead><tr><th>الإضافة</th><th>العدد</th><th>الوزن الزيادة</th></tr></thead>
+          <tbody>
+            ${names.map(n => { const g = grams(n); return `<tr><td class="cat-cell">${n}</td><td><strong>${fmt(byName[n])}</strong></td><td>${g ? fmt(g * byName[n]) + " جم" : "—"}</td></tr>`; }).join("")}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // 3) مبيعات كل منتج
+  const prods = (d.products || []).filter(inBranch);
+  if (prods.length) {
+    const byProd = {};
+    prods.forEach(p => {
+      const r = byProd[p.product] || (byProd[p.product] = { qty: 0, days: new Set() });
+      r.qty += Number(p.qty || 0); r.days.add(p.date);
+    });
+    const names = Object.keys(byProd).sort((a, b) => byProd[b].qty - byProd[a].qty);
+    const totalDays = new Set(prods.map(p => p.date)).size || 1;
+    html += `
+      <div class="cat-title">🧾 مبيعات كل منتج (${names.length} منتج · ${totalDays} يوم)</div>
+      <input type="search" class="ts-prod-search" placeholder="🔎 دوّر على منتج…" oninput="filterTsProducts(this.value)">
+      <div class="order-table-wrap" style="margin-bottom:20px;">
+        <table class="order-table" id="tsProductsTable">
+          <thead><tr><th>المنتج</th><th>الكمية</th><th>متوسط/يوم</th></tr></thead>
+          <tbody>
+            ${names.map(n => `<tr data-name="${n.replace(/"/g, "&quot;")}"><td class="cat-cell">${n}</td><td><strong>${fmt(byProd[n].qty)}</strong></td><td>${fmt(byProd[n].qty / totalDays)}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+  }
+  return html;
+}
+
+function filterTsProducts(q) {
+  const needle = String(q || "").trim();
+  document.querySelectorAll("#tsProductsTable tbody tr").forEach(tr => {
+    tr.style.display = !needle || tr.dataset.name.includes(needle) ? "" : "none";
+  });
 }
