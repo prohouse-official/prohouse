@@ -543,6 +543,10 @@ const SupaEngine = (() => {
 
   async function saveWasteReport(payload) {
     const { date, branch, items } = payload;
+    if (!items || !items.length) {
+      // آخر سجل انحذف — لازم ينحذف من السيرفر كمان
+      await query(`waste_log?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`, { method: "DELETE" });
+    }
     if (items && items.length) {
       const rows = items.map(it => ({
         id: it.id || (crypto.randomUUID ? crypto.randomUUID() : "wst_" + Date.now() + Math.random()),
