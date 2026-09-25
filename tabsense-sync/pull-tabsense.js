@@ -157,6 +157,9 @@ async function extractCategoryTable(page) {
     if (!table) return [];
     const headers = Array.from(table.querySelectorAll('thead th, thead td')).map(th => th.innerText.trim());
     const catIdx = headers.findIndex(h => h.includes('التصنيف') || h.toLowerCase().includes('category'));
+    // عمود المبلغ (اختياري): الإجمالي/صافي المبيعات
+    let amtIdx = headers.findIndex(h => /صافي|net/i.test(h));
+    if (amtIdx < 0) amtIdx = headers.findIndex(h => /الإجمالي|الاجمالي|إجمالي|اجمالي|المبلغ|total|amount/i.test(h));
     const qtyIdx = headers.findIndex(h => h === 'الكمية' || h.toLowerCase() === 'qty' || h.toLowerCase() === 'quantity');
     
     const rows = [];
@@ -168,7 +171,8 @@ async function extractCategoryTable(page) {
         const qtyStr = tds[qtyIdx >= 0 ? qtyIdx : 4] ? tds[qtyIdx >= 0 ? qtyIdx : 4].replace(/,/g, '') : '0';
         rows.push({
           category: catText,
-          qty: parseFloat(qtyStr) || 0
+          qty: parseFloat(qtyStr) || 0,
+          amount: amtIdx >= 0 && tds[amtIdx] ? (parseFloat(tds[amtIdx].replace(/[^0-9.\-]/g, "")) || null) : null
         });
       }
     }
@@ -279,6 +283,18 @@ async function run() {
       console.log("🍩 جاري سحب تقرير المبيعات حسب المنتج...");
       await prepareReportPageAndSetDate(page, PRODUCT_REPORT_URL, display);
       const products = await extractProductTable(page);
+      // مبيعات كل منتج بالتفصيل (لتقارير الموقع)
+      const productRows = products.filter(p => p.name && p.qty > 0);
+      if (productRows.length) {
+        try {
+          await sendToSupabase("import_product_sales", iso, BRANCH, productRows,
+            config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co",
+            config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36");
+          console.log(`🧾 تم حفظ مبيعات ${productRows.length} منتج ليوم ${iso}.`);
+        } catch (prodErr) {
+          console.warn("⚠ تعذر حفظ مبيعات المنتجات:", prodErr.message);
+        }
+      }
       const ummAliQty = findProductQty(products, UMM_ALI_PRODUCT_NAME);
       console.log(`كمية منتج أم علي المباعة ليوم ${display}: ${ummAliQty}`);
       
