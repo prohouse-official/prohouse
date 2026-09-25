@@ -853,16 +853,35 @@ const SupaEngine = (() => {
   }
 
   // حفظ/حذف الصور ذرّي بالداتابيس (قفل للصف) — جهازين بيرفعوا صور سوا ما بيضيّعوا بعض
+  // الصور بتنرفع كملفات على Storage عن طريق دالة photos (قاعدة البيانات بتحفظ الرابط بس)
+  async function photosFn(body) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 30000);
+    try {
+      const res = await fetch(SUPABASE_URL + "/functions/v1/photos", {
+        method: "POST", signal: controller.signal,
+        headers: getHeaders(), body: JSON.stringify(body)
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || `photos [${res.status}]`);
+      return out;
+    } finally { clearTimeout(t); }
+  }
+
   async function saveInspectionPhoto(photoObj) {
     const { date, branch } = photoObj;
     if (!date || !branch) return photoObj;
-    await rpc("upsert_inspection_photo", { p_date: date, p_branch: branch, p_photo: photoObj });
-    return photoObj;
+    const out = await photosFn({ action: "upload", date, branch, photo: photoObj });
+    return out.photo || photoObj;
   }
 
   async function deleteInspectionPhoto(photoId, date, branch) {
     if (!date || !branch) return [];
-    return (await rpc("delete_inspection_photo", { p_date: date, p_branch: branch, p_id: String(photoId) })) || [];
+    return (await photosFn({ action: "delete", date, branch, id: String(photoId) })).photos || [];
+  }
+
+  async function migratePhotosToStorage() {
+    return await photosFn({ action: "migrate" });
   }
 
 
@@ -954,6 +973,7 @@ const SupaEngine = (() => {
     saveCustody,
     getPayments,
     getCustodyRange,
+    migratePhotosToStorage,
     restoreEntryRows,
     saveDay,
     saveRemainingReport,

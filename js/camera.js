@@ -61,7 +61,7 @@ function openMediaDatabase() {
 }
 
 // الصورة وصلت السيرفر — منعلّمها عشان ما نرجع نفحصها ونرفعها كل مرة
-async function markPhotoUploaded(id) {
+async function markPhotoUploaded(id, saved) {
   const db = await openMediaDatabase();
   if (!db || !id) return;
   await new Promise((resolve) => {
@@ -69,7 +69,11 @@ async function markPhotoUploaded(id) {
       const tx = db.transaction("photos", "readwrite");
       const store = tx.objectStore("photos");
       const req = store.get(id);
-      req.onsuccess = () => { if (req.result && !req.result.uploaded) store.put({ ...req.result, uploaded: true }); };
+      req.onsuccess = () => {
+        if (!req.result) return;
+        const extra = saved && saved.url ? { url: saved.url, path: saved.path } : {};
+        if (!req.result.uploaded || extra.url) store.put({ ...req.result, ...extra, uploaded: true });
+      };
       tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
     } catch (e) { resolve(); }
   });
@@ -151,9 +155,10 @@ async function savePhotoRecord(photoData) {
   // 3. المزامنة السحابية الفورية مع سوبابيس لتظهر لجميع الأجهزة واللابتوب
   if (typeof SupaEngine !== "undefined" && SupaEngine.saveInspectionPhoto) {
     try {
-      await SupaEngine.saveInspectionPhoto(photoData);
+      const saved = await SupaEngine.saveInspectionPhoto(photoData);
       photoData.uploaded = true;
-      await markPhotoUploaded(photoData.id);
+      if (saved && saved.url) { photoData.url = saved.url; photoData.path = saved.path; }
+      await markPhotoUploaded(photoData.id, saved);
     } catch (err) {
       console.warn("Direct photo cloud sync failed, queuing via Sync:", err);
       if (typeof Sync !== "undefined" && Sync.enqueue) {
@@ -167,7 +172,7 @@ async function savePhotoRecord(photoData) {
   return photoData;
 }
 
-async function deletePhotoRecord(photoId) {
+async function deletePhotoRecord(photoId, photoDate, photoBranch) {
   if (!(await phConfirm("هل أنت متأكد من حذف هذه الصورة؟ يمكنك التقاط صورة جديدة بدلاً منها.", { ok: "احذف", danger: true }))) return;
 
   // 1. Delete from IndexedDB
@@ -193,12 +198,15 @@ async function deletePhotoRecord(photoId) {
 
   // 3. Delete from Supabase
   if (typeof SupaEngine !== "undefined" && SupaEngine.deleteInspectionPhoto) {
-    const branch = (typeof Branch !== "undefined" ? Branch.get() : "") || (typeof allowedBranchList === "function" ? allowedBranchList()[0] : "");
-    const date = todayStr();
+    // الصورة بتنحذف من يومها وفرعها هي (قبل كان دايماً اليوم والفرع المختار، فصور يوم تاني ما كانت تنحذف)
+    const branch = photoBranch || (typeof Branch !== "undefined" ? Branch.get() : "") || (typeof allowedBranchList === "function" ? allowedBranchList()[0] : "");
+    const date = photoDate || todayStr();
     try {
       await SupaEngine.deleteInspectionPhoto(photoId, date, branch);
     } catch (err) {
       console.warn("Supabase photo delete error:", err);
+      showToast("⚠ ما انحذفت من السيرفر: " + (err.message || "تأكد من النت"), true);
+      return;
     }
   }
 
@@ -463,7 +471,9 @@ function takePhotoSnap() {
   const ctx = canvas.getContext("2d");
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-  capturedDataUrl = canvas.toDataURL("image/jpeg", 0.6); // ضغط الصورة 60% للمزامنة السريعة
+  // WebP أصغر بحوالي النص من JPEG بنفس الجودة؛ المتصفحات اللي ما بتدعمه بترجع PNG فمنرجع لـ JPEG
+  const webp = canvas.toDataURL("image/webp", 0.6);
+  capturedDataUrl = webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/jpeg", 0.6);
   img.src = capturedDataUrl;
   img.style.display = "block";
   video.style.display = "none";
@@ -547,7 +557,7 @@ async function renderInspectionGalleryView() {
             ${photos.map(p => `
               <div class="timeline-card">
                 <div class="timeline-img-wrap" onclick="viewPhotoFullscreen('${p.id}')" title="اضغط لتكبير الصورة">
-                  <img src="${p.dataUrl}" alt="${p.checkpointName}" />
+                  <img src="${p.url || p.dataUrl}" loading="lazy" alt="${p.checkpointName}" />
                   <span class="timeline-time">${new Date(p.timestamp).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
                 <div class="timeline-info" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;">
@@ -555,7 +565,7 @@ async function renderInspectionGalleryView() {
                     <strong style="display:block;margin-bottom:3px;">${p.checkpointName}</strong>
                     <div class="timeline-emp">👤 ${p.employeeName}</div>
                   </div>
-                  <button class="btn danger" style="padding:5px 12px;font-size:12px;" onclick="deletePhotoRecord('${p.id}')" title="حذف هذه الصورة إذا تم تصويرها بالخطأ">
+                  <button class="btn danger" style="padding:5px 12px;font-size:12px;" onclick="deletePhotoRecord('${p.id}', '${p.date || ""}', '${String(p.branch || "").replace(/'/g, "")}')" title="حذف هذه الصورة إذا تم تصويرها بالخطأ">
                     🗑️ حذف
                   </button>
                 </div>
@@ -590,12 +600,12 @@ function viewPhotoFullscreen(photoId) {
     }
     overlay.innerHTML = `
       <div class="fullscreen-box" onclick="event.stopPropagation()">
-        <img src="${p.dataUrl}" alt="${p.checkpointName}" />
+        <img src="${p.url || p.dataUrl}" loading="lazy" alt="${p.checkpointName}" />
         <div class="fullscreen-caption">
           <h3>${p.checkpointName}</h3>
           <div>الفرع: ${p.branch} | الموظف: ${p.employeeName} | الوقت: ${new Date(p.timestamp).toLocaleString("ar-SA")}</div>
           <div style="margin-top:14px;display:flex;gap:10px;justify-content:center;">
-            <button class="btn danger" style="font-size:14px;padding:8px 20px;" onclick="deletePhotoRecord('${p.id}')">
+            <button class="btn danger" style="font-size:14px;padding:8px 20px;" onclick="deletePhotoRecord('${p.id}', '${p.date || ""}', '${String(p.branch || "").replace(/'/g, "")}')">
               🗑️ حذف الصورة (إذا تم تصويرها بالخطأ)
             </button>
           </div>

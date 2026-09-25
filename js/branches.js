@@ -241,7 +241,7 @@ async function renderOpeningView() {
                 <div class="cp-main-content" style="display:flex;align-items:center;gap:12px;width:100%;">
                   ${hasPhoto ? `
                     <div class="cp-thumb-preview" onclick="viewPhotoFullscreen('${photo.id}')" title="اضغط لتكبير ومعاينة الصورة" style="cursor:pointer;position:relative;flex-shrink:0;">
-                      <img src="${photo.dataUrl}" alt="${cp.name}" style="width:62px;height:62px;object-fit:cover;border-radius:10px;border:2px solid var(--accent);box-shadow:0 2px 6px rgba(0,0,0,0.15);" />
+                      <img src="${photo.url || photo.dataUrl}" loading="lazy" alt="${cp.name}" style="width:62px;height:62px;object-fit:cover;border-radius:10px;border:2px solid var(--accent);box-shadow:0 2px 6px rgba(0,0,0,0.15);" />
                       <span style="position:absolute;bottom:-4px;right:-4px;background:var(--accent);color:#000;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;">🔍</span>
                     </div>
                   ` : `
@@ -259,7 +259,7 @@ async function renderOpeningView() {
                     ${hasPhoto ? '🔄 تغيير / إعادة تصوير' : '📷 تصوير'}
                   </button>
                   ${hasPhoto ? `
-                    <button class="btn danger" style="padding:0 14px;border-radius:8px;" onclick="deletePhotoRecord('${photo.id}')" title="حذف هذه الصورة إذا تم تصويرها بالخطأ">
+                    <button class="btn danger" style="padding:0 14px;border-radius:8px;" onclick="deletePhotoRecord('${photo.id}', '${photo.date || ""}', '${String(photo.branch || "").replace(/'/g, "")}')" title="حذف هذه الصورة إذا تم تصويرها بالخطأ">
                       🗑️ حذف
                     </button>
                   ` : ''}

@@ -167,6 +167,20 @@
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
     const url = typeof input === "string" ? input : input.url;
+    if (/supabase\.co\/functions\/v1\/photos/.test(url)) {
+      // تخزين الصور بالمعاينة: الصورة بتضل dataUrl بس منحطها كـ url متل النظام الحقيقي
+      let body = {}; try { body = JSON.parse(init.body || "{}"); } catch (e) {}
+      let out;
+      if (body.action === "upload") {
+        const { dataUrl, ...rest } = body.photo || {};
+        const photo = { ...rest, url: rest.url || dataUrl, path: "demo/" + rest.id };
+        handle("POST", "https://demo.supabase.co/rest/v1/rpc/upsert_inspection_photo", { p_date: body.date, p_branch: body.branch, p_photo: photo });
+        out = { photo };
+      } else if (body.action === "delete") {
+        out = { photos: handle("POST", "https://demo.supabase.co/rest/v1/rpc/delete_inspection_photo", { p_date: body.date, p_branch: body.branch, p_id: body.id })[1] };
+      } else out = { moved: 0 };
+      return new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     if (/supabase\.co\/functions\//.test(url)) {
       return new Response('{"sent":1,"gone":0,"failed":0}', { status: 200, headers: { "Content-Type": "application/json" } });
     }
