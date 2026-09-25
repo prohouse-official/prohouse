@@ -78,6 +78,113 @@ const Branch = {
   set(name) { localStorage.setItem("ph_branch", name); }
 };
 
+// ---- الإدخال السريع: شريط تقدم، زر "الصنف الجاي"، وزر "التالي" بالكيبورد ----
+// أي خانة إدخال رئيسية عليها class="entry-input" بتدخل بالحساب
+function entryProgressHtml() {
+  return `<div class="entry-progress">
+    <div class="entry-progress-top"><span class="entry-progress-text"></span><button type="button" class="entry-next-btn">⤵ الصنف الجاي</button></div>
+    <div class="entry-progress-track"><div class="entry-progress-fill"></div></div>
+  </div>`;
+}
+
+function entryInputs(view) {
+  if (!view) return [];
+  return Array.from(view.querySelectorAll("input.entry-input"))
+    .filter(i => !i.disabled && i.offsetParent !== null || (!i.disabled && i.closest(".category-section.collapsed")));
+}
+
+function updateEntryProgress(view) {
+  const bar = view && view.querySelector(".entry-progress");
+  if (!bar) return;
+  const inputs = entryInputs(view);
+  const filled = inputs.filter(i => i.value !== "").length;
+  const allDone = inputs.length > 0 && filled >= inputs.length;
+  bar.querySelector(".entry-progress-text").textContent = inputs.length ? `✏️ ${filled} من ${inputs.length}` : "";
+  bar.querySelector(".entry-progress-fill").style.width = (inputs.length ? Math.round((filled * 100) / inputs.length) : 0) + "%";
+  const btn = bar.querySelector(".entry-next-btn");
+  btn.textContent = allDone ? "✅ خلصت كلها" : "⤵ الصنف الجاي";
+  btn.disabled = allDone;
+  const topbar = document.querySelector(".app-topbar");
+  if (topbar) bar.style.top = topbar.offsetHeight + "px";
+}
+
+function focusEntry(input) {
+  const section = input.closest(".category-section.collapsed");
+  if (section) section.classList.remove("collapsed");
+  input.scrollIntoView({ block: "center", behavior: "smooth" });
+  input.focus({ preventScroll: true });
+}
+
+function jumpToNextEmpty(view) {
+  const next = entryInputs(view).find(i => i.value === "");
+  if (next) focusEntry(next);
+}
+
+if (typeof document !== "undefined") {
+  document.addEventListener("keydown", (e) => {
+    const t = e.target;
+    if (e.key !== "Enter" || !t.classList || !t.classList.contains("entry-input")) return;
+    e.preventDefault();
+    const inputs = entryInputs(t.closest(".view"));
+    const next = inputs[inputs.indexOf(t) + 1];
+    if (next) focusEntry(next); else t.blur();
+  });
+  document.addEventListener("input", (e) => {
+    if (e.target.classList && e.target.classList.contains("entry-input")) updateEntryProgress(e.target.closest(".view"));
+  });
+  // أزرار "= المطلوب" و"لم يصل" و"0" بتغيّر القيمة من الكود، فمنعيد الحساب بعد أي كبسة
+  document.addEventListener("click", (e) => {
+    const view = e.target.closest && e.target.closest(".view");
+    if (!view || !view.querySelector(".entry-progress")) return;
+    if (e.target.closest(".entry-next-btn")) { jumpToNextEmpty(view); return; }
+    setTimeout(() => updateEntryProgress(view), 0);
+  });
+}
+
+// ---- حفظ تلقائي: بيبعت بس الأصناف اللي تغيّرت وإلها قيمة (الفاضي ما بيمسح رقم محفوظ أبداً) ----
+function createAutosaver({ delay = 1500, collect, send, onStatus }) {
+  let timer = null;
+  let running = false;
+  async function run() {
+    if (running) { schedule(); return; }
+    const job = collect();
+    if (!job || !job.items.length) return;
+    running = true;
+    onStatus("saving");
+    try {
+      await send(job);
+      job.commit();
+      onStatus("saved");
+    } catch (e) {
+      onStatus("error", e);
+      timer = setTimeout(run, 10000);
+    } finally {
+      running = false;
+    }
+  }
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(run, delay);
+  }
+  const saver = { schedule, flush: run };
+  allAutosavers.push(saver);
+  return saver;
+}
+
+const allAutosavers = [];
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") allAutosavers.forEach(a => a.flush());
+  });
+}
+
+function autosaveStatusText(state, e) {
+  const time = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+  if (state === "saving") return "⏳ عم ينحفظ…";
+  if (state === "saved") return `✓ انحفظ تلقائياً ${time}`;
+  return "⚠ ما انحفظ، رح نعيد المحاولة — " + ((e && e.message) || "");
+}
+
 // ---- شريط "تراجع" بعد شيل صنف ----
 function showUndoBar(message, onUndo, ms = 8000) {
   document.querySelectorAll(".undo-bar").forEach(el => el.remove());

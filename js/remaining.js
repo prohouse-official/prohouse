@@ -11,6 +11,47 @@ let currentRemainingExtraItems = [];
 let currentRemainingRemovedIds = new Set();
 let cachedReceivingDataForRemaining = null;
 let cachedSalesDataForRemaining = null;
+let remainingBaseline = {}; // itemId -> نسخة من قيم المتبقي كما هي عالسيرفر (للحفظ التلقائي)
+let remainingDataKey = null; // اليوم والفرع اللي الأرقام المعروضة تابعة إلهم
+
+const REM_FIELDS = ["remaining", "remainingWeight", "remainingSauce", "notes"];
+function remainingSnapshot(d) {
+  const out = {};
+  REM_FIELDS.forEach(f => { out[f] = d && d[f] != null ? String(d[f]) : ""; });
+  out.isSauce = !!(d && d.isSauce);
+  return out;
+}
+
+const remainingAutosave = createAutosaver({
+  collect() {
+    if (!remainingDataKey) return null;
+    const { date, branch } = remainingDataKey;
+    const blank = (v) => v === "" || v === null || v === undefined;
+    const items = [];
+    getAllRemainingActiveItems(cachedReceivingDataForRemaining).forEach(it => {
+      const d = currentRemainingData[it.id];
+      if (!d || (blank(d.remaining) && blank(d.remainingWeight) && blank(d.remainingSauce))) return;
+      const now = remainingSnapshot(d);
+      const base = remainingBaseline[it.id] || remainingSnapshot(null);
+      if (JSON.stringify(now) === JSON.stringify(base)) return;
+      items.push({ itemId: it.id, itemName: it.name, unit: it.unit || "جرام", category: it.category || "عام", isCustom: !!it.isCustom,
+        remaining: d.remainingWeight || d.remaining || "", remainingWeight: d.remainingWeight || "", remainingSauce: d.remainingSauce || "",
+        isSauce: !!d.isSauce, notes: d.notes || "", _snapshot: now });
+    });
+    return {
+      items,
+      payload: { date, branch, items: items.map(({ _snapshot, ...rest }) => rest) },
+      commit() { items.forEach(i => { remainingBaseline[i.itemId] = i._snapshot; }); }
+    };
+  },
+  send: (job) => Sync.postOnce("saveRemainingReport", job.payload),
+  onStatus(state, e) {
+    const el = document.getElementById("remainingSaveStatus");
+    if (!el) return;
+    el.textContent = autosaveStatusText(state, e);
+    el.classList.toggle("dirty", state === "error");
+  }
+});
 
 function getAllRemainingActiveItems(receivingData) {
   const branch = currentRemainingBranch;
@@ -185,6 +226,8 @@ function initRemainingModule() {
 }
 
 async function loadRemainingData(date, branch) {
+  await remainingAutosave.flush(); // أرقام اليوم اللي كان مفتوح بتنحفظ عيومها قبل ما نفتح يوم تاني
+  remainingDataKey = null;
   currentRemainingDate = date || currentRemainingDate;
   currentRemainingBranch = branch || Branch.get() || allowedBranchList()[0] || "";
 
@@ -226,6 +269,9 @@ async function loadRemainingData(date, branch) {
     if (remainingData) {
       mergeFreshRemainingData(remainingData);
     }
+    remainingBaseline = {};
+    Object.keys(currentRemainingData).forEach(id => { remainingBaseline[id] = remainingSnapshot(currentRemainingData[id]); });
+    remainingDataKey = { date: currentRemainingDate, branch: currentRemainingBranch };
 
     renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
   } catch (err) {
@@ -349,6 +395,7 @@ function filterRemainingCardsUI() {
     const visibleCards = sec.querySelectorAll('.remaining-card-mobile:not([style*="display: none"])');
     sec.style.display = visibleCards.length > 0 ? "" : "none";
   });
+  updateEntryProgress(document.getElementById("remainingView"));
 }
 
 function renderRemainingView(receivingData, salesData) {
@@ -491,6 +538,7 @@ function renderRemainingView(receivingData, salesData) {
         ` : ''}
       </div>
     </div>
+    ${entryProgressHtml()}
   `;
 
   if (!categories.length) {
@@ -594,11 +642,12 @@ function renderRemainingView(receivingData, salesData) {
                 <div class="rem-mini-input-wrap">
                   <input type="number" step="any" min="0" inputmode="decimal"
                          id="remweight-${it.id}"
+                         enterkeyhint="next"
                          value="${rawVal}"
                          placeholder="—"
                          ${isClosed ? 'disabled' : ''}
                          oninput="onRemainingWeightChange('${it.id}', this.value)"
-                         class="rem-mini-input ${numVal > 0 ? 'border-green' : ''}">
+                         class="entry-input rem-mini-input ${numVal > 0 ? 'border-green' : ''}">
                   <span class="rem-mini-unit">${itemUnitLabel}</span>
                 </div>
                 <button type="button" class="rem-mini-zero-btn" ${isClosed ? 'disabled' : ''} onclick="onQuickRemWeightZero('${it.id}')" title="نفد (0)">0</button>
@@ -780,6 +829,7 @@ function renderRemainingView(receivingData, salesData) {
 
   view.innerHTML = html;
   filterRemainingCardsUI();
+  updateEntryProgress(view);
 }
 
 function updateCategoryHeaderMetrics(itemId) {
@@ -1065,6 +1115,7 @@ function onRemainingNotesChange(itemId, val) {
 let saveRemLocalTimer = null;
 function saveRemainingLocalDebounced() {
   clearTimeout(saveRemLocalTimer);
+  remainingAutosave.schedule();
   saveRemLocalTimer = setTimeout(() => {
     const allItems = getAllRemainingActiveItems(cachedReceivingDataForRemaining);
     const itemsPayload = [];
@@ -1152,6 +1203,7 @@ async function saveRemainingReportData() {
   try {
     // محاولة المزامنة الفورية السريعة مع Supabase
     await Sync.postOnce("saveRemainingReport", payload);
+    itemsPayload.forEach(i => { remainingBaseline[i.itemId] = remainingSnapshot(currentRemainingData[i.itemId]); });
     showToast("✅ تم رفع تقرير المتبقي ومزامنته سحابياً بنجاح!");
     if (statusEl) {
       statusEl.textContent = "✅ متزامن سحابياً مع كل الأجهزة (" + new Date().toLocaleTimeString("ar-SA") + ")";
