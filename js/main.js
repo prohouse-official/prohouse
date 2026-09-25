@@ -80,6 +80,13 @@ function setActiveTab(tab) {
   document.getElementById("saveBarJuices").classList.toggle("hidden", tab !== "juices" || Auth.isViewOnlyEntry());
   document.getElementById("saveBarChecklist").classList.toggle("hidden", tab !== "checklist" || Auth.isViewOnlyEntry());
 
+  // تبويبات الشاشات المدموجة (قائمة الفحص جوّا التوثيق، إغلاق الفرع جوّا العهدة)
+  document.querySelectorAll(".sub-tabs").forEach(bar => {
+    const btns = Array.from(bar.querySelectorAll("[data-go]")).filter(b => tabAllowed(b.dataset.go));
+    bar.querySelectorAll("[data-go]").forEach(b => { b.classList.toggle("hidden", !tabAllowed(b.dataset.go)); b.classList.toggle("active", b.dataset.go === tab); });
+    bar.classList.toggle("hidden", !btns.some(b => b.dataset.go === tab) || btns.length < 2);
+  });
+
   if (tab === "dashboard") { renderDashboard(); }
   if (tab === "branches") { renderBranchesHubView(); }
   if (tab === "opening") { renderOpeningView(); }
@@ -117,6 +124,10 @@ function setActiveTab(tab) {
   if (tab === "settings") { Promise.all([loadSettings(), Items.load()]).then(renderSettingsView); }
 }
 
+document.querySelectorAll(".sub-tabs [data-go]").forEach(btn => {
+  btn.addEventListener("click", () => setActiveTab(btn.dataset.go));
+});
+
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
 });
@@ -129,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // شاشات مخفية من القائمة (الكود موجود — لترجيع أي وحدة شيلها من هون)
 // المستخدمون والصلاحيات صارت زر جوّا الإعدادات
-const NAV_HIDDEN_TABS = ["branches", "items", "users", "waste"]; // الهدر صار جوّا تقرير المتبقي (زر 🗑 بكل صنف)
+const NAV_HIDDEN_TABS = ["branches", "items", "users", "waste", "checklist", "closing"]; // الهدر صار جوّا تقرير المتبقي (زر 🗑 بكل صنف)
 
 function applyRoleUiGating() {
   document.querySelectorAll(".tab-btn").forEach(btn => {
