@@ -1178,6 +1178,8 @@ function updateSaveBarRemainingStatus() {
 
 async function saveRemainingReportData() {
   if (isRemainingSaving) return;
+  // منحفظ على اليوم والفرع المحمّلين فعلاً — إذا الشاشة لسا عم تحمّل يوم تاني ما منحفظ
+  if (!remainingDataKey) { showToast("⏳ لحظة، الشاشة لسا عم تحمّل"); return; }
   isRemainingSaving = true;
 
   const saveBtn = document.getElementById("remainingSaveBtn");
@@ -1203,8 +1205,8 @@ async function saveRemainingReportData() {
 
   const emp = Auth.getEmployee();
   const payload = {
-    date: currentRemainingDate,
-    branch: currentRemainingBranch,
+    date: remainingDataKey.date,
+    branch: remainingDataKey.branch,
     employeeName: emp ? emp.name : "",
     meta: currentRemainingMeta,
     items: itemsPayload,

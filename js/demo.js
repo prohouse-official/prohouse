@@ -87,6 +87,7 @@
       if (op === "gt" && !(num(cell) > num(v))) return false;
       if (op === "lt" && !(num(cell) < num(v))) return false;
       if (op === "in" && !parseList(v).includes(String(cell))) return false;
+      if (op === "not" && v.startsWith("in.") && parseList(v).includes(String(cell))) return false;
       if (op === "is" && !((v === "null" && cell == null) || String(cell) === v)) return false;
     }
     return true;
@@ -113,6 +114,22 @@
         if (!e) return [200, null];
         const { token, ...employee } = e;
         return [200, employee];
+      }
+      // نسخة مبسطة من الدوال الذرّية تبع الصور وقائمة الفحص
+      if (fn === "upsert_inspection_photo" || fn === "delete_inspection_photo" || fn === "save_checklist_shift") {
+        const { p_date, p_branch } = body || {};
+        let row = db.day_meta.find(m => m.date === p_date && m.branch === p_branch);
+        if (!row) { row = { date: p_date, branch: p_branch }; db.day_meta.push(row); }
+        if (fn === "save_checklist_shift") {
+          let cur = {}; try { cur = JSON.parse(row.payments_report_link || "{}"); } catch (e) {}
+          cur[body.p_shift || "morning"] = body.p_data || {};
+          row.payments_report_link = JSON.stringify(cur); persist(); return [200, cur];
+        }
+        let photos = []; try { photos = JSON.parse(row.sales_report_link || "[]"); } catch (e) {}
+        if (fn === "delete_inspection_photo") photos = photos.filter(x => String(x.id) !== String(body.p_id));
+        else { const ph = body.p_photo; photos = photos.filter(x => !(x.id === ph.id || (ph.sessionId && x.sessionId === ph.sessionId && x.checkpointId === ph.checkpointId))); photos.push(ph); }
+        row.sales_report_link = JSON.stringify(photos); persist();
+        return [200, fn === "delete_inspection_photo" ? photos : body.p_photo];
       }
       return [200, {}];
     }

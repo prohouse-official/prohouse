@@ -8,9 +8,14 @@ const API_URL = "https://script.google.com/macros/s/AKfycbykhtn0VUleuPkNYAKutt6A
 const APP_VERSION = "3.0.0-supabase";
 
 // ---- دوال التاريخ المشتركة ----
+// تاريخ اليوم بتوقيت الرياض دايماً — حتى لو منطقة الجوال الزمنية غلط (مسافر أو ضابطها يدوي)
 function todayStr() {
-  const d = new Date();
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  } catch (e) {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
 }
 function addDaysStr(dateStr, delta) {
   const d = new Date(dateStr + "T00:00:00");
