@@ -5,6 +5,7 @@ const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
 const { PAYMENT_REPORT_URL, extractPaymentRows } = require("./payments");
+const { MODIFIER_REPORT_URL, MEAL_WEIGHT_G, extractModifierRows, modifierGramsByCategory } = require("./modifiers");
 
 const CONFIG_PATH = path.join(__dirname, "config.json");
 if (!fs.existsSync(CONFIG_PATH)) {
@@ -332,6 +333,28 @@ async function run() {
             }
           }
         });
+      }
+
+      // ---- 2ب) الإضافات (+50 دجاج/لحم/بحري): جزء من الوزن المستلم، فبتنحسب ضمن مبيعات التصنيف ----
+      try {
+        await prepareReportPageAndSetDate(page, MODIFIER_REPORT_URL, display);
+        const modifierRows = await extractModifierRows(page);
+        if (modifierRows.length) {
+          await sendToSupabase("import_modifier_sales", iso, BRANCH, modifierRows,
+            config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co",
+            config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36");
+          const grams = modifierGramsByCategory(modifierRows);
+          Object.entries(grams).forEach(([cat, g]) => {
+            const meals = Math.round((g / MEAL_WEIGHT_G) * 100) / 100;
+            if (!meals || !mappedRows.length) return;
+            const existing = mappedRows.find(r => r.category === cat);
+            if (existing) existing.qty += meals;
+            else mappedRows.push({ category: cat, qty: meals });
+            console.log(`➕ إضافات ${cat}: ${g} جم = ${meals} وجبة`);
+          });
+        }
+      } catch (modErr) {
+        console.warn("⚠ تعذر سحب الإضافات:", modErr.message);
       }
 
       if (!mappedRows.length) {
