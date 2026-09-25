@@ -3109,3 +3109,20 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .ph-branch-pills button{ min-height:44px; padding:0 16px; border-radius:999px; border:1.5px solid var(--line-strong); background:#fff; color:#111; font-family:inherit; font-size:14.5px; font-weight:900; cursor:pointer; transition:background .15s ease, color .15s ease; }
 .ph-branch-pills button.active{ background:#111; color:var(--yellow); border-color:#111; box-shadow:0 6px 16px -10px rgba(0,0,0,.7); }
 .ph-branch-pills button:active{ transform:scale(.97); }
+
+/* ==================== نسخة أصغر لاختيار التاريخ والفرع ==================== */
+.ph-datebar{ gap:6px; padding:8px 12px 10px; }
+.ph-date-row{ gap:6px; }
+.ph-date-card{ min-height:46px; padding:5px 12px; gap:8px; border-radius:14px; }
+.ph-date-icon{ font-size:17px; }
+.ph-date-text{ flex-direction:row; align-items:baseline; gap:8px; }
+.ph-date-day{ font-size:15px; }
+.ph-date-full{ font-size:13px; }
+.ph-date-rel{ font-size:11.5px; padding:2px 9px; }
+.ph-date-arrow{ flex-basis:44px; min-height:46px; border-radius:14px !important; font-size:18px !important; }
+.ph-date-chips{ gap:6px; }
+.ph-date-chips button{ min-height:34px; font-size:13px !important; border-radius:11px !important; padding:4px 10px !important; }
+.ph-branch-pills{ flex-wrap:nowrap; overflow-x:auto; gap:6px; scrollbar-width:none; }
+.ph-branch-pills::-webkit-scrollbar{ display:none; }
+.ph-branch-pills button{ flex:0 0 auto; min-height:36px; padding:0 12px; font-size:13.5px; border-width:1px; white-space:nowrap; }
+.ph-date-day, .ph-date-full{ white-space:nowrap; }
