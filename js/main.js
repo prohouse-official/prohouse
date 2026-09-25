@@ -46,6 +46,7 @@ function setActiveSubTab(subTab) {
 
 function setActiveTab(tab) {
   if (!tabAllowed(tab)) tab = "dashboard";
+  lastActiveTab = tab;
   closeMobileSidebar();
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
@@ -308,8 +309,45 @@ function initDayJumpButtons() {
   });
 }
 
+// ---- الرجوع لنفس المكان بعد التحديث: الشاشة واليوم ومكان السكرول ----
+// بينحفظ لنص ساعة بس، لحتى فتح التطبيق تاني يوم يبدأ من الرئيسية وتاريخ اليوم
+const PLACE_KEY = "ph_last_place";
+let lastActiveTab = "dashboard";
+function savePlace() {
+  try {
+    sessionStorage.setItem(PLACE_KEY, JSON.stringify({
+      at: Date.now(), tab: lastActiveTab, scroll: window.scrollY,
+      rec: currentReceivingDate, rem: currentRemainingDate,
+      cust: typeof currentCustodyDate !== "undefined" ? currentCustodyDate : null
+    }));
+  } catch (e) { /* بلا تخزين: بيرجع للرئيسية */ }
+}
+function takeSavedPlace() {
+  try {
+    const p = JSON.parse(sessionStorage.getItem(PLACE_KEY) || "null");
+    sessionStorage.removeItem(PLACE_KEY);
+    return p && Date.now() - p.at < 30 * 60 * 1000 ? p : null;
+  } catch (e) { return null; }
+}
+window.addEventListener("pagehide", savePlace);
+// الشاشات بتبدأ على تاريخ اليوم وقت التشغيل، فمنرجّع اليوم اللي كان مفتوح بعدها
+function restorePlaceDates(place) {
+  const isDate = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d || "");
+  // الاستلام والمتبقي بيتزامنوا على نفس اليوم، فمناخد يوم الشاشة اللي كان مفتوح
+  const shared = place.tab === "remaining" ? place.rem : place.rec;
+  const setInput = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+  if (isDate(shared)) {
+    currentReceivingDate = shared; currentRemainingDate = shared;
+    setInput("receivingDateInput", shared); setInput("remainingDateInput", shared);
+  }
+  if (isDate(place.cust) && typeof currentCustodyDate !== "undefined") {
+    currentCustodyDate = place.cust; setInput("custodyDateInput", place.cust);
+  }
+}
+
 async function startApp() {
   hideLoginView();
+  const place = takeSavedPlace();
   applyRoleUiGating();
   updateOfflineBanner();
   updateSyncBadge({ pending: Sync.getQueue().length });
@@ -324,6 +362,7 @@ async function startApp() {
   initChecklistTab();
   initReportTab();
   initDayJumpButtons();
+  if (place) restorePlaceDates(place);
   // فتح شاشة معيّنة من رابط التنبيه (?tab=receiving)
   const params = new URLSearchParams(location.search);
   const wantedTab = params.get("tab");
@@ -331,7 +370,12 @@ async function startApp() {
     params.delete("tab");
     history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "") + location.hash);
   }
-  setActiveTab(wantedTab && tabAllowed(wantedTab) ? wantedTab : "dashboard");
+  const startTab = wantedTab || (place && place.tab) || "dashboard";
+  setActiveTab(tabAllowed(startTab) ? startTab : "dashboard");
+  if (place && !wantedTab && place.scroll > 0) {
+    // منستنى الشاشة تتعبّى قبل ما نرجع لنفس مكان السكرول
+    setTimeout(() => window.scrollTo({ top: place.scroll, behavior: "instant" }), 1200);
+  }
   if (typeof Push !== "undefined") Push.refreshLink();
 }
 

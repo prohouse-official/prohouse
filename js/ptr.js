@@ -65,6 +65,7 @@
     try {
       if (typeof allAutosavers !== "undefined") await Promise.all(allAutosavers.map(a => a.flush()));
     } catch (err) { /* الحفظ الفاشل بيضل بالطابور وبيتعاد */ }
+    if (typeof savePlace === "function") savePlace();
     location.reload();
   });
 })();
