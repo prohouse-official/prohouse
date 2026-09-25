@@ -7,7 +7,9 @@ const { PAYMENT_REPORT_URL, extractPaymentRows } = require("./payments");
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
 const BASE = "https://app.tabsense.ai/prohouse/dashboard";
-const INTERESTING = /payment|pay|method|tender|summary|shift|close|cash|drawer|دفع|الدفع|ملخص|وردية|نقد|كاش|اغلاق|إغلاق|صندوق/i;
+const INTERESTING = process.env.EXPLORE_MODE === "modifiers"
+  ? /modifier|option|addon|add-on|extra|topping|إضاف|اضاف|خيار|تعديل/i
+  : /payment|pay|method|tender|summary|shift|close|cash|drawer|دفع|الدفع|ملخص|وردية|نقد|كاش|اغلاق|إغلاق|صندوق/i;
 
 function yesterdayDisplay() {
   const d = new Date(Date.now() - 86400000);
@@ -34,6 +36,7 @@ async function dumpTables(page) {
       page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')
     ]);
 
+    if (process.env.EXPLORE_MODE !== "modifiers") {
     // اختبار استخراج طرق الدفع بنفس طريقة سكربت السحب (بالواجهة العربية)
     await page.goto(PAYMENT_REPORT_URL, { waitUntil: "networkidle" });
     await page.waitForTimeout(2500);
@@ -51,6 +54,7 @@ async function dumpTables(page) {
     const headers = await page.evaluate(() => Array.from(document.querySelectorAll("table thead th")).map(th => th.innerText.trim()));
     console.log("EXPLORE_PAYMENTS_AR", JSON.stringify({ headers, rows: await extractPaymentRows(page) }));
     if (process.env.EXPLORE_PAYMENTS_ONLY === "1") return;
+    }
 
     const links = new Map();
     for (const start of [`${BASE}/reports/sales-by-category`, BASE]) {

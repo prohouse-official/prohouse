@@ -60,6 +60,6 @@ jobs:
         if: github.ref_name != 'main'
         working-directory: ./tabsense-sync
         env:
-          EXPLORE_PAYMENTS_ONLY: "1"
+          EXPLORE_MODE: "modifiers"
         run: |
           node explore-reports.js
