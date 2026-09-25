@@ -94,7 +94,8 @@
   }
   function pick(row, select) {
     if (!select || select === "*") return row;
-    return Object.fromEntries(select.split(",").map(c => c.trim()).filter(Boolean).map(c => [c, row[c]]));
+    const photosCount = () => { try { const a = JSON.parse(row.sales_report_link || "[]"); return Array.isArray(a) ? a.length : 0; } catch (e) { return 0; } };
+    return Object.fromEntries(select.split(",").map(c => c.trim()).filter(Boolean).map(c => [c, c === "photos_count" ? photosCount() : row[c]]));
   }
 
   function handle(method, url, body) {
@@ -137,7 +138,9 @@
     const table = db[path];
     if (method === "GET") {
       const select = u.searchParams.get("select");
-      return [200, table.filter(r => matches(r, params)).map(r => pick(r, select))];
+      const offset = Number(u.searchParams.get("offset")) || 0;
+      const limit = u.searchParams.has("limit") ? Number(u.searchParams.get("limit")) : Infinity;
+      return [200, table.filter(r => matches(r, params)).slice(offset, offset + limit).map(r => pick(r, select))];
     }
     if (method === "DELETE") {
       db[path] = table.filter(r => !matches(r, params));

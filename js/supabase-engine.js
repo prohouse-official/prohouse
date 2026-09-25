@@ -62,6 +62,22 @@ const SupaEngine = (() => {
     return text ? JSON.parse(text) : null;
   }
 
+  // الداتابيس بترجّع ١٠٠٠ سطر كحد أقصى بالطلب — التقارير الطويلة (شهر لكل الفروع = ٤٠٠٠+ سطر)
+  // كانت تنقص بدون ما حد ينتبه. هاد بيجيب كل الصفحات ورا بعض بترتيب ثابت.
+  const PAGE = 1000;
+  async function queryAll(endpoint, order) {
+    const sep = endpoint.includes("?") ? "&" : "?";
+    const out = [];
+    for (let offset = 0; ; offset += PAGE) {
+      const rows = (await query(`${endpoint}${sep}order=${order}&limit=${PAGE}&offset=${offset}`)) || [];
+      out.push(...rows);
+      if (rows.length < PAGE) return out;
+    }
+  }
+
+  // أعمدة ميتا اليوم بدون الصور (الصور كبيرة وبتنجاب لحالها لما تنعرض) + عدد الصور محسوب بالداتابيس
+  const META_COLS = "date,branch,employee_name,payments_report_link,removed_item_ids,saved_at,updated_at,photos_count";
+
   // أرقام بتترجع من الداتابيس: فاضي = null (بلا قيمة)، عدا هيك رقم
   function numOrNull(v) {
     if (v === "" || v === null || v === undefined) return null;
@@ -272,6 +288,7 @@ const SupaEngine = (() => {
       branch: m.branch,
       employeeName: m.employee_name,
       salesReportLink: m.sales_report_link,
+      photosCount: m.photos_count,
       paymentsReportLink: m.payments_report_link,
       removedItemIds: Array.isArray(removedItemIds) ? removedItemIds : [],
       savedAt: m.saved_at,
@@ -283,7 +300,7 @@ const SupaEngine = (() => {
   async function getDay(date, branch) {
     const [entries, meta] = await Promise.all([
       query(`daily_entries?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`),
-      query(`day_meta?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`)
+      query(`day_meta?select=${META_COLS}&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`)
     ]);
 
     const mappedMeta = meta && meta[0] ? mapMeta(meta[0]) : null;
@@ -399,8 +416,8 @@ const SupaEngine = (() => {
   async function getRecentCookNames() {
     const since = new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10);
     const [a, b] = await Promise.all([
-      query(`daily_entries?select=item_id,cook_name&cook_name=neq.&date=gte.${since}`),
-      query(`tomorrow_orders?select=item_id,cook_name&cook_name=neq.&date=gte.${since}`)
+      queryAll(`daily_entries?select=item_id,cook_name&cook_name=neq.&date=gte.${since}`, "id"),
+      queryAll(`tomorrow_orders?select=item_id,cook_name&cook_name=neq.&date=gte.${since}`, "id")
     ]);
     return [...(a || []), ...(b || [])].map(r => ({ itemId: r.item_id, cookName: r.cook_name }));
   }
@@ -619,7 +636,7 @@ const SupaEngine = (() => {
   // --- المبيعات والتقارير الشاملة ---
   async function getSalesByCategory(start, end, branch) {
     const branchFilter = branch ? `&branch=eq.${encodeURIComponent(branch)}` : "";
-    const res = await query(`tabsense_sales?select=*&date=gte.${start}&date=lte.${end}${branchFilter}`);
+    const res = await queryAll(`tabsense_sales?select=*&date=gte.${start}&date=lte.${end}${branchFilter}`, "id");
     return (res || []).map(r => ({
       date: r.date,
       branch: r.branch,
@@ -632,9 +649,9 @@ const SupaEngine = (() => {
   async function getTabsenseDetails(start, end) {
     const range = `date=gte.${start}&date=lte.${end}`;
     const [products, modifiers, payments] = await Promise.all([
-      query(`tabsense_product_sales?select=date,branch,product,qty&${range}`).catch(() => []),
-      query(`tabsense_modifier_sales?select=date,branch,modifier,option,qty&${range}`).catch(() => []),
-      query(`tabsense_payments?select=date,branch,channel,amount,transactions&${range}`).catch(() => [])
+      queryAll(`tabsense_product_sales?select=date,branch,product,qty&${range}`, "date,branch,product").catch(() => []),
+      queryAll(`tabsense_modifier_sales?select=date,branch,modifier,option,qty&${range}`, "date,branch,modifier,option").catch(() => []),
+      queryAll(`tabsense_payments?select=date,branch,channel,amount,transactions&${range}`, "date,branch,channel").catch(() => [])
     ]);
     return { products: products || [], modifiers: modifiers || [], payments: payments || [] };
   }
@@ -647,10 +664,10 @@ const SupaEngine = (() => {
     }
 
     const [entries, metaRows, tabsense, juices] = await Promise.all([
-      query(`daily_entries?select=*&date=gte.${start}&date=lte.${end}${bf}`),
-      query(`day_meta?select=*&date=gte.${start}&date=lte.${end}${bf}`),
-      query(`tabsense_sales?select=*&date=gte.${start}&date=lte.${end}${bf}`),
-      query(`juice_sales?select=*&date=gte.${start}&date=lte.${end}${bf}`)
+      queryAll(`daily_entries?select=*&date=gte.${start}&date=lte.${end}${bf}`, "id"),
+      queryAll(`day_meta?select=date,branch,employee_name&date=gte.${start}&date=lte.${end}${bf}`, "date,branch"),
+      queryAll(`tabsense_sales?select=*&date=gte.${start}&date=lte.${end}${bf}`, "id"),
+      queryAll(`juice_sales?select=*&date=gte.${start}&date=lte.${end}${bf}`, "id")
     ]);
 
     const byDateBranch = {};
@@ -666,7 +683,7 @@ const SupaEngine = (() => {
       return {
         date,
         branch,
-        meta: m ? { employeeName: m.employee_name, salesReportLink: m.sales_report_link } : null,
+        meta: m ? { employeeName: m.employee_name } : null,
         items: byDateBranch[k]
       };
     });
@@ -711,7 +728,7 @@ const SupaEngine = (() => {
     }
 
     const [entries, settings] = await Promise.all([
-      query(`daily_entries?select=item_id,item_name,unit,received,returned&date=gte.${start}&date=lte.${end}${bf}`),
+      queryAll(`daily_entries?select=item_id,item_name,unit,received,returned&date=gte.${start}&date=lte.${end}${bf}`, "id"),
       getSettings()
     ]);
 
@@ -752,7 +769,7 @@ const SupaEngine = (() => {
     const [todayRows, yestRows, metaRows, tomorrowRows, jCounts, jSales, settings] = await Promise.all([
       query(`daily_entries?select=*&date=eq.${date}`),
       query(`daily_entries?select=*&date=eq.${prevDate}`),
-      query(`day_meta?select=*&date=in.(${date},${prevDate})`),
+      query(`day_meta?select=${META_COLS}&date=in.(${date},${prevDate})`),
       query(`tomorrow_orders?select=*&date=eq.${nextDate}`),
       query(`juice_counts?select=*&date=in.(${date},${prevDate})`),
       query(`juice_sales?select=*&date=eq.${date}`),
@@ -868,8 +885,8 @@ const SupaEngine = (() => {
   async function getCustodyRange(start, end, branch) {
     const range = `date=gte.${start}&date=lte.${end}&branch=eq.${encodeURIComponent(branch)}`;
     const [closings, payments] = await Promise.all([
-      query(`custody_closings?select=*&${range}`),
-      query(`tabsense_payments?select=date,channel,amount&${range}`).catch(() => [])
+      queryAll(`custody_closings?select=*&${range}`, "date"),
+      queryAll(`tabsense_payments?select=date,channel,amount&${range}`, "date,channel").catch(() => [])
     ]);
     return { closings: closings || [], payments: payments || [] };
   }
@@ -894,7 +911,7 @@ const SupaEngine = (() => {
 
   // الفروع اللي سجّلت استلام فعلي من تاريخ معيّن — لنعرف مين شغّال عالنظام
   async function getActiveBranches(since) {
-    const rows = await query(`daily_entries?select=branch&date=gte.${since}&received=gt.0`);
+    const rows = await queryAll(`daily_entries?select=branch&date=gte.${since}&received=gt.0`, "id");
     return [...new Set((rows || []).map(r => r.branch).filter(Boolean))];
   }
 

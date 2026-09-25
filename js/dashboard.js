@@ -95,11 +95,16 @@ async function loadBranchStatus(branch, dash) {
   const hasValue = (v) => v !== "" && v !== null && v !== undefined;
   const countedIds = new Set(items.filter(it => hasValue(it.remaining) || hasValue(it.remainingWeight) || hasValue(it.remainingSauce)).map(it => it.itemId));
   let photosCount = 0;
-  try {
-    const raw = dayData && dayData.meta && dayData.meta.salesReportLink;
-    const photos = raw && String(raw).startsWith("[") ? JSON.parse(raw) : [];
-    photosCount = Array.isArray(photos) ? photos.length : 0;
-  } catch (e) { photosCount = 0; }
+  const meta = dayData && dayData.meta;
+  if (meta && typeof meta.photosCount === "number") {
+    photosCount = meta.photosCount; // محسوب بالداتابيس — بدون تنزيل الصور
+  } else {
+    try {
+      const raw = meta && meta.salesReportLink;
+      const photos = raw && String(raw).startsWith("[") ? JSON.parse(raw) : [];
+      photosCount = Array.isArray(photos) ? photos.length : 0;
+    } catch (e) { photosCount = 0; }
+  }
   const custody = typeof Custody !== "undefined" ? await Custody.statusFor(today, branch) : null;
 
   return {

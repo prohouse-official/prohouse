@@ -60,6 +60,40 @@ function openMediaDatabase() {
   });
 }
 
+// الصورة وصلت السيرفر — منعلّمها عشان ما نرجع نفحصها ونرفعها كل مرة
+async function markPhotoUploaded(id) {
+  const db = await openMediaDatabase();
+  if (!db || !id) return;
+  await new Promise((resolve) => {
+    try {
+      const tx = db.transaction("photos", "readwrite");
+      const store = tx.objectStore("photos");
+      const req = store.get(id);
+      req.onsuccess = () => { if (req.result && !req.result.uploaded) store.put({ ...req.result, uploaded: true }); };
+      tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
+    } catch (e) { resolve(); }
+  });
+}
+
+// ذاكرة الجوال: الصور المرفوعة منخلّيها ٣ أيام بس، واللي ما انرفعت ٣٠ يوم.
+// قبل كانت تضل للأبد وكل فتحة للتوثيق تقرأها كلها وتفحصها مع السيرفر يوم يوم.
+const LOCAL_PHOTO_KEEP_UPLOADED = 3, LOCAL_PHOTO_KEEP_PENDING = 30;
+function isStaleLocalPhoto(p) {
+  const d = p.date || (p.timestamp ? String(p.timestamp).slice(0, 10) : "");
+  if (!d) return false;
+  return d < addDaysStr(todayStr(), -(p.uploaded ? LOCAL_PHOTO_KEEP_UPLOADED : LOCAL_PHOTO_KEEP_PENDING));
+}
+function pruneLocalPhotos(db, list) {
+  const stale = list.filter(isStaleLocalPhoto);
+  if (db && stale.length) {
+    try {
+      const tx = db.transaction("photos", "readwrite");
+      stale.forEach(p => tx.objectStore("photos").delete(p.id));
+    } catch (e) { /* منرجع نحاول المرة الجاي */ }
+  }
+  return list.filter(p => !isStaleLocalPhoto(p));
+}
+
 async function savePhotoRecord(photoData) {
   const db = await openMediaDatabase();
   photoData.id = photoData.id || "IMG-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
@@ -103,8 +137,9 @@ async function savePhotoRecord(photoData) {
     savePhotoToLocalStorageFallback(photoData);
   }
 
-  // 2. تحديث LocalStorage مع إزالة القديم إن وجد
-  try {
+  // 2. نسخة بالـ LocalStorage بس إذا الجوال ما بيدعم IndexedDB
+  // (قبل كانت كل صورة تنحفظ بالمكانين، و٥٠ صورة كانت تعبّي نص ذاكرة المتصفح)
+  if (!db) try {
     let list = JSON.parse(localStorage.getItem("ph_local_photos") || "[]");
     if (photoData.sessionId && photoData.checkpointId) {
       list = list.filter(p => !(p.sessionId === photoData.sessionId && p.checkpointId === photoData.checkpointId));
@@ -118,6 +153,7 @@ async function savePhotoRecord(photoData) {
     try {
       await SupaEngine.saveInspectionPhoto(photoData);
       photoData.uploaded = true;
+      await markPhotoUploaded(photoData.id);
     } catch (err) {
       console.warn("Direct photo cloud sync failed, queuing via Sync:", err);
       if (typeof Sync !== "undefined" && Sync.enqueue) {
@@ -219,6 +255,8 @@ async function getAllPhotos(branchFilter, dateFilter) {
         req.onsuccess = () => resolve(req.result || []);
         req.onerror = () => resolve([]);
       });
+      localPhotos = pruneLocalPhotos(db, localPhotos);
+      if (localStorage.getItem("ph_local_photos")) localStorage.removeItem("ph_local_photos"); // نسخة قديمة مكررة
     } else {
       localPhotos = JSON.parse(localStorage.getItem("ph_local_photos") || "[]");
     }
@@ -280,7 +318,8 @@ async function syncPendingLocalPhotos(localList) {
       }
     }
 
-    if (!list || list.length === 0) return;
+    list = (list || []).filter(p => !p.uploaded && !isStaleLocalPhoto(p));
+    if (list.length === 0) return;
 
     // تجميع حسب الفرع والتاريخ
     const groups = {};
@@ -303,6 +342,7 @@ async function syncPendingLocalPhotos(localList) {
           await SupaEngine.saveInspectionPhoto(lp);
           remoteIds.add(lp.id);
         }
+        await markPhotoUploaded(lp.id);
       }
     }
   } catch (e) {
