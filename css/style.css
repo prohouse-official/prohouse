@@ -3086,3 +3086,26 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .sub-tabs button.hidden{ display:none; }
 
 .opening-past-banner{ background:var(--yellow-tint); border:1px solid #F2E29A; border-radius:14px; padding:10px 14px; font-weight:900; margin:0 0 12px; }
+
+/* ==================== اختيار التاريخ والفرع (برو هاوس) ==================== */
+.ph-datebar{ display:flex !important; flex-direction:column; align-items:stretch !important; gap:8px; padding:10px 12px 12px; }
+.ph-datebar.hidden{ display:none !important; }
+.ph-date-row{ display:flex; align-items:stretch; gap:8px; }
+.ph-date-card{ position:relative; flex:1; display:flex; align-items:center; gap:10px; min-height:58px; padding:8px 14px; background:#111; color:#fff; border-radius:18px; cursor:pointer; box-shadow:0 8px 20px -12px rgba(0,0,0,.6); overflow:hidden; }
+.ph-date-card input[type=date]{ position:absolute !important; inset:0; width:100% !important; height:100% !important; opacity:0; cursor:pointer; border:0 !important; padding:0 !important; margin:0 !important; }
+.ph-date-icon{ font-size:22px; }
+.ph-date-text{ display:flex; flex-direction:column; line-height:1.25; flex:1; }
+.ph-date-day{ font-size:17px; font-weight:900; color:var(--yellow); }
+.ph-date-full{ font-size:13px; font-weight:700; color:#E9E6DD; }
+.ph-date-rel{ background:var(--yellow); color:#111; font-size:12.5px; font-weight:900; border-radius:999px; padding:4px 10px; }
+.ph-date-arrow{ flex:0 0 52px; min-height:58px; border-radius:18px !important; border:1px solid var(--line-strong) !important; background:#fff !important; font-size:22px !important; font-weight:900 !important; color:#111 !important; padding:0 !important; }
+.ph-date-arrow:disabled{ opacity:.35; }
+.ph-date-chips{ display:flex; gap:8px; }
+.ph-date-chips button{ flex:1; min-height:42px; font-size:14px !important; border-radius:14px !important; }
+.ph-date-chips button.active{ background:var(--yellow) !important; border-color:#E6CB3A !important; }
+
+.ph-hidden-select{ display:none !important; }
+.ph-branch-pills{ display:flex; flex-wrap:wrap; gap:8px; }
+.ph-branch-pills button{ min-height:44px; padding:0 16px; border-radius:999px; border:1.5px solid var(--line-strong); background:#fff; color:#111; font-family:inherit; font-size:14.5px; font-weight:900; cursor:pointer; transition:background .15s ease, color .15s ease; }
+.ph-branch-pills button.active{ background:#111; color:var(--yellow); border-color:#111; box-shadow:0 6px 16px -10px rgba(0,0,0,.7); }
+.ph-branch-pills button:active{ transform:scale(.97); }
