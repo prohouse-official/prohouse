@@ -12,11 +12,15 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=5.3.0">
+<link rel="stylesheet" href="css/style.css?v=5.4.0">
 <script>
-// الشغل بدون نت انلغى: منشيل أي Service Worker قديم ومنمسح ملفاته لحتى الجهاز يجيب أحدث نسخة دايماً
+// الشغل بدون نت انلغى: منشيل الـ Service Worker القديم (sw.js) ومنمسح ملفاته لحتى الجهاز يجيب أحدث نسخة دايماً.
+// عامل الإشعارات (push-sw.js) ما بيخزّن شي، فمنخليه.
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+  navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => {
+    const w = r.active || r.waiting || r.installing;
+    if (!w || !/push-sw\.js$/.test(new URL(w.scriptURL).pathname)) r.unregister();
+  })).catch(() => {});
 }
 if ('caches' in window) {
   caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
@@ -130,6 +134,10 @@ if ('caches' in window) {
         <span class="nav-icon">📊</span>
         <span class="nav-text">تقرير المتبقي والجرد</span>
       </button>
+      <button class="tab-btn nav-item" data-tab="custody">
+        <span class="nav-icon">💰</span>
+        <span class="nav-text">إغلاق العهدة</span>
+      </button>
 
       <div class="nav-group-title">📋 التشغيل والمبيعات</div>
       <button class="tab-btn nav-item" data-tab="tomorrow">
@@ -216,6 +224,15 @@ if ('caches' in window) {
           <button type="button" data-day="next" title="اليوم التالي" aria-label="اليوم التالي">←</button>
         </div>
       </div>
+      <div class="datebar hidden" id="custodyDateBar">
+        <input type="date" id="custodyDateInput">
+        <div class="day-jump">
+          <button type="button" data-day="prev" title="اليوم السابق" aria-label="اليوم السابق">→</button>
+          <button type="button" data-day="yesterday">أمس</button>
+          <button type="button" data-day="today">اليوم</button>
+          <button type="button" data-day="next" title="اليوم التالي" aria-label="اليوم التالي">←</button>
+        </div>
+      </div>
       <div class="datebar hidden" id="tomorrowDateBar">
         <input type="date" id="tomorrowDateInput">
       </div>
@@ -249,6 +266,7 @@ if ('caches' in window) {
       <div id="inspectionView" class="view hidden"></div>
       <div id="receivingView" class="view hidden"></div>
       <div id="remainingView" class="view hidden"></div>
+      <div id="custodyView" class="view hidden"></div>
       <div id="tomorrowView" class="view hidden"></div>
       <div id="juicesView" class="view hidden"></div>
       <div id="checklistView" class="view hidden"></div>
@@ -336,27 +354,30 @@ if ('caches' in window) {
 
 <div class="toast" id="toast"></div>
 
-<script src="js/config.js?v=5.3.0"></script>
-<script src="js/supabase-engine.js?v=5.3.0"></script>
-<script src="js/shared.js?v=5.3.0"></script>
-<script src="js/auth.js?v=5.3.0"></script>
-<script src="js/sync.js?v=5.3.0"></script>
-<script src="js/items.js?v=5.3.0"></script>
-<script src="js/camera.js?v=5.3.0"></script>
-<script src="js/branches.js?v=5.3.0"></script>
-<script src="js/receiving.js?v=5.3.0"></script>
-<script src="js/remaining.js?v=5.3.0"></script>
-<script src="js/waste.js?v=5.3.0"></script>
-<script src="js/users.js?v=5.3.0"></script>
-<script src="js/audit.js?v=5.3.0"></script>
-<script src="js/forecast.js?v=5.3.0"></script>
-<script src="js/tomorrow.js?v=5.3.0"></script>
-<script src="js/juices.js?v=5.3.0"></script>
-<script src="js/checklist.js?v=5.3.0"></script>
-<script src="js/report.js?v=5.3.0"></script>
-<script src="js/settings.js?v=5.3.0"></script>
-<script src="js/dashboard.js?v=5.3.0"></script>
-<script src="js/main.js?v=5.3.0"></script>
+<script src="js/demo.js?v=5.4.0"></script>
+<script src="js/config.js?v=5.4.0"></script>
+<script src="js/supabase-engine.js?v=5.4.0"></script>
+<script src="js/shared.js?v=5.4.0"></script>
+<script src="js/auth.js?v=5.4.0"></script>
+<script src="js/sync.js?v=5.4.0"></script>
+<script src="js/items.js?v=5.4.0"></script>
+<script src="js/camera.js?v=5.4.0"></script>
+<script src="js/branches.js?v=5.4.0"></script>
+<script src="js/receiving.js?v=5.4.0"></script>
+<script src="js/remaining.js?v=5.4.0"></script>
+<script src="js/custody.js?v=5.4.0"></script>
+<script src="js/push.js?v=5.4.0"></script>
+<script src="js/waste.js?v=5.4.0"></script>
+<script src="js/users.js?v=5.4.0"></script>
+<script src="js/audit.js?v=5.4.0"></script>
+<script src="js/forecast.js?v=5.4.0"></script>
+<script src="js/tomorrow.js?v=5.4.0"></script>
+<script src="js/juices.js?v=5.4.0"></script>
+<script src="js/checklist.js?v=5.4.0"></script>
+<script src="js/report.js?v=5.4.0"></script>
+<script src="js/settings.js?v=5.4.0"></script>
+<script src="js/dashboard.js?v=5.4.0"></script>
+<script src="js/main.js?v=5.4.0"></script>
 
 </body>
 </html>

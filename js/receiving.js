@@ -10,6 +10,41 @@ let isReceivingSaving = false;
 let receivingActiveFilter = "all"; // 'all', 'unreceived', 'mismatch'
 let receivingCollapsed = {};
 let receivingNotesExpanded = {}; // itemId -> boolean
+let receivingBaseline = {}; // itemId -> { received, notes } كما هي عالسيرفر (للحفظ التلقائي)
+let receivingDataKey = null; // اليوم والفرع اللي الأرقام المعروضة تابعة إلهم — مش التاريخ اللي بالحقل
+
+const receivingAutosave = createAutosaver({
+  collect() {
+    if (!receivingDataKey) return null;
+    const { date, branch } = receivingDataKey;
+    const blank = (v) => v === "" || v === null || v === undefined;
+    const changed = getAllReceivingActiveItems().filter(it => {
+      const d = currentReceivingData[it.id];
+      if (!d || blank(d.received)) return false;
+      const base = receivingBaseline[it.id] || {};
+      return String(d.received) !== String(base.received ?? "") || String(d.notes || "") !== String(base.notes || "");
+    });
+    const items = changed.map(it => {
+      const d = currentReceivingData[it.id];
+      const ord = currentReceivingOrdered[it.id] || 0;
+      return { itemId: it.id, itemName: it.name, unit: it.unit || "جرام", category: it.category || "عام", isCustom: !!it.isCustom,
+        ordered: ord, received: d.received, status: computeReceivingItemStatus(d.received, ord), notes: d.notes || "", cookName: d.cookName || "" };
+    });
+    const emp = Auth.getEmployee();
+    return {
+      date, branch, items,
+      payload: { date, branch, employeeName: emp ? emp.name : "", items, removedItemIds: Array.from(currentReceivingRemovedIds) },
+      commit() { items.forEach(i => { receivingBaseline[i.itemId] = { received: i.received, notes: i.notes }; }); }
+    };
+  },
+  send: (job) => Sync.postOnce("saveDay", job.payload),
+  onStatus(state, e) {
+    const el = document.getElementById("receivingSaveStatus");
+    if (!el) return;
+    el.textContent = autosaveStatusText(state, e);
+    el.classList.toggle("dirty", state === "error");
+  }
+});
 
 function initReceivingModule() {
   currentReceivingBranch = Branch.get() || allowedBranchList()[0] || "";
@@ -17,6 +52,8 @@ function initReceivingModule() {
 }
 
 async function loadReceivingData(date, branch) {
+  await receivingAutosave.flush(); // أرقام اليوم اللي كان مفتوح بتنحفظ عيومها قبل ما نفتح يوم تاني
+  receivingDataKey = null;
   currentReceivingDate = date || currentReceivingDate;
   currentReceivingBranch = branch || Branch.get() || allowedBranchList()[0] || "";
   
@@ -34,6 +71,8 @@ async function loadReceivingData(date, branch) {
   currentReceivingData = {};
   currentReceivingExtraItems = [];
   currentReceivingRemovedIds = new Set();
+  receivingBaseline = {};
+  receivingDataKey = { date: currentReceivingDate, branch: currentReceivingBranch };
   
   if (dayData) {
     if (Array.isArray(dayData.removedItemIds)) {
@@ -50,6 +89,7 @@ async function loadReceivingData(date, branch) {
           cookName: it.cookName || "",
           status: it.status || computeReceivingItemStatus(it.received, currentReceivingOrdered[it.itemId])
         };
+        receivingBaseline[it.itemId] = { received: currentReceivingData[it.itemId].received, notes: currentReceivingData[it.itemId].notes };
 
         const existingInCatalog = Items.current.some(catalogIt => catalogIt.id === it.itemId);
         if (!existingInCatalog && (it.isCustom || String(it.itemId).startsWith("custom_rec_") || it.itemName)) {
@@ -141,6 +181,7 @@ function filterReceivingCardsUI() {
     const visibleCards = sec.querySelectorAll('.receiving-item-card:not([style*="display: none"])');
     sec.style.display = visibleCards.length > 0 ? "" : "none";
   });
+  updateEntryProgress(document.getElementById("receivingView"));
 }
 
 function renderReceivingView() {
@@ -205,8 +246,8 @@ function renderReceivingView() {
         </div>
       </div>
 
-      <!-- تنبيه مصدر الطلبية -->
-      ${(() => {
+      <!-- تنبيه مصدر الطلبية (مخفي عن الموظف لحتى ما تزدحم الشاشة) -->
+      ${Auth.isBranchStaff() ? "" : (() => {
         const orderedCount = Object.keys(currentReceivingOrdered || {}).length;
         return orderedCount > 0
           ? `<div class="rec-source-badge">📋 «المطلوب من المطبخ» مأخوذ من طلبية الأمس (${orderedCount} صنف).</div>`
@@ -214,7 +255,7 @@ function renderReceivingView() {
       })()}
 
       <!-- بطاقات الإحصائيات السريعة -->
-      <div class="rec-stats-row">
+      ${Auth.isBranchStaff() ? "" : `<div class="rec-stats-row">
         <div class="rec-stat-pill">
           <span class="rec-stat-num">${totalItemsCount}</span>
           <span class="rec-stat-lbl">إجمالي الأصناف</span>
@@ -231,7 +272,7 @@ function renderReceivingView() {
           <span class="rec-stat-num">${unreceivedCount}</span>
           <span class="rec-stat-lbl">لم يستلم بعد</span>
         </div>
-      </div>
+      </div>`}
 
       <!-- أزرار الإجراء السريع -->
       <div class="rec-quick-actions-bar">
@@ -254,6 +295,7 @@ function renderReceivingView() {
         </button>
       </div>
     </div>
+    ${entryProgressHtml()}
   `;
 
   // تجميع الأصناف حسب التصنيف
@@ -326,7 +368,7 @@ function renderReceivingView() {
               <span class="rec-meta-chip rec-diff-chip ${diff < 0 ? 'diff-red' : (diff > 0 ? 'diff-orange' : (diff === 0 ? 'diff-green' : 'diff-gray'))}" id="recdiff-${it.id}">
                 ${diff === null ? '—' : (diff === 0 ? '✅ مطابق' : (diff < 0 ? `🔻 ${diff}` : `🔺 +${diff}`))}
               </span>
-              ${isSandwich ? `<span class="rec-meta-chip rec-meal-chip" id="recmeals-${it.id}">🥪 ${recNum ? Math.round(recNum) : "0"} ساندويتش</span>` :
+              ${Auth.isBranchStaff() ? "" : isSandwich ? `<span class="rec-meta-chip rec-meal-chip" id="recmeals-${it.id}">🥪 ${recNum ? Math.round(recNum) : "0"} ساندويتش</span>` :
                 (isSalad ? `<span class="rec-meta-chip rec-meal-chip" id="recmeals-${it.id}">🥗 ${recNum ? Math.round(recNum) : "0"} حبة</span>` :
                 (isWeightMeal ? `<span class="rec-meta-chip rec-meal-chip" id="recmeals-${it.id}">🍽 ${mealsCount(rec) || "0"} وجبة</span>` : ""))}
             </div>
@@ -344,8 +386,9 @@ function renderReceivingView() {
                      value="${rec}" 
                      placeholder="—"
                      id="recinput-${it.id}"
+                     enterkeyhint="next"
                      oninput="onReceivingInputChange('${it.id}', this.value)"
-                     class="rec-main-input ${diff < 0 ? 'border-red' : (diff > 0 ? 'border-orange' : (hasValue ? 'border-green' : ''))}">
+                     class="entry-input rec-main-input ${diff < 0 ? 'border-red' : (diff > 0 ? 'border-orange' : (hasValue ? 'border-green' : ''))}">
               <span class="rec-input-unit-label">${isSandwich ? "ساندويتش" : (isSalad ? "حبة" : (it.unit || "جم"))}</span>
             </div>
 
@@ -390,6 +433,7 @@ function renderReceivingView() {
 
   view.innerHTML = html;
   filterReceivingCardsUI();
+  updateEntryProgress(view);
 }
 
 // ---- وظائف التفاعل السريع للأوزان والأزرار ----
@@ -547,7 +591,7 @@ function updateReceivingItemCardUI(itemId) {
   // تحديث حدود الحقل
   const input = document.getElementById("recinput-" + itemId);
   if (input) {
-    input.className = "rec-main-input " + (diff < 0 ? 'border-red' : (diff > 0 ? 'border-orange' : (hasValue ? 'border-green' : '')));
+    input.className = "entry-input rec-main-input " + (diff < 0 ? 'border-red' : (diff > 0 ? 'border-orange' : (hasValue ? 'border-green' : '')));
   }
 
   // تحديث شريحة الفرق
@@ -744,6 +788,7 @@ function flushReceivingSave() {
     removedItemIds: Array.from(currentReceivingRemovedIds)
   };
   Sync.cacheSet("day:" + currentReceivingDate + ":" + currentReceivingBranch, payload);
+  receivingAutosave.schedule();
   return payload;
 }
 
@@ -828,6 +873,7 @@ async function saveReceivingReportData() {
   try {
     // محاولة المزامنة الفورية السريعة مع Supabase
     await Sync.postOnce("saveDay", payload);
+    itemsPayload.forEach(i => { receivingBaseline[i.itemId] = { received: i.received, notes: i.notes }; });
     showToast("✅ تم رفع تقرير الاستلام ومزامنته سحابياً بنجاح!");
     if (statusEl) {
       statusEl.textContent = "✅ متزامن سحابياً مع كل الأجهزة (" + new Date().toLocaleTimeString("ar-SA") + ")";

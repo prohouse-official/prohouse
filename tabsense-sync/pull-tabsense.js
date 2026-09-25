@@ -4,6 +4,7 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
+const { PAYMENT_REPORT_URL, extractPaymentRows } = require("./payments");
 
 const CONFIG_PATH = path.join(__dirname, "config.json");
 if (!fs.existsSync(CONFIG_PATH)) {
@@ -341,6 +342,21 @@ async function run() {
         } catch (supaErr) {
           console.warn(`⚠ تعذر تحديث Supabase (مبيعات التصنيفات لفرع ${BRANCH}):`, supaErr.message);
         }
+      }
+
+      // ---- 3ب) المبيعات حسب طريقة الدفع (لإغلاق العهدة: كاش مقابل مدى) ----
+      try {
+        await prepareReportPageAndSetDate(page, PAYMENT_REPORT_URL, display);
+        const paymentRows = await extractPaymentRows(page);
+        console.log(`💳 طرق الدفع ليوم ${iso}:`, paymentRows);
+        if (paymentRows.length) {
+          await sendToSupabase("import_payments", iso, BRANCH, paymentRows,
+            config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supabase.co",
+            config.supabaseToken || "83354f8b8614b5aa649f1828e05da526b42a69ac9d97ad36");
+          console.log(`☁️ تم تحديث مبيعات طرق الدفع على Supabase لفرع ${BRANCH}.`);
+        }
+      } catch (payErr) {
+        console.warn("⚠ تعذر سحب/إرسال المبيعات حسب طريقة الدفع:", payErr.message);
       }
 
       // ---- 4) مبيعات العصيرات (لصفحة جرد العصيرات) ----

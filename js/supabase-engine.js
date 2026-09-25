@@ -69,6 +69,11 @@ const SupaEngine = (() => {
     return isNaN(n) ? null : n;
   }
 
+  // نداء دالة بالداتابيس (RPC) — الجلسة بتنبعت بالهيدر متل كل الطلبات
+  async function rpc(name, body) {
+    return query("rpc/" + name, { method: "POST", body: JSON.stringify(body || {}) });
+  }
+
   // --- تسجيل الدخول والمصادقة ---
   // الشيك الفعلي للرقم السري صار داخل دالة login بالداتابيس (ما حد يقدر يقرأ جدول
   // الموظفين ولا يشوف الهاشات من المتصفح)
@@ -910,6 +915,25 @@ const SupaEngine = (() => {
     return existingPhotos;
   }
 
+  // --- إغلاق العهدة ---
+  async function getCustody(date, branch) {
+    const rows = await query(`custody_closings?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
+    return (rows && rows[0]) || null;
+  }
+
+  async function saveCustody(row) {
+    await query("custody_closings?on_conflict=date,branch", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(row)
+    });
+  }
+
+  // مبيعات تابسنس حسب طريقة الدفع — الداتابيس بترجّعها للمالك بس
+  async function getPayments(date, branch) {
+    return (await query(`tabsense_payments?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`)) || [];
+  }
+
   // نسخة من صف صنف بيوم معيّن قبل ما ينشال — لزر التراجع
   async function getEntryRows(date, branch, itemId) {
     return (await query(`daily_entries?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&item_id=eq.${encodeURIComponent(itemId)}`)) || [];
@@ -966,6 +990,7 @@ const SupaEngine = (() => {
   }
 
   return {
+    rpc,
     login,
     changePin,
     getItems,
@@ -976,6 +1001,9 @@ const SupaEngine = (() => {
     getDay,
     getActiveBranches,
     getEntryRows,
+    getCustody,
+    saveCustody,
+    getPayments,
     restoreEntryRows,
     saveDay,
     saveRemainingReport,

@@ -42,8 +42,18 @@ jobs:
           fi
 
       - name: Run TabSense Sync Script
+        if: github.ref_name == 'main'
         working-directory: ./tabsense-sync
         env:
           TABSENSE_BRANCH: "عبداللطيف جميل"
         run: |
           node pull-tabsense.js
+
+      # على أي فرع غير main: بس قراءة قائمة تقارير تابسنس (بلا كتابة بقاعدة البيانات)
+      - name: Explore TabSense reports (read-only)
+        if: github.ref_name != 'main'
+        working-directory: ./tabsense-sync
+        env:
+          EXPLORE_PAYMENTS_ONLY: "1"
+        run: |
+          node explore-reports.js
