@@ -217,8 +217,10 @@ async function renderDashboard() {
       </div>
       ${statuses.length > 1 ? `<div class="home-dots">${statuses.map((s, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${s.branch}"></button>`).join("")}</div>` : ""}
       ${flagged.length ? `<button type="button" class="home-flag" data-tab="report">⚠ ${flagged.length} صنف إرجاعه مرتفع هالشهر ‹</button>` : ""}
+      <div id="monthAlertsCard"></div>
       <div id="pushCardHome" class="push-card-slot"></div>
     `;
+    if (Auth.isOwner && Auth.isOwner()) renderMonthAlerts(today);
   }
 
   const swiper = document.getElementById("homeSwiper");
@@ -240,6 +242,35 @@ async function renderDashboard() {
     });
   });
   if (typeof mountPushCard === "function") mountPushCard(document.getElementById("pushCardHome"), { compact: true });
+}
+
+// ==================== تنبيهات الشهر (للمالك) ====================
+// عجز/زيادة الدجاج واللحم والبحري من أول الشهر لكل فرع (المستلم − المباع − الهدر مقارنة بالمتبقي)
+// + فروقات الكاش والأيام اللي ما انقفلت فيها العهدة. الحساب كله بالداتابيس.
+async function renderMonthAlerts(today) {
+  const el = document.getElementById("monthAlertsCard");
+  if (!el || typeof SupaEngine === "undefined" || !SupaEngine.rpc) return;
+  let data;
+  try { data = await SupaEngine.rpc("owner_month_alerts", { p_start: today.slice(0, 7) + "-01", p_end: today }); }
+  catch (e) { return; }
+  const meals = (g) => (Math.abs(g) / MEAL_WEIGHT_G).toFixed(1).replace(/\.0$/, "");
+  const kg = (g) => (Math.abs(g) / 1000).toFixed(1).replace(/\.0$/, "");
+  const lines = [];
+  (data.categories || []).forEach(c => {
+    if (c.variance_g !== null && c.variance_g <= -MEAL_WEIGHT_G) {
+      lines.push(`<li class="bad">🔻 ${c.branch} · ${c.category}: عجز <b>${kg(c.variance_g)} كجم</b> (${meals(c.variance_g)} وجبة) خلال ${c.counted_days} يوم</li>`);
+    } else if (c.variance_g !== null && c.variance_g >= MEAL_WEIGHT_G * 3) {
+      lines.push(`<li>🔺 ${c.branch} · ${c.category}: زيادة ${kg(c.variance_g)} كجم — تأكد من الجرد</li>`);
+    }
+    if (c.missing_days > 0) lines.push(`<li>📝 ${c.branch} · ${c.category}: ${c.missing_days} يوم بدون جرد متبقي</li>`);
+  });
+  (data.cash || []).forEach(c => {
+    if (c.open_days > 0) lines.push(`<li>💵 ${c.branch}: ${c.open_days} يوم ما انقفلت العهدة</li>`);
+    if (c.big_diff_days > 0 || Math.abs(c.cash_diff) >= 20) lines.push(`<li class="${c.cash_diff < 0 ? "bad" : ""}">💵 ${c.branch}: فرق الكاش ${c.cash_diff < 0 ? "عجز" : "زيادة"} <b>${Math.abs(c.cash_diff).toFixed(2)} ر.س</b>${c.big_diff_days ? ` · ${c.big_diff_days} يوم فيها فرق كبير` : ""}</li>`);
+  });
+  el.innerHTML = lines.length
+    ? `<div class="month-alerts"><div class="month-alerts-title">⚠ تنبيهات الشهر</div><ul>${lines.join("")}</ul></div>`
+    : `<div class="month-alerts ok">✅ ما في تنبيهات هالشهر</div>`;
 }
 
 function initDashboardTab() {

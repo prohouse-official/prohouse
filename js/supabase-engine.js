@@ -67,11 +67,16 @@ const SupaEngine = (() => {
   const PAGE = 1000;
   async function queryAll(endpoint, order) {
     const sep = endpoint.includes("?") ? "&" : "?";
-    const out = [];
-    for (let offset = 0; ; offset += PAGE) {
-      const rows = (await query(`${endpoint}${sep}order=${order}&limit=${PAGE}&offset=${offset}`)) || [];
-      out.push(...rows);
-      if (rows.length < PAGE) return out;
+    const page = async (offset) => (await query(`${endpoint}${sep}order=${order}&limit=${PAGE}&offset=${offset}`)) || [];
+    const out = await page(0);
+    if (out.length < PAGE) return out;
+    // تقرير طويل: منجيب ٤ صفحات مع بعض بدل وحدة ورا التانية
+    for (let offset = PAGE; ; offset += PAGE * 4) {
+      const batch = await Promise.all([0, 1, 2, 3].map(k => page(offset + k * PAGE)));
+      for (const rows of batch) {
+        out.push(...rows);
+        if (rows.length < PAGE) return out;
+      }
     }
   }
 
@@ -261,6 +266,7 @@ const SupaEngine = (() => {
       remaining: e.remaining,
       remainingWeight: e.remaining_weight,
       remainingSauce: e.remaining_sauce,
+      remainingNotes: e.remaining_notes,
       savedAt: e.saved_at
     };
   }
@@ -398,7 +404,7 @@ const SupaEngine = (() => {
         remaining: numOrNull(it.remainingWeight || it.remaining),
         remaining_weight: numOrNull(it.remainingWeight),
         remaining_sauce: numOrNull(it.remainingSauce),
-        ...(it.notes ? { notes: it.notes } : {}), // خانة الملاحظات مشتركة مع الاستلام — الفاضي ما بيمسح ملاحظة الاستلام
+        remaining_notes: it.notes || null, // ملاحظة المتبقي بخانتها — ما بتلمس ملاحظة الاستلام
         saved_at: new Date().toISOString()
       }));
 

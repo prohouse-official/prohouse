@@ -3149,3 +3149,10 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 
 /* رابط نموذج المصروفات تحت المصاريف */
 .cust-form-link { display: block; text-align: center; text-decoration: none; margin-top: 6px; }
+
+/* تنبيهات الشهر بالرئيسية (المالك) */
+.month-alerts { background: var(--card, #fff); border: 1px solid var(--border, #e5e5e5); border-radius: 14px; padding: 12px 14px; margin: 12px 0; }
+.month-alerts.ok { color: #1b7f3b; font-weight: 600; text-align: center; }
+.month-alerts-title { font-weight: 800; margin-bottom: 6px; }
+.month-alerts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.month-alerts li.bad b { color: #c62828; }
