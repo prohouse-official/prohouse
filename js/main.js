@@ -67,6 +67,7 @@ function setActiveTab(tab) {
   if (remDateBar) remDateBar.classList.toggle("hidden", tab !== "remaining");
 
   document.getElementById("custodyDateBar").classList.toggle("hidden", tab !== "custody");
+  document.getElementById("openingDateBar").classList.toggle("hidden", tab !== "opening");
   document.getElementById("tomorrowDateBar").classList.toggle("hidden", tab !== "tomorrow");
   document.getElementById("juiceDateBar").classList.toggle("hidden", tab !== "juices");
   document.getElementById("checklistDateBar").classList.toggle("hidden", tab !== "checklist");
