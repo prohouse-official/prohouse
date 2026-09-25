@@ -99,6 +99,8 @@ function renderSettingsView() {
       <button class="btn gold" id="saveThresholdsBtn" style="margin-top:8px;">حفظ الأعتاب</button>
     </div>
 
+    ${typeof reminderSettingsCardHtml === "function" ? reminderSettingsCardHtml() : ""}
+
     <div class="settings-card">
       <h3>إشعارات وتنبيهات الواتساب 💬📱</h3>
       <div class="field">
@@ -189,6 +191,8 @@ function renderSettingsView() {
     Sync.enqueue("saveSettings:categoryOrder", "saveSettings", payload);
     showToast("تم حفظ ترتيب التصنيفات");
   });
+
+  if (typeof bindReminderSettings === "function") bindReminderSettings();
 
   document.getElementById("saveThresholdsBtn").addEventListener("click", () => {
     const payload = {

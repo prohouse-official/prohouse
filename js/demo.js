@@ -144,6 +144,9 @@
   const realFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
     const url = typeof input === "string" ? input : input.url;
+    if (/supabase\.co\/functions\//.test(url)) {
+      return new Response('{"sent":1,"gone":0,"failed":0}', { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     if (/supabase\.co\//.test(url)) {
       let body = null;
       try { body = init.body ? JSON.parse(init.body) : null; } catch (e) { body = null; }

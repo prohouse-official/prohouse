@@ -69,6 +69,11 @@ const SupaEngine = (() => {
     return isNaN(n) ? null : n;
   }
 
+  // نداء دالة بالداتابيس (RPC) — الجلسة بتنبعت بالهيدر متل كل الطلبات
+  async function rpc(name, body) {
+    return query("rpc/" + name, { method: "POST", body: JSON.stringify(body || {}) });
+  }
+
   // --- تسجيل الدخول والمصادقة ---
   // الشيك الفعلي للرقم السري صار داخل دالة login بالداتابيس (ما حد يقدر يقرأ جدول
   // الموظفين ولا يشوف الهاشات من المتصفح)
@@ -985,6 +990,7 @@ const SupaEngine = (() => {
   }
 
   return {
+    rpc,
     login,
     changePin,
     getItems,

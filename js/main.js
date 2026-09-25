@@ -322,7 +322,15 @@ async function startApp() {
   initChecklistTab();
   initReportTab();
   initDayJumpButtons();
-  setActiveTab("dashboard");
+  // فتح شاشة معيّنة من رابط التنبيه (?tab=receiving)
+  const params = new URLSearchParams(location.search);
+  const wantedTab = params.get("tab");
+  if (wantedTab) {
+    params.delete("tab");
+    history.replaceState(null, "", location.pathname + (params.toString() ? "?" + params : "") + location.hash);
+  }
+  setActiveTab(wantedTab && tabAllowed(wantedTab) ? wantedTab : "dashboard");
+  if (typeof Push !== "undefined") Push.refreshLink();
 }
 
 async function doLoginSubmit() {

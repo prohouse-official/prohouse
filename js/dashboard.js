@@ -192,6 +192,7 @@ async function renderDashboard() {
           <span class="home-next-title">${next.icon} ${next.title}</span>
         </button>` : `<div class="home-all-done">✅ خلّصت كل خطوات اليوم. يعطيك العافية!</div>`}
       ${s ? stepsCardHtml(s, false) : ""}
+      <div id="pushCardHome" class="push-card-slot"></div>
     `;
   } else {
     let flagged = [];
@@ -205,6 +206,7 @@ async function renderDashboard() {
       <div class="home-sub">${dateLabel}</div>
       ${statuses.map(s => stepsCardHtml(s, true)).join("")}
       ${flagged.length ? `<button type="button" class="home-flag" data-tab="report">⚠ ${flagged.length} صنف إرجاعه مرتفع هالشهر ‹</button>` : ""}
+      <div id="pushCardHome" class="push-card-slot"></div>
     `;
   }
 
@@ -214,6 +216,7 @@ async function renderDashboard() {
       setActiveTab(btn.dataset.tab);
     });
   });
+  if (typeof mountPushCard === "function") mountPushCard(document.getElementById("pushCardHome"), { compact: true });
 }
 
 function initDashboardTab() {
