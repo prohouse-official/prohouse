@@ -82,6 +82,13 @@ function getTargetDates() {
     const parts = customDate.split("/");
     return [{ display: customDate, iso: `${parts[2]}-${parts[0]}-${parts[1]}` }];
   }
+  // سحب أيام قديمة: BACKFILL_DAYS=14 بيسحب من 14 يوم لمبارح (زر التشغيل اليدوي بالـ workflow)
+  const backfill = parseInt(process.env.BACKFILL_DAYS || "", 10);
+  if (backfill > 0) {
+    const days = [];
+    for (let n = Math.min(backfill, 60); n >= 1; n--) days.push(riyadhDateObj(n));
+    return days;
+  }
   return [riyadhDateObj(1), riyadhDateObj(0)];
 }
 

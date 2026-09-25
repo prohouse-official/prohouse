@@ -5,6 +5,11 @@ on:
     # Runs automatically every 30 minutes
     - cron: '*/30 * * * *'
   workflow_dispatch: # Enables manual trigger button on GitHub
+    inputs:
+      backfill_days:
+        description: "Pull this many past days (e.g. 14). Empty = yesterday + today"
+        required: false
+        default: ""
 
 jobs:
   tabsense-sync:
@@ -46,6 +51,7 @@ jobs:
         working-directory: ./tabsense-sync
         env:
           TABSENSE_BRANCH: "عبداللطيف جميل"
+          BACKFILL_DAYS: ${{ github.event.inputs.backfill_days }}
         run: |
           node pull-tabsense.js
 
