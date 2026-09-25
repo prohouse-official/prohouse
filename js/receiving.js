@@ -837,6 +837,8 @@ function updateSaveBarReceivingStatus() {
 
 async function saveReceivingReportData() {
   if (isReceivingSaving) return;
+  // منحفظ على اليوم والفرع المحمّلين فعلاً — إذا الشاشة لسا عم تحمّل يوم تاني ما منحفظ
+  if (!receivingDataKey) { showToast("⏳ لحظة، الشاشة لسا عم تحمّل"); return; }
   isReceivingSaving = true;
 
   const saveBtn = document.getElementById("receivingSaveBtn");
@@ -866,8 +868,8 @@ async function saveReceivingReportData() {
 
   const emp = Auth.getEmployee();
   const payload = {
-    date: currentReceivingDate,
-    branch: currentReceivingBranch,
+    date: receivingDataKey.date,
+    branch: receivingDataKey.branch,
     employeeName: emp ? emp.name : "",
     items: itemsPayload,
     removedItemIds: Array.from(currentReceivingRemovedIds),

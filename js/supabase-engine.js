@@ -259,7 +259,7 @@ const SupaEngine = (() => {
         try { removedItemIds = JSON.parse(m.removed_item_ids); } catch(e){}
       }
     }
-    if ((!removedItemIds || !removedItemIds.length) && m.payments_report_link && typeof m.payments_report_link === "string" && m.payments_report_link.startsWith("{")) {
+    if ((m.removed_item_ids === null || m.removed_item_ids === undefined) && m.payments_report_link && typeof m.payments_report_link === "string" && m.payments_report_link.startsWith("{")) {
       try {
         const parsed = JSON.parse(m.payments_report_link);
         if (parsed && Array.isArray(parsed._removedItemIds)) {
@@ -302,53 +302,18 @@ const SupaEngine = (() => {
     const { date, branch, items, employeeName, salesReportLink, paymentsReportLink, removedItemIds } = payload;
     const remIds = Array.isArray(removedItemIds) ? removedItemIds : [];
 
-    // حفظ أو تحديث الميتا وقائمة الأصناف المستبعدة
-    let existingMetaRes = null;
-    try {
-      existingMetaRes = await query(`day_meta?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
-    } catch(e) {}
-
-    const existingMetaRow = (existingMetaRes && existingMetaRes[0]) || {};
-    let currentChecklist = {};
-    let paymentsLink = paymentsReportLink !== undefined ? paymentsReportLink : (existingMetaRow.payments_report_link || "");
-    if (paymentsLink && paymentsLink.startsWith("{")) {
-      try { currentChecklist = JSON.parse(paymentsLink); } catch(e){}
-    }
-
-    if (remIds.length > 0 || currentChecklist._removedItemIds) {
-      currentChecklist._removedItemIds = remIds;
-      paymentsLink = JSON.stringify(currentChecklist);
-    }
-
-    const metaBody = {
-      date,
-      branch,
-      employee_name: employeeName !== undefined ? employeeName : (existingMetaRow.employee_name || ""),
-      sales_report_link: salesReportLink !== undefined ? salesReportLink : (existingMetaRow.sales_report_link || ""),
-      payments_report_link: paymentsLink,
-      updated_at: new Date().toISOString()
-    };
-
-    if (existingMetaRow.hasOwnProperty("removed_item_ids") || remIds.length >= 0) {
-      metaBody.removed_item_ids = remIds;
-    }
-
-    try {
-      await query("day_meta", {
-        method: "POST",
-        headers: { "Prefer": "resolution=merge-duplicates" },
-        body: JSON.stringify(metaBody)
-      });
-    } catch (err) {
-      if (metaBody.removed_item_ids !== undefined) {
-        delete metaBody.removed_item_ids;
-        await query("day_meta", {
-          method: "POST",
-          headers: { "Prefer": "resolution=merge-duplicates" },
-          body: JSON.stringify(metaBody)
-        }).catch(e => console.warn("day_meta save retry error:", e));
-      }
-    }
+    // الميتا: منكتب بس الأعمدة اللي إلها علاقة بالاستلام. الصور (sales_report_link) وقائمة الفحص
+    // (payments_report_link) إلهم دوال ذرّية بالداتابيس — ما منرجع نكتبهم من نسخة قديمة.
+    const metaBody = { date, branch, updated_at: new Date().toISOString() };
+    if (employeeName) metaBody.employee_name = employeeName;
+    if (Array.isArray(removedItemIds)) metaBody.removed_item_ids = remIds;
+    if (salesReportLink !== undefined) metaBody.sales_report_link = salesReportLink;
+    if (paymentsReportLink !== undefined) metaBody.payments_report_link = paymentsReportLink;
+    await query("day_meta", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(metaBody)
+    }).catch(e => console.warn("day_meta save error:", e));
 
     // إزالة الأصناف المستبعدة نهائياً من daily_entries لهذا اليوم والفرع
     if (remIds.length > 0) {
@@ -397,46 +362,12 @@ const SupaEngine = (() => {
         method: "DELETE"
       }).catch(e => console.warn("delete remaining daily_entries error:", e));
 
-      // حفظ قائمة الاستبعاد في day_meta
-      try {
-        let existingMetaRes = await query(`day_meta?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
-        const existingMetaRow = (existingMetaRes && existingMetaRes[0]) || {};
-        let currentChecklist = {};
-        let paymentsLink = existingMetaRow.payments_report_link || "";
-        if (paymentsLink && paymentsLink.startsWith("{")) {
-          try { currentChecklist = JSON.parse(paymentsLink); } catch(e){}
-        }
-        currentChecklist._removedItemIds = remIds;
-
-        const metaBody = {
-          date,
-          branch,
-          employee_name: existingMetaRow.employee_name || "",
-          sales_report_link: existingMetaRow.sales_report_link || "",
-          payments_report_link: JSON.stringify(currentChecklist),
-          updated_at: new Date().toISOString()
-        };
-        if (existingMetaRow.hasOwnProperty("removed_item_ids") || remIds.length >= 0) {
-          metaBody.removed_item_ids = remIds;
-        }
-
-        try {
-          await query("day_meta", {
-            method: "POST",
-            headers: { "Prefer": "resolution=merge-duplicates" },
-            body: JSON.stringify(metaBody)
-          });
-        } catch(err) {
-          delete metaBody.removed_item_ids;
-          await query("day_meta", {
-            method: "POST",
-            headers: { "Prefer": "resolution=merge-duplicates" },
-            body: JSON.stringify(metaBody)
-          }).catch(e => console.warn("saveRemainingReport day_meta retry error:", e));
-        }
-      } catch(e) {
-        console.warn("saveRemainingReport day_meta error:", e);
-      }
+      // حفظ قائمة الاستبعاد بعمودها بس (بدون ما نلمس الصور وقائمة الفحص)
+      await query("day_meta", {
+        method: "POST",
+        headers: { "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify({ date, branch, removed_item_ids: remIds, updated_at: new Date().toISOString() })
+      }).catch(e => console.warn("saveRemainingReport day_meta error:", e));
     }
 
     if (items && items.length) {
@@ -450,7 +381,7 @@ const SupaEngine = (() => {
         remaining: numOrNull(it.remainingWeight || it.remaining),
         remaining_weight: numOrNull(it.remainingWeight),
         remaining_sauce: numOrNull(it.remainingSauce),
-        notes: it.notes || "",
+        ...(it.notes ? { notes: it.notes } : {}), // خانة الملاحظات مشتركة مع الاستلام — الفاضي ما بيمسح ملاحظة الاستلام
         saved_at: new Date().toISOString()
       }));
 
@@ -494,8 +425,9 @@ const SupaEngine = (() => {
 
     // استبدال كامل لطلبية نفس اليوم والفرع (نفس سلوك النظام القديم) — عشان لو
     // الموظف شال صنف من الطلبية، ما يضل صف قديم إله بيرجع يبيّن بالمقارنة
-    await query(`tomorrow_orders?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`, { method: "DELETE" });
-
+    // أول شي منحفظ الصفوف (upsert)، وبعدين منشيل بس الأصناف اللي انشالت من الطلبية —
+    // قبل كان يمسح الطلبية كاملة ثم يكتبها، فأي فشل بالنص كان يضيّع الطلبية.
+    const keepIds = (items || []).map(it => it.itemId).filter(Boolean);
     if (items && items.length) {
       await ensureItemsExist(items, branch);
       const rows = items.map(it => ({
@@ -511,11 +443,14 @@ const SupaEngine = (() => {
         saved_at: new Date().toISOString()
       }));
 
-      await query("tomorrow_orders", {
+      await query("tomorrow_orders?on_conflict=date,branch,item_id", {
         method: "POST",
+        headers: { "Prefer": "resolution=merge-duplicates" },
         body: JSON.stringify(rows)
       });
     }
+    const notIn = keepIds.length ? `&item_id=not.in.(${keepIds.map(id => `"${encodeURIComponent(id)}"`).join(",")})` : "";
+    await query(`tomorrow_orders?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}${notIn}`, { method: "DELETE" });
     return { date, branch, savedAt: new Date().toISOString() };
   }
 
@@ -543,13 +478,12 @@ const SupaEngine = (() => {
 
   async function saveWasteReport(payload) {
     const { date, branch, items } = payload;
-    if (!items || !items.length) {
-      // آخر سجل انحذف — لازم ينحذف من السيرفر كمان
-      await query(`waste_log?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`, { method: "DELETE" });
-    }
+    // منحفظ (upsert) أول، وبعدين منشيل بس السجلات اللي انحذفت — بدل ما نمسح اليوم كامل ونكتبه
+    (items || []).forEach(it => { if (!it.id) it.id = crypto.randomUUID ? crypto.randomUUID() : "wst_" + Date.now() + Math.random(); });
+    const keepIds = (items || []).map(it => String(it.id));
     if (items && items.length) {
       const rows = items.map(it => ({
-        id: it.id || (crypto.randomUUID ? crypto.randomUUID() : "wst_" + Date.now() + Math.random()),
+        id: it.id,
         date,
         branch,
         item_id: it.itemId || "",
@@ -563,12 +497,14 @@ const SupaEngine = (() => {
         saved_at: new Date().toISOString()
       }));
 
-      await query(`waste_log?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`, { method: "DELETE" });
-      await query("waste_log", {
+      await query("waste_log?on_conflict=id", {
         method: "POST",
+        headers: { "Prefer": "resolution=merge-duplicates" },
         body: JSON.stringify(rows)
       });
     }
+    const notIn = keepIds.length ? `&id=not.in.(${keepIds.map(id => `"${encodeURIComponent(id)}"`).join(",")})` : "";
+    await query(`waste_log?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}${notIn}`, { method: "DELETE" });
     return { date, branch, count: (items || []).length };
   }
 
@@ -899,50 +835,19 @@ const SupaEngine = (() => {
     }
   }
 
+  // حفظ/حذف الصور ذرّي بالداتابيس (قفل للصف) — جهازين بيرفعوا صور سوا ما بيضيّعوا بعض
   async function saveInspectionPhoto(photoObj) {
     const { date, branch } = photoObj;
     if (!date || !branch) return photoObj;
-    let existingPhotos = await getInspectionPhotos(date, branch);
-    const idx = existingPhotos.findIndex(p => p.id === photoObj.id || (photoObj.sessionId && p.sessionId === photoObj.sessionId && p.checkpointId === photoObj.checkpointId));
-    if (idx >= 0) {
-      existingPhotos[idx] = photoObj;
-    } else {
-      existingPhotos.push(photoObj);
-    }
-    if (existingPhotos.length > 50) {
-      existingPhotos = existingPhotos.slice(-50);
-    }
-    await query("day_meta", {
-      method: "POST",
-      headers: { "Prefer": "resolution=merge-duplicates" },
-      body: JSON.stringify({
-        date,
-        branch,
-        sales_report_link: JSON.stringify(existingPhotos),
-        employee_name: photoObj.employeeName || "",
-        updated_at: new Date().toISOString()
-      })
-    });
+    await rpc("upsert_inspection_photo", { p_date: date, p_branch: branch, p_photo: photoObj });
     return photoObj;
   }
 
   async function deleteInspectionPhoto(photoId, date, branch) {
     if (!date || !branch) return [];
-    let existingPhotos = await getInspectionPhotos(date, branch);
-    existingPhotos = existingPhotos.filter(p => p.id !== photoId);
-
-    await query("day_meta", {
-      method: "POST",
-      headers: { "Prefer": "resolution=merge-duplicates" },
-      body: JSON.stringify({
-        date,
-        branch,
-        sales_report_link: JSON.stringify(existingPhotos),
-        updated_at: new Date().toISOString()
-      })
-    });
-    return existingPhotos;
+    return (await rpc("delete_inspection_photo", { p_date: date, p_branch: branch, p_id: String(photoId) })) || [];
   }
+
 
   // --- إغلاق العهدة ---
   async function getCustody(date, branch) {
@@ -1012,21 +917,9 @@ const SupaEngine = (() => {
   async function saveChecklist(payload) {
     const { date, branch, shift, data } = payload;
     if (!date || !branch) return;
-    let existing = await getChecklist(date, branch) || {};
-    existing[shift || "morning"] = data;
-    await query("day_meta", {
-      method: "POST",
-      headers: { "Prefer": "resolution=merge-duplicates" },
-      body: JSON.stringify({
-        date,
-        branch,
-        payments_report_link: JSON.stringify(existing),
-        employee_name: (data && data.updatedBy) || "",
-        updated_at: new Date().toISOString()
-      })
-    });
-    return existing;
+    return rpc("save_checklist_shift", { p_date: date, p_branch: branch, p_shift: shift || "morning", p_data: data || {} });
   }
+
 
   return {
     rpc,
