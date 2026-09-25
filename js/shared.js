@@ -67,15 +67,22 @@ function workingBranchList() {
 }
 
 // ---- الفرع الحالي ----
-// آخر فرع اختاره المستخدم، بس إذا كان فرع مش شغّال منفتح على فرع شغّال بدالو
+// الفرع اللي اختاره المستخدم بإيده بهالجلسة بيضل مختار (حتى لو ما فيه إدخالات قريبة، متل الروضة والشاطئ).
+// غير هيك (أول فتح) منفتح على فرع شغّال لحتى ما يعلق الجوال على فرع قديم.
 const Branch = {
   get() {
     const saved = localStorage.getItem("ph_branch") || "";
+    let chosen = "";
+    try { chosen = sessionStorage.getItem("ph_branch_chosen") || ""; } catch (e) {}
+    if (saved && chosen === saved && allowedBranchList().includes(saved)) return saved;
     const working = workingBranchList();
     if (saved && working.includes(saved)) return saved;
     return working[0] || saved;
   },
-  set(name) { localStorage.setItem("ph_branch", name); }
+  set(name) {
+    localStorage.setItem("ph_branch", name);
+    try { sessionStorage.setItem("ph_branch_chosen", name); } catch (e) {}
+  }
 };
 
 // ---- الإدخال السريع: شريط تقدم، زر "الصنف الجاي"، وزر "التالي" بالكيبورد ----

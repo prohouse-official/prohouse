@@ -99,7 +99,7 @@ function setActiveTab(tab) {
       const recDateInp = document.getElementById("receivingDateInput");
       if (recDateInp) recDateInp.value = currentReceivingDate;
     }
-    loadReceivingData(currentReceivingDate, currentReceivingBranch); 
+    loadReceivingData(currentReceivingDate, Branch.get() || currentReceivingBranch); 
   }
   if (tab === "remaining") { 
     if (typeof flushReceivingSave === "function") flushReceivingSave();
@@ -108,7 +108,7 @@ function setActiveTab(tab) {
       const remDateInp = document.getElementById("remainingDateInput");
       if (remDateInp) remDateInp.value = currentRemainingDate;
     }
-    loadRemainingData(currentRemainingDate, currentRemainingBranch); 
+    loadRemainingData(currentRemainingDate, Branch.get() || currentRemainingBranch); 
   }
   if (tab === "custody") { loadCustody(currentCustodyDate, Branch.get()); }
   if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
