@@ -955,6 +955,16 @@ const SupaEngine = (() => {
   }
 
   // مبيعات تابسنس حسب طريقة الدفع — الداتابيس بترجّعها للمالك بس
+  // ملخص الشهر للمالك: كل إغلاقات العهدة ومبيعات طرق الدفع بفترة
+  async function getCustodyRange(start, end, branch) {
+    const range = `date=gte.${start}&date=lte.${end}&branch=eq.${encodeURIComponent(branch)}`;
+    const [closings, payments] = await Promise.all([
+      query(`custody_closings?select=*&${range}`),
+      query(`tabsense_payments?select=date,channel,amount&${range}`).catch(() => [])
+    ]);
+    return { closings: closings || [], payments: payments || [] };
+  }
+
   async function getPayments(date, branch) {
     return (await query(`tabsense_payments?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`)) || [];
   }
@@ -1029,6 +1039,7 @@ const SupaEngine = (() => {
     getCustody,
     saveCustody,
     getPayments,
+    getCustodyRange,
     restoreEntryRows,
     saveDay,
     saveRemainingReport,
