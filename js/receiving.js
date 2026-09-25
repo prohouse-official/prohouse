@@ -787,23 +787,37 @@ function flushReceivingSave() {
     });
   });
 
+  // مفتاح اليوم المحمّل فعلاً (مش التاريخ اللي بالحقل) — لحتى ما تنكتب أرقام يوم على يوم تاني
+  const key = receivingDataKey || { date: currentReceivingDate, branch: currentReceivingBranch };
   const payload = { 
-    date: currentReceivingDate, 
-    branch: currentReceivingBranch, 
+    date: key.date, 
+    branch: key.branch, 
     items: itemsPayload,
     removedItemIds: Array.from(currentReceivingRemovedIds)
   };
-  Sync.cacheSet("day:" + currentReceivingDate + ":" + currentReceivingBranch, payload);
+  if (receivingDataKey) Sync.cacheSet("day:" + key.date + ":" + key.branch, payload);
   receivingAutosave.schedule();
   return payload;
 }
 
+// بيانات الاستلام اللي بالشاشة — بس إذا كانت فعلاً محمّلة لنفس اليوم والفرع.
+// (قبل: تغيير التاريخ من شاشة المتبقي كان يغيّر currentReceivingDate بدون ما يتحمّل اليوم الجديد،
+// فكانت أرقام اليوم القديم تنعرض كأنها لليوم الجديد — "مستلم: 0". وما منرجع لنسخة محفوظة عالجهاز لأنها ممكن تكون قديمة.)
 function getActiveReceivingData(date, branch) {
-  if (currentReceivingDate === date && currentReceivingBranch === branch && Object.keys(currentReceivingData).length > 0) {
-    return flushReceivingSave();
+  if (receivingDataKey && receivingDataKey.date === date && receivingDataKey.branch === branch) {
+    return receivingPayloadFor(date, branch);
   }
-  const cached = Sync.cacheGet("day:" + date + ":" + branch);
-  return cached ? cached.value : null;
+  return null; // منجيبها من السيرفر
+}
+
+function receivingPayloadFor(date, branch) {
+  const items = getAllReceivingActiveItems().map(it => {
+    const data = currentReceivingData[it.id] || { received: "", notes: "" };
+    const ord = currentReceivingOrdered[it.id] || 0;
+    return { itemId: it.id, itemName: it.name, unit: it.unit || "جرام", category: it.category || "عام", isCustom: !!it.isCustom,
+      ordered: ord, received: data.received, status: computeReceivingItemStatus(data.received, ord), notes: data.notes || "", cookName: data.cookName || "" };
+  });
+  return { date, branch, items, removedItemIds: Array.from(currentReceivingRemovedIds) };
 }
 
 function saveLocalDebounced() {
