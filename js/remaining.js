@@ -220,7 +220,7 @@ function mergeFreshRemainingData(freshRem) {
         remainingWeight: isSauce ? "" : val,
         remainingSauce: isSauce ? val : "",
         isSauce: isSauce,
-        notes: it.notes || ""
+        notes: it.remainingNotes || ""
       };
     }
 
