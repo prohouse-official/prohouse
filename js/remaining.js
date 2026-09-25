@@ -8,6 +8,7 @@ let isRemainingSaving = false;
 let remainingActiveFilter = "all"; // 'all', 'uncounted', 'protein', 'sauce', 'variance'
 let remainingCollapsed = {};
 let currentRemainingExtraItems = [];
+let currentRemainingWaste = []; // سجلات الهدر لهاليوم والفرع (نفس جدول سجل الهدر)
 let currentRemainingAddedSlots = {}; // خانات الشيف اللي انضافت من شاشة المتبقي: id -> اسم الطبخة
 let currentRemainingRemovedIds = new Set();
 let cachedReceivingDataForRemaining = null;
@@ -257,7 +258,7 @@ async function loadRemainingData(date, branch) {
       ? getActiveReceivingData(currentRemainingDate, currentRemainingBranch)
       : null;
 
-    const [receivingData, salesData, remainingData] = await Promise.all([
+    const [receivingData, salesData, remainingData, wasteData] = await Promise.all([
       (activeRec ? Promise.resolve(activeRec) : Sync.get("getDay", { date: currentRemainingDate, branch: currentRemainingBranch }, "day:" + currentRemainingDate + ":" + currentRemainingBranch, (freshRec) => {
         if (freshRec && freshRec.items) {
           cachedReceivingDataForRemaining = freshRec;
@@ -270,8 +271,10 @@ async function loadRemainingData(date, branch) {
           mergeFreshRemainingData(freshRem);
           renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
         }
-      }).catch(() => null)
+      }).catch(() => null),
+      SupaEngine.getWasteReport(currentRemainingDate, currentRemainingBranch).catch(() => null)
     ]);
+    currentRemainingWaste = (wasteData && wasteData.items) || [];
 
     cachedReceivingDataForRemaining = activeRec || receivingData || cachedReceivingDataForRemaining;
     cachedSalesDataForRemaining = salesData || cachedSalesDataForRemaining;
@@ -575,6 +578,7 @@ function renderRemainingView(receivingData, salesData) {
     let catReceivedSum = 0;
     let catActualChickenSum = 0;
     let catActualSauceSum = 0;
+    const catWaste = catItems.reduce((sum, it) => sum + remainingWasteFor(it.id), 0);
 
     const cardsHtml = catItems.map(it => {
       const recEntry = receivingMap[it.id] || {};
@@ -601,14 +605,14 @@ function renderRemainingView(receivingData, salesData) {
       let hasVariance = false;
       if (recQty > 0 && Auth.canSeeSales()) {
         if (isWeightMeal) {
-          const itemExpected = Math.max(0, recQty - categoryConsumedGrams);
+          const itemExpected = Math.max(0, recQty - categoryConsumedGrams - remainingWasteFor(it.id));
           const diff = actualChicken - itemExpected;
           if (Math.abs(diff) > 50) {
             hasVariance = true;
             itemVarianceText = diff < 0 ? `🔻 عجز تقريبي: ${Math.round(diff)} جم` : `🔺 زيادة: +${Math.round(diff)} جم`;
           }
         } else if (isSandwich || isSalad) {
-          const itemExpected = Math.max(0, recQty - categorySoldMeals);
+          const itemExpected = Math.max(0, recQty - categorySoldMeals - remainingWasteFor(it.id));
           const diff = numVal - itemExpected;
           if (diff !== 0 && numVal > 0) {
             hasVariance = true;
@@ -683,6 +687,7 @@ function renderRemainingView(receivingData, salesData) {
 
               <!-- الإجراءات (ملاحظة وحذف) -->
               <div class="rem-inline-actions">
+                <button type="button" class="rem-waste-btn ${remainingWasteFor(it.id) ? 'has-waste' : ''}" ${isClosed ? 'disabled' : ''} onclick="openRemainingWaste('${it.id}')" title="تسجيل هدر">🗑${remainingWasteFor(it.id) ? ` ${Math.round(remainingWasteFor(it.id))}` : ''}</button>
                 <button type="button" class="rem-mini-note-btn ${remData.notes ? 'has-notes' : ''}" onclick="toggleRemainingNote('${it.id}')" title="ملاحظة">📝</button>
                 <button type="button" class="rec-btn-remove" onclick="onRemoveRemainingItem('${it.id}', '${String(it.name).replace(/'/g, "\\'")}')" title="استبعاد الصنف">✕</button>
               </div>
@@ -715,7 +720,7 @@ function renderRemainingView(receivingData, salesData) {
     let varBadgeHtml = "";
 
     if (isWeightMeal) {
-      const expectedRemainingGrams = Math.max(0, catReceivedSum - categoryConsumedGrams);
+      const expectedRemainingGrams = Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste);
       const catVarianceGrams = catActualChickenSum - expectedRemainingGrams;
       const catVariancePct = catReceivedSum > 0 ? (catVarianceGrams / catReceivedSum) * 100 : 0;
       const catBadge = getVarianceBadge(catVariancePct);
@@ -744,7 +749,7 @@ function renderRemainingView(receivingData, salesData) {
     } else if (isSandwich) {
       const recCount = Math.round(catReceivedSum);
       const soldCount = categorySoldMeals;
-      const expectedRem = Math.max(0, recCount - soldCount);
+      const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
       const catVariance = Math.round(catActualChickenSum) - expectedRem;
 
       recDisplay = `${recCount} ساندويتش`;
@@ -763,7 +768,7 @@ function renderRemainingView(receivingData, salesData) {
     } else if (isSalad) {
       const recCount = Math.round(catReceivedSum);
       const soldCount = categorySoldMeals;
-      const expectedRem = Math.max(0, recCount - soldCount);
+      const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
       const catVariance = Math.round(catActualChickenSum) - expectedRem;
 
       recDisplay = `${recCount} حبة`;
@@ -802,7 +807,7 @@ function renderRemainingView(receivingData, salesData) {
           <div class="cat-header-main">
             <div class="cat-label">
               <span class="cat-title">${categoryIconSticker(cat)} ${cat}</span>
-              ${isWeightMeal && Auth.canSeeSales() ? `<span class="badge ${getVarianceBadge((catActualChickenSum - Math.max(0, catReceivedSum - categoryConsumedGrams)) / (catReceivedSum || 1) * 100).class}" style="font-size:11px;margin-right:6px;">${getVarianceBadge((catActualChickenSum - Math.max(0, catReceivedSum - categoryConsumedGrams)) / (catReceivedSum || 1) * 100).label}</span>` : ''}
+              ${isWeightMeal && Auth.canSeeSales() ? `<span class="badge ${getVarianceBadge((catActualChickenSum - Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste)) / (catReceivedSum || 1) * 100).class}" style="font-size:11px;margin-right:6px;">${getVarianceBadge((catActualChickenSum - Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste)) / (catReceivedSum || 1) * 100).label}</span>` : ''}
             </div>
 
             <!-- شريط مؤشرات التصنيف: المستلم، المباع، المتبقي، العجز -->
@@ -896,6 +901,8 @@ function updateCategoryHeaderMetrics(itemId) {
     }
   });
 
+  const catWaste = catItems.reduce((sum, it) => sum + remainingWasteFor(it.id), 0);
+
   const countEl = document.getElementById("cat-count-" + catSafeId);
   if (countEl) countEl.textContent = `${filledCount}/${catItems.length}`;
 
@@ -913,7 +920,7 @@ function updateCategoryHeaderMetrics(itemId) {
     } else {
       if (isWeightMeal) {
         const categoryConsumedGrams = categorySoldMeals * MEAL_WEIGHT_G;
-        const expectedRemainingGrams = Math.max(0, catReceivedSum - categoryConsumedGrams);
+        const expectedRemainingGrams = Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste);
         const catVarianceGrams = catActualChickenSum - expectedRemainingGrams;
         const varMeals = (catVarianceGrams / MEAL_WEIGHT_G).toFixed(1).replace(/\.0$/, "");
 
@@ -931,7 +938,7 @@ function updateCategoryHeaderMetrics(itemId) {
       } else if (isSandwich) {
         const recCount = Math.round(catReceivedSum);
         const soldCount = categorySoldMeals;
-        const expectedRem = Math.max(0, recCount - soldCount);
+        const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
         const catVariance = Math.round(catActualChickenSum) - expectedRem;
 
         if (hasRemainingRecorded) {
@@ -948,7 +955,7 @@ function updateCategoryHeaderMetrics(itemId) {
       } else if (isSalad) {
         const recCount = Math.round(catReceivedSum);
         const soldCount = categorySoldMeals;
-        const expectedRem = Math.max(0, recCount - soldCount);
+        const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
         const catVariance = Math.round(catActualChickenSum) - expectedRem;
 
         if (hasRemainingRecorded) {
@@ -1432,4 +1439,70 @@ function openRemainingChefPicker(category) {
       focusEntryById("remweight-" + slot.id);
     }
   });
+}
+
+
+// ---- الهدر من شاشة المتبقي (نفس جدول سجل الهدر) ----
+function remainingWasteFor(itemId) {
+  return (currentRemainingWaste || []).filter(w => w.itemId === itemId).reduce((sum, w) => sum + Number(w.qty || 0), 0);
+}
+
+function saveRemainingWaste() {
+  const payload = { date: currentRemainingDate, branch: currentRemainingBranch, items: currentRemainingWaste };
+  Sync.cacheSet("waste:" + currentRemainingDate + ":" + currentRemainingBranch, payload);
+  Sync.enqueue("saveWasteReport:" + currentRemainingDate + ":" + currentRemainingBranch, "saveWasteReport", payload);
+}
+
+function openRemainingWaste(itemId) {
+  const it = getAllRemainingActiveItems(cachedReceivingDataForRemaining).find(x => x.id === itemId) || Items.byId(itemId);
+  if (!it) return;
+  const cat = String(it.category || "");
+  const unit = isSandwichCategory(cat) ? "ساندويتش" : (isSaladCategory(cat) ? "حبة" : (it.unit || "جم"));
+  const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const records = currentRemainingWaste.filter(w => w.itemId === itemId);
+  let reason = WASTE_REASONS[0];
+  const wrap = document.createElement("div");
+  wrap.className = "ph-dialog";
+  wrap.innerHTML = `
+    <div class="ph-dialog-card waste-dialog" role="dialog" aria-modal="true">
+      <img class="ph-dialog-logo" src="assets/logo.png" alt="">
+      <div class="ph-dialog-title">🗑 هدر: ${esc(it.name)}</div>
+      ${records.length ? `<div class="waste-list">${records.map(w => `
+        <div class="waste-row"><span><b>${esc(w.qty)} ${esc(unit)}</b> · ${esc(w.reason)}${w.notes ? " · " + esc(w.notes) : ""}</span>
+        <button type="button" class="waste-del" data-id="${esc(w.id)}" aria-label="حذف">✕</button></div>`).join("")}</div>` : ""}
+      <input class="ph-dialog-input waste-qty" type="number" inputmode="decimal" min="0" step="any" placeholder="الكمية (${esc(unit)})">
+      <div class="waste-reasons">${WASTE_REASONS.map((r, i) => `<button type="button" class="chef-opt waste-reason${i ? "" : " active"}" data-r="${esc(r)}">${esc(r)}</button>`).join("")}</div>
+      <input class="ph-dialog-input waste-note" type="text" placeholder="ملاحظة (اختياري)">
+      <div class="ph-dialog-actions">
+        <button type="button" class="ph-dialog-ok waste-add">سجّل الهدر</button>
+        <button type="button" class="ph-dialog-cancel">سكّر</button>
+      </div>
+    </div>`;
+  const close = () => { wrap.classList.add("closing"); setTimeout(() => wrap.remove(), 160); };
+  const rerender = () => renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
+  wrap.querySelectorAll(".waste-reason").forEach(b => b.addEventListener("click", () => {
+    reason = b.dataset.r;
+    wrap.querySelectorAll(".waste-reason").forEach(x => x.classList.toggle("active", x === b));
+  }));
+  wrap.querySelectorAll(".waste-del").forEach(b => b.addEventListener("click", () => {
+    currentRemainingWaste = currentRemainingWaste.filter(w => String(w.id) !== b.dataset.id);
+    saveRemainingWaste(); close(); rerender(); showToast("انحذف سجل الهدر");
+  }));
+  wrap.querySelector(".waste-add").addEventListener("click", () => {
+    const qty = Number(wrap.querySelector(".waste-qty").value);
+    if (!qty || qty <= 0) { showToast("⚠ اكتب كمية الهدر"); return; }
+    const emp = Auth.getEmployee();
+    currentRemainingWaste.push({
+      id: (crypto.randomUUID ? crypto.randomUUID() : "wst_" + Date.now()),
+      itemId, itemName: it.name, unit: it.unit || "جرام", qty, reason,
+      notes: wrap.querySelector(".waste-note").value.trim(),
+      employeeName: emp ? emp.name : "", timestamp: new Date().toISOString()
+    });
+    saveRemainingWaste(); close(); rerender(); showToast(`🗑 انسجل هدر ${qty} ${unit}`);
+  });
+  wrap.querySelector(".ph-dialog-cancel").addEventListener("click", close);
+  wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+  document.body.appendChild(wrap);
+  requestAnimationFrame(() => wrap.classList.add("open"));
+  wrap.querySelector(".waste-qty").focus({ preventScroll: true });
 }

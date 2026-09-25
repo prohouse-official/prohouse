@@ -129,7 +129,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // شاشات مخفية من القائمة (الكود موجود — لترجيع أي وحدة شيلها من هون)
 // المستخدمون والصلاحيات صارت زر جوّا الإعدادات
-const NAV_HIDDEN_TABS = ["branches", "items", "users"];
+const NAV_HIDDEN_TABS = ["branches", "items", "users", "waste"]; // الهدر صار جوّا تقرير المتبقي (زر 🗑 بكل صنف)
 
 function applyRoleUiGating() {
   document.querySelectorAll(".tab-btn").forEach(btn => {
