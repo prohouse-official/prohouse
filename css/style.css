@@ -2701,6 +2701,11 @@ body{ background:var(--canvas); color:var(--ink); font-variant-numeric:tabular-n
 }
 .day-jump button:hover{ background:var(--yellow-soft); border-color:#E6CB3A; }
 .day-jump button:active{ transform:scale(.96); }
+.demo-banner{
+  position:sticky; top:0; z-index:9000; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;
+  background:#1B1B1C; color:#FFE88A; font-size:12.5px; font-weight:700; text-align:center; padding:7px 12px;
+}
+.demo-banner button{ font-family:inherit; font-size:12px; font-weight:800; border:none; border-radius:999px; padding:4px 10px; background:var(--yellow); color:var(--ink); cursor:pointer; }
 .undo-bar{
   position:fixed; left:16px; right:16px; bottom:calc(92px + env(safe-area-inset-bottom)); z-index:120;
   display:flex; align-items:center; justify-content:space-between; gap:14px; max-width:520px; margin:0 auto;
