@@ -8,6 +8,7 @@ let isRemainingSaving = false;
 let remainingActiveFilter = "all"; // 'all', 'uncounted', 'protein', 'sauce', 'variance'
 let remainingCollapsed = {};
 let currentRemainingExtraItems = [];
+let currentRemainingAddedSlots = {}; // خانات الشيف اللي انضافت من شاشة المتبقي: id -> اسم الطبخة
 let currentRemainingRemovedIds = new Set();
 let cachedReceivingDataForRemaining = null;
 let cachedSalesDataForRemaining = null;
@@ -111,8 +112,10 @@ function getAllRemainingActiveItems(receivingData) {
       const received = r && Number(r.received) > 0;
       const d = currentRemainingData[id];
       const counted = d && [d.remaining, d.remainingWeight, d.remainingSauce].some(v => v !== "" && v !== null && v !== undefined);
-      if (!received && !counted) return;
-      if (isChefSlot(def) && r && r.cookName && item.name === def.name) item.name = chefSlotName(def, r.cookName);
+      const added = Object.prototype.hasOwnProperty.call(currentRemainingAddedSlots, id);
+      if (!received && !counted && !added) return;
+      if (added && currentRemainingAddedSlots[id] && item.name === def.name) item.name = chefSlotName(def, currentRemainingAddedSlots[id]);
+      if (isChefItem(def) && r && r.cookName && item.name === def.name) item.name = chefSlotName(def, r.cookName);
     }
     const cat = String(item.category || "").trim();
     if (cat.includes("كارب") || cat.toLowerCase().includes("carb")) return;
@@ -276,6 +279,7 @@ async function loadRemainingData(date, branch) {
     currentRemainingData = {};
     currentRemainingMeta = { isClosed: false, closedBy: "", closedAt: "" };
     currentRemainingExtraItems = [];
+    currentRemainingAddedSlots = {};
     currentRemainingRemovedIds = new Set();
 
     if (remainingData) {
@@ -830,8 +834,8 @@ function renderRemainingView(receivingData, salesData) {
         <div class="category-body">
           <div>
             ${cardsHtml}
-            <button type="button" class="rec-add-item-btn" onclick="openAddRemainingItemModal('${String(cat).replace(/'/g, "\\'")}')">
-              ➕ إضافة صنف في قسم (${cat})
+            <button type="button" class="rec-add-item-btn" onclick="${usesChefSlots(cat) ? "openRemainingChefPicker" : "openAddRemainingItemModal"}('${String(cat).replace(/'/g, "\\'")}')">
+              ➕ ${usesChefSlots(cat) ? "إضافة صنف " + cat : "إضافة صنف في قسم (" + cat + ")"}
             </button>
           </div>
         </div>
@@ -1411,4 +1415,21 @@ function toggleRemainingNote(itemId) {
       if (inp) inp.focus();
     }
   }
+}
+
+
+// خانات الشيف من شاشة المتبقي
+function openRemainingChefPicker(category) {
+  const shown = new Set(getAllRemainingActiveItems(cachedReceivingDataForRemaining).map(it => it.id));
+  openChefPicker({
+    category,
+    branch: currentRemainingBranch,
+    isUsed: (id) => shown.has(id),
+    extraNames: Object.values(currentRemainingAddedSlots),
+    onPick(slot, name) {
+      currentRemainingAddedSlots[slot.id] = name;
+      renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
+      focusEntryById("remweight-" + slot.id);
+    }
+  });
 }

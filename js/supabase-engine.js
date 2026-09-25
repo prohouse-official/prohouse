@@ -464,6 +464,16 @@ const SupaEngine = (() => {
   }
 
   // --- طلبيات الغد (TomorrowOrders) ---
+  // أسماء الطبخات اللي انكتبت على أصناف الشيف آخر 120 يوم (ذاكرة الأسماء)
+  async function getRecentCookNames() {
+    const since = new Date(Date.now() - 120 * 86400000).toISOString().slice(0, 10);
+    const [a, b] = await Promise.all([
+      query(`daily_entries?select=item_id,cook_name&cook_name=neq.&date=gte.${since}`),
+      query(`tomorrow_orders?select=item_id,cook_name&cook_name=neq.&date=gte.${since}`)
+    ]);
+    return [...(a || []), ...(b || [])].map(r => ({ itemId: r.item_id, cookName: r.cook_name }));
+  }
+
   async function getTomorrowOrder(date, branch) {
     const res = await query(`tomorrow_orders?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
     return (res || []).map(r => ({
@@ -1012,6 +1022,7 @@ const SupaEngine = (() => {
     saveDay,
     saveRemainingReport,
     getTomorrowOrder,
+    getRecentCookNames,
     saveTomorrowOrder,
     getWasteReport,
     saveWasteReport,
