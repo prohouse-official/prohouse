@@ -2692,6 +2692,27 @@ body{ background:var(--canvas); color:var(--ink); font-variant-numeric:tabular-n
 .mobile-toggle-btn{ background:var(--ink); border:none; box-shadow:0 4px 12px -6px rgba(0,0,0,.5); }
 .sync-badge{ border:1px solid transparent; box-shadow:none; background:var(--ink); }
 .sync-badge.ok{ background:#E7F6EF; color:#137A50; border-color:#BFE6D3; }
+.datebar{ flex-wrap:wrap; }
+.day-jump{ display:flex; gap:6px; }
+.day-jump button{
+  font-family:inherit; font-size:13px; font-weight:800; color:var(--ink); cursor:pointer;
+  background:#fff; border:1px solid var(--line-strong); border-radius:999px; padding:7px 12px; min-width:38px;
+  transition:background .15s ease, border-color .15s ease;
+}
+.day-jump button:hover{ background:var(--yellow-soft); border-color:#E6CB3A; }
+.day-jump button:active{ transform:scale(.96); }
+.undo-bar{
+  position:fixed; left:16px; right:16px; bottom:calc(92px + env(safe-area-inset-bottom)); z-index:120;
+  display:flex; align-items:center; justify-content:space-between; gap:14px; max-width:520px; margin:0 auto;
+  background:var(--ink); color:#fff; border-radius:14px; padding:10px 10px 10px 16px;
+  font-size:13.5px; font-weight:700; box-shadow:0 18px 40px -14px rgba(0,0,0,.55);
+  animation:fadeInUp .25s var(--ease) both;
+}
+.undo-bar button{
+  flex:none; font-family:inherit; font-size:13.5px; font-weight:900; cursor:pointer;
+  background:var(--yellow); color:var(--ink); border:none; border-radius:10px; padding:8px 14px;
+}
+.sync-badge.error{ background:#FDECEC; color:#B42318; border-color:#F4C7C3; }
 
 /* --- البطاقات والأسطح --- */
 .item-card, .report-card, .settings-card, .dash-card, .dash-tasks, .dash-flagged, .order-table-wrap, .chart-wrap,

@@ -159,14 +159,18 @@ function applyRoleUiGating() {
 }
 
 // ---- شارة حالة المزامنة ----
-function updateSyncBadge({ pending }) {
+function updateSyncBadge({ pending, readError }) {
   const el = document.getElementById("syncBadge");
   if (!API_URL) {
     el.textContent = "⚙ لسا ما انربط الباك اند";
     el.classList.remove("ok");
     return;
   }
-  if (pending > 0) {
+  el.classList.toggle("error", !!readError);
+  if (readError) {
+    el.textContent = "⚠ تعذّر الاتصال بالسيرفر";
+    el.classList.remove("ok", "pending");
+  } else if (pending > 0) {
     el.textContent = `🔄 ${pending} بانتظار المزامنة`;
     el.classList.remove("ok");
     el.classList.add("pending");
@@ -277,6 +281,27 @@ function initRemainingTab() {
   }
 }
 
+// أزرار التنقل السريع بين الأيام جنب التاريخ: بتغيّر قيمة الحقل وبتطلق نفس حدث التغيير
+// اللي بيستعمله كل تبويب، فالتحميل بيصير بنفس الطريقة. "التالي" ما بيتعدّى اليوم.
+function initDayJumpButtons() {
+  document.querySelectorAll(".datebar [data-day]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const input = btn.closest(".datebar").querySelector('input[type="date"]');
+      if (!input) return;
+      const today = todayStr();
+      const current = input.value || today;
+      let next = current;
+      if (btn.dataset.day === "today") next = today;
+      else if (btn.dataset.day === "yesterday") next = addDaysStr(today, -1);
+      else if (btn.dataset.day === "prev") next = addDaysStr(current, -1);
+      else if (btn.dataset.day === "next") next = current < today ? addDaysStr(current, 1) : today;
+      if (next === input.value) return;
+      input.value = next;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  });
+}
+
 async function startApp() {
   hideLoginView();
   applyRoleUiGating();
@@ -291,6 +316,7 @@ async function startApp() {
   if (tabAllowed("juices")) initJuicesTab();
   initChecklistTab();
   initReportTab();
+  initDayJumpButtons();
   setActiveTab("dashboard");
 }
 

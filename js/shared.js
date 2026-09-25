@@ -78,6 +78,36 @@ const Branch = {
   set(name) { localStorage.setItem("ph_branch", name); }
 };
 
+// ---- شريط "تراجع" بعد شيل صنف ----
+function showUndoBar(message, onUndo, ms = 8000) {
+  document.querySelectorAll(".undo-bar").forEach(el => el.remove());
+  const bar = document.createElement("div");
+  bar.className = "undo-bar";
+  bar.innerHTML = `<span></span><button type="button">↩️ تراجع</button>`;
+  bar.querySelector("span").textContent = message;
+  const timer = setTimeout(() => bar.remove(), ms);
+  bar.querySelector("button").addEventListener("click", async () => {
+    clearTimeout(timer);
+    bar.remove();
+    try {
+      await onUndo();
+      showToast("↩️ رجع الصنف مع أرقامه");
+    } catch (e) {
+      showToast("⚠ تعذّر التراجع — " + (e.message || e));
+    }
+  });
+  document.body.appendChild(bar);
+}
+
+// بتشيل الصنف من قائمة المستبعدين عالسيرفر وبترجّع صفه متل ما كان
+async function restoreRemovedItem(date, branch, itemId, savedRows) {
+  if (typeof SupaEngine === "undefined" || typeof SUPABASE_URL === "undefined" || !SUPABASE_URL) return;
+  const day = await SupaEngine.getDay(date, branch);
+  const stillRemoved = ((day && day.removedItemIds) || []).filter(id => id !== itemId);
+  await SupaEngine.saveDay({ date, branch, removedItemIds: stillRemoved });
+  await SupaEngine.restoreEntryRows(savedRows);
+}
+
 // ---- حماية من مسح أرقام محفوظة بالغلط ----
 // قبل الحفظ منقارن مع اللي عالسيرفر: إذا صنف إلو رقم محفوظ ورح ينحفظ فاضي/صفر، منسأل أول
 async function confirmNoDataLoss(kind, date, branch, itemsPayload) {

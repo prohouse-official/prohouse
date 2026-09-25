@@ -910,6 +910,20 @@ const SupaEngine = (() => {
     return existingPhotos;
   }
 
+  // نسخة من صف صنف بيوم معيّن قبل ما ينشال — لزر التراجع
+  async function getEntryRows(date, branch, itemId) {
+    return (await query(`daily_entries?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&item_id=eq.${encodeURIComponent(itemId)}`)) || [];
+  }
+
+  async function restoreEntryRows(rows) {
+    if (!rows || !rows.length) return;
+    await query("daily_entries?on_conflict=date,branch,item_id", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(rows.map(({ id, ...row }) => row))
+    });
+  }
+
   // الفروع اللي سجّلت استلام فعلي من تاريخ معيّن — لنعرف مين شغّال عالنظام
   async function getActiveBranches(since) {
     const rows = await query(`daily_entries?select=branch&date=gte.${since}&received=gt.0`);
@@ -961,6 +975,8 @@ const SupaEngine = (() => {
     deleteJuice,
     getDay,
     getActiveBranches,
+    getEntryRows,
+    restoreEntryRows,
     saveDay,
     saveRemainingReport,
     getTomorrowOrder,

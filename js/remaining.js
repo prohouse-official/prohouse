@@ -595,7 +595,7 @@ function renderRemainingView(receivingData, salesData) {
                   <input type="number" step="any" min="0" inputmode="decimal"
                          id="remweight-${it.id}"
                          value="${rawVal}"
-                         placeholder="0"
+                         placeholder="—"
                          ${isClosed ? 'disabled' : ''}
                          oninput="onRemainingWeightChange('${it.id}', this.value)"
                          class="rem-mini-input ${numVal > 0 ? 'border-green' : ''}">
@@ -1197,22 +1197,38 @@ function onRemoveRemainingItem(itemId, itemName) {
   const confirmed = confirm(`هل أنت متأكد من استبعاد الصنف "${itemName || ''}" من جرد المتبقي اليوم؟`);
   if (!confirmed) return;
 
+  const date = currentRemainingDate;
+  const branch = currentRemainingBranch;
+  const prevData = currentRemainingData[itemId];
+  const prevExtra = currentRemainingExtraItems.find(it => it.id === itemId);
+
   currentRemainingRemovedIds.add(itemId);
   currentRemainingExtraItems = currentRemainingExtraItems.filter(it => it.id !== itemId);
   delete currentRemainingData[itemId];
 
-  showToast(`🗑️ تم استبعاد الصنف من جرد المتبقي`);
   renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
   saveRemainingLocalDebounced();
   updateSaveBarRemainingStatus();
 
-  if (typeof SupaEngine !== "undefined" && typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) {
-    SupaEngine.saveRemainingReport({
-      date: currentRemainingDate,
-      branch: currentRemainingBranch,
-      removedItemIds: Array.from(currentRemainingRemovedIds)
-    }).catch(e => console.warn("Auto sync remaining removal error:", e));
-  }
+  let savedRows = [];
+  const removedList = Array.from(currentRemainingRemovedIds);
+  const removal = (async () => {
+    if (typeof SupaEngine === "undefined" || typeof SUPABASE_URL === "undefined" || !SUPABASE_URL) return;
+    try { savedRows = await SupaEngine.getEntryRows(date, branch, itemId); } catch (e) { console.warn("Undo snapshot error:", e); }
+    await SupaEngine.saveRemainingReport({ date, branch, removedItemIds: removedList }).catch(e => console.warn("Auto sync remaining removal error:", e));
+  })();
+
+  showUndoBar(`🗑️ انشال "${itemName || ''}" من جرد المتبقي`, async () => {
+    await removal;
+    if (currentRemainingDate === date && currentRemainingBranch === branch) {
+      currentRemainingRemovedIds.delete(itemId);
+      if (prevExtra) currentRemainingExtraItems.push(prevExtra);
+      if (prevData) currentRemainingData[itemId] = prevData;
+      renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
+      saveRemainingLocalDebounced();
+    }
+    await restoreRemovedItem(date, branch, itemId, savedRows);
+  });
 }
 
 function openAddRemainingItemModal(category) {
