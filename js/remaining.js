@@ -156,7 +156,7 @@ function mergeFreshRemainingData(freshRem) {
       const isSauce = !!it.isSauce || (Number(it.remainingSauce || 0) > 0 && (!it.remainingWeight || Number(it.remainingWeight) === 0));
       const val = isSauce
         ? String(it.remainingSauce || it.remaining || "")
-        : String(it.remainingWeight !== undefined && it.remainingWeight !== null && it.remainingWeight !== "" ? it.remainingWeight : (it.remaining || ""));
+        : String(it.remainingWeight !== undefined && it.remainingWeight !== null && it.remainingWeight !== "" ? it.remainingWeight : (it.remaining ?? ""));
 
       currentRemainingData[it.itemId] = {
         remaining: val,
@@ -1137,6 +1137,13 @@ async function saveRemainingReportData() {
     removedItemIds: Array.from(currentRemainingRemovedIds),
     savedAt: new Date().toISOString()
   };
+
+  if (!(await confirmNoDataLoss("remaining", payload.date, payload.branch, itemsPayload))) {
+    isRemainingSaving = false;
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 حفظ تقرير المتبقي"; }
+    showToast("تم إلغاء الحفظ — الأرقام المحفوظة ما انمسّت");
+    return;
+  }
 
   Sync.cacheSet("remaining:" + currentRemainingDate + ":" + currentRemainingBranch, payload);
 

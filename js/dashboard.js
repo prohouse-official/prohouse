@@ -149,7 +149,7 @@ async function renderDashboard() {
   }
 
   await Promise.all([Items.load(), tabAllowed("juices") ? Juices.load() : Promise.resolve()]);
-  const branches = allowedBranchList();
+  const branches = workingBranchList();
   // نداء واحد مجمّع لكل فروع المستخدم بدل ~17 نداء (شوف getDashboardData_ بالباك اند)
   const today = todayStr();
   const dash = await Sync.get("getDashboard", { date: today }, "dashboard:" + today, (fresh) => applyDashboardPayload(fresh));
@@ -174,8 +174,8 @@ async function renderDashboard() {
 
   const tasks = buildTasks(statuses);
 
-  const activeBranch = Branch.get() || allowedBranchList()[0] || "";
-  const totalBranchesCount = allowedBranchList().length;
+  const activeBranch = Branch.get() || branches[0] || "";
+  const totalBranchesCount = branches.length;
   const currentStatusObj = statuses.find(s => s.branch === activeBranch) || statuses[0] || {};
   
   let healthBadge = { label: "🟢 جميع الفروع تعمل بشكل طبيعي", class: "ok" };

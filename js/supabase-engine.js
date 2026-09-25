@@ -910,6 +910,12 @@ const SupaEngine = (() => {
     return existingPhotos;
   }
 
+  // الفروع اللي سجّلت استلام فعلي من تاريخ معيّن — لنعرف مين شغّال عالنظام
+  async function getActiveBranches(since) {
+    const rows = await query(`daily_entries?select=branch&date=gte.${since}&received=gt.0`);
+    return [...new Set((rows || []).map(r => r.branch).filter(Boolean))];
+  }
+
   // --- قائمة الفحص والافتتاح اليومي (Daily Shift Checklist) ---
   async function getChecklist(date, branch) {
     try {
@@ -954,6 +960,7 @@ const SupaEngine = (() => {
     saveJuice,
     deleteJuice,
     getDay,
+    getActiveBranches,
     saveDay,
     saveRemainingReport,
     getTomorrowOrder,
