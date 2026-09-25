@@ -3126,3 +3126,23 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .ph-branch-pills::-webkit-scrollbar{ display:none; }
 .ph-branch-pills button{ flex:0 0 auto; min-height:36px; padding:0 12px; font-size:13.5px; border-width:1px; white-space:nowrap; }
 .ph-date-day, .ph-date-full{ white-space:nowrap; }
+
+/* ==================== تقويم برو هاوس ==================== */
+.ph-date-card{ border:0; font-family:inherit; text-align:right; }
+.ph-cal{ width:100%; max-width:360px; background:#fff; border-radius:24px; border-top:6px solid var(--yellow); padding:14px 14px 12px; box-shadow:0 24px 60px -18px rgba(0,0,0,.45); transform:translateY(12px) scale(.97); transition:transform .22s cubic-bezier(.34,1.4,.5,1); }
+.ph-dialog.open .ph-cal{ transform:none; }
+.ph-cal-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+.ph-cal-title{ font-size:17px; font-weight:900; }
+.ph-cal-nav{ width:42px; height:42px; border-radius:12px; border:1px solid var(--line-strong); background:#fff; font-size:18px; font-weight:900; cursor:pointer; font-family:inherit; }
+.ph-cal-nav:disabled{ opacity:.3; }
+.ph-cal-week, .ph-cal-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:4px; text-align:center; }
+.ph-cal-week span{ font-size:11.5px; font-weight:800; color:var(--muted); padding:4px 0; }
+.ph-cal-day{ aspect-ratio:1; border:0; border-radius:12px; background:transparent; font-family:inherit; font-size:16px; font-weight:800; color:#111; cursor:pointer; }
+.ph-cal-day:active{ background:var(--yellow-soft); }
+.ph-cal-day.today{ box-shadow:inset 0 0 0 2px var(--yellow-dark); }
+.ph-cal-day.sel{ background:#111; color:var(--yellow); }
+.ph-cal-day.off{ color:#CFCBC0; cursor:default; }
+.ph-cal-foot{ display:flex; gap:8px; margin-top:12px; }
+.ph-cal-foot button{ flex:1; min-height:46px; border-radius:14px; border:0; font-family:inherit; font-size:15px; font-weight:900; cursor:pointer; }
+.ph-cal-today{ background:var(--yellow); color:#111; }
+.ph-cal-cancel{ background:#F4F2EC; color:#111; }

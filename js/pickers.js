@@ -24,10 +24,13 @@
 
     const row = document.createElement("div");
     row.className = "ph-date-row";
-    const card = document.createElement("label");
+    const card = document.createElement("button");
+    card.type = "button";
     card.className = "ph-date-card";
     card.innerHTML = `<span class="ph-date-icon">📅</span><span class="ph-date-text"><b class="ph-date-day"></b><span class="ph-date-full"></span></span><span class="ph-date-rel"></span>`;
-    card.appendChild(input); // الحقل الأصلي فوق الكرت وشفاف: الكبسة بتفتح منتقي التاريخ تبع الجوال
+    input.classList.add("ph-hidden-select"); // الحقل الأصلي مخفي — التقويم تبعنا بيعبّيه
+    const allowFuture = bar.id === "tomorrowDateBar";
+    card.addEventListener("click", () => openPhCalendar(input, allowFuture));
     if (prev) { prev.classList.add("ph-date-arrow"); row.appendChild(prev); }
     row.appendChild(card);
     if (next) { next.classList.add("ph-date-arrow"); row.appendChild(next); }
@@ -57,6 +60,68 @@
     input.addEventListener("input", refresh);
     input._phRefresh = refresh;
     refresh();
+  }
+
+  // ---- تقويم برو هاوس (بدل تقويم الجوال) ----
+  const WEEK = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
+  const pad = (n) => String(n).padStart(2, "0");
+  const isoOf = (y, m, d) => `${y}-${pad(m + 1)}-${pad(d)}`;
+
+  function openPhCalendar(input, allowFuture) {
+    const today = todayStr();
+    const selected = input.value || today;
+    let y = Number(selected.slice(0, 4)), m = Number(selected.slice(5, 7)) - 1;
+    const wrap = document.createElement("div");
+    wrap.className = "ph-dialog ph-cal-wrap";
+    const close = () => { wrap.classList.add("closing"); setTimeout(() => wrap.remove(), 160); };
+    const pick = (iso) => {
+      close();
+      if (iso === input.value) return;
+      input.value = iso;
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    const render = () => {
+      const first = new Date(Date.UTC(y, m, 1));
+      const daysIn = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      const lead = first.getUTCDay();
+      const title = first.toLocaleDateString("ar-SA-u-ca-gregory", { month: "long", year: "numeric", timeZone: "UTC" });
+      const cells = [];
+      for (let i = 0; i < lead; i++) cells.push('<span class="ph-cal-empty"></span>');
+      for (let d = 1; d <= daysIn; d++) {
+        const iso = isoOf(y, m, d);
+        const future = !allowFuture && iso > today;
+        const cls = ["ph-cal-day", iso === selected ? "sel" : "", iso === today ? "today" : "", future ? "off" : ""].join(" ");
+        cells.push(`<button type="button" class="${cls}" data-iso="${iso}" ${future ? "disabled" : ""}>${d}</button>`);
+      }
+      const nextMonthStart = isoOf(m === 11 ? y + 1 : y, (m + 1) % 12, 1);
+      const canNext = allowFuture || nextMonthStart <= today;
+      wrap.innerHTML = `
+        <div class="ph-cal" role="dialog" aria-modal="true">
+          <div class="ph-cal-head">
+            <button type="button" class="ph-cal-nav" data-nav="-1" aria-label="الشهر السابق">→</button>
+            <b class="ph-cal-title">${title}</b>
+            <button type="button" class="ph-cal-nav" data-nav="1" aria-label="الشهر الجاي" ${canNext ? "" : "disabled"}>←</button>
+          </div>
+          <div class="ph-cal-week">${WEEK.map(w => `<span>${w}</span>`).join("")}</div>
+          <div class="ph-cal-grid">${cells.join("")}</div>
+          <div class="ph-cal-foot">
+            <button type="button" class="ph-cal-today">📅 اليوم</button>
+            <button type="button" class="ph-cal-cancel">إلغاء</button>
+          </div>
+        </div>`;
+      wrap.querySelectorAll(".ph-cal-day:not(.off)").forEach(b => b.addEventListener("click", () => pick(b.dataset.iso)));
+      wrap.querySelectorAll(".ph-cal-nav").forEach(b => b.addEventListener("click", () => {
+        m += Number(b.dataset.nav);
+        if (m < 0) { m = 11; y--; } else if (m > 11) { m = 0; y++; }
+        render();
+      }));
+      wrap.querySelector(".ph-cal-today").addEventListener("click", () => pick(today));
+      wrap.querySelector(".ph-cal-cancel").addEventListener("click", close);
+    };
+    render();
+    wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add("open"));
   }
 
   // ---- أزرار الفروع ----
