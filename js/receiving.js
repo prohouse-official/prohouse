@@ -273,31 +273,8 @@ function renderReceivingView() {
           : `<div class="rec-source-badge warn">⚠️ لم تُسجل طلبية سابقة لهذا اليوم. يمكنك تسجيل المستلم يدوياً.</div>`;
       })()}
 
-      <!-- بطاقات الإحصائيات السريعة -->
-      ${Auth.isBranchStaff() ? "" : `<div class="rec-stats-row">
-        <div class="rec-stat-pill">
-          <span class="rec-stat-num">${totalItemsCount}</span>
-          <span class="rec-stat-lbl">إجمالي الأصناف</span>
-        </div>
-        <div class="rec-stat-pill ok">
-          <span class="rec-stat-num">${matchedCount}</span>
-          <span class="rec-stat-lbl">مطابق</span>
-        </div>
-        <div class="rec-stat-pill warn">
-          <span class="rec-stat-num">${totalShortageCount}</span>
-          <span class="rec-stat-lbl">فيه نقص</span>
-        </div>
-        <div class="rec-stat-pill unrec">
-          <span class="rec-stat-num">${unreceivedCount}</span>
-          <span class="rec-stat-lbl">لم يستلم بعد</span>
-        </div>
-      </div>`}
-
       <!-- أزرار الإجراء السريع -->
       <div class="rec-quick-actions-bar">
-        <button type="button" class="btn rec-match-all-btn" onclick="onMatchAllReceiving()">
-          ⚡ استلام الكل مطابق للمطلوب
-        </button>
         ${renderCompactToggleBtnHtml()}
       </div>
 
