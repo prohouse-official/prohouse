@@ -304,7 +304,7 @@ function renderTomorrowView() {
                    id="tominput-${item.id}"
                    data-id="${item.id}" data-field="qty"
                    value="${entry.qty}" 
-                   placeholder="0"
+                   placeholder="—"
                    ${ro}
                    class="rec-main-input ${isFilled ? 'border-green' : ''}">
             <span class="rec-input-unit-label">${item.unit || "جم"}</span>

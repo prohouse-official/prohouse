@@ -342,7 +342,7 @@ function renderReceivingView() {
               <input type="number" step="any" min="0" 
                      inputmode="decimal"
                      value="${rec}" 
-                     placeholder="0"
+                     placeholder="—"
                      id="recinput-${it.id}"
                      oninput="onReceivingInputChange('${it.id}', this.value)"
                      class="rec-main-input ${diff < 0 ? 'border-red' : (diff > 0 ? 'border-orange' : (hasValue ? 'border-green' : ''))}">
@@ -569,23 +569,39 @@ function onRemoveReceivingItem(itemId, itemName) {
   const confirmed = confirm(`هل أنت متأكد من إزالة الصنف "${itemName || ''}" من استلام اليوم؟`);
   if (!confirmed) return;
 
+  const date = currentReceivingDate;
+  const branch = currentReceivingBranch;
+  const prevData = currentReceivingData[itemId];
+  const prevExtra = currentReceivingExtraItems.find(it => it.id === itemId);
+
   currentReceivingRemovedIds.add(itemId);
   currentReceivingExtraItems = currentReceivingExtraItems.filter(it => it.id !== itemId);
   delete currentReceivingData[itemId];
 
-  showToast(`🗑️ تم استبعاد الصنف من استلام اليوم`);
   renderReceivingView();
   flushReceivingSave();
   updateSaveBarReceivingStatus();
 
-  // مزامنة فورية بالخلفية لضمان بقاء الاستبعاد وحفظه فوراً في Supabase
-  if (typeof SupaEngine !== "undefined" && typeof SUPABASE_URL !== "undefined" && SUPABASE_URL) {
-    SupaEngine.saveDay({
-      date: currentReceivingDate,
-      branch: currentReceivingBranch,
-      removedItemIds: Array.from(currentReceivingRemovedIds)
-    }).catch(e => console.warn("Auto sync removed item error:", e));
-  }
+  // مزامنة فورية بالخلفية لضمان بقاء الاستبعاد وحفظه فوراً في Supabase — بعد ما ناخد نسخة من الصف للتراجع
+  let savedRows = [];
+  const removedList = Array.from(currentReceivingRemovedIds);
+  const removal = (async () => {
+    if (typeof SupaEngine === "undefined" || typeof SUPABASE_URL === "undefined" || !SUPABASE_URL) return;
+    try { savedRows = await SupaEngine.getEntryRows(date, branch, itemId); } catch (e) { console.warn("Undo snapshot error:", e); }
+    await SupaEngine.saveDay({ date, branch, removedItemIds: removedList }).catch(e => console.warn("Auto sync removed item error:", e));
+  })();
+
+  showUndoBar(`🗑️ انشال "${itemName || ''}" من استلام اليوم`, async () => {
+    await removal;
+    if (currentReceivingDate === date && currentReceivingBranch === branch) {
+      currentReceivingRemovedIds.delete(itemId);
+      if (prevExtra) currentReceivingExtraItems.push(prevExtra);
+      if (prevData) currentReceivingData[itemId] = prevData;
+      renderReceivingView();
+      flushReceivingSave();
+    }
+    await restoreRemovedItem(date, branch, itemId, savedRows);
+  });
 }
 
 function openAddReceivingItemModal(category) {

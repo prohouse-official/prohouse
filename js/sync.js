@@ -6,11 +6,12 @@ const Sync = (() => {
   const QUEUE_KEY = "ph_pending_queue";
   const listeners = [];
   let lastReadError = null;
+  let readFailing = false;
 
   function onStatusChange(fn) { listeners.push(fn); }
   function emitStatus() {
     const q = getQueue();
-    listeners.forEach(fn => fn({ pending: q.length }));
+    listeners.forEach(fn => fn({ pending: q.length, readError: readFailing }));
   }
 
   function getQueue() {
@@ -61,7 +62,15 @@ const Sync = (() => {
     const msg = offline ? "ما في اتصال بالإنترنت" : String(e.message || e).replace(/^(Error:\s*)+/, "");
     console.error("فشل قراءة " + action + ": " + msg);
     lastReadError = { action, msg, at: Date.now() };
+    readFailing = true;
+    emitStatus();
     if (typeof showToast === "function") showToast("⚠ تعذّر جلب البيانات — " + msg);
+  }
+
+  function markReadOk() {
+    if (!readFailing) return;
+    readFailing = false;
+    emitStatus();
   }
 
   async function get(action, params, cacheKey, onFresh) {
@@ -79,6 +88,7 @@ const Sync = (() => {
             }
           }
           cacheSet(ck, result);
+          markReadOk();
           if (onFresh) onFresh(result);
           return result;
         }
@@ -102,6 +112,7 @@ const Sync = (() => {
         throw new Error(json.error || "server error");
       }
       cacheSet(ck, json.data);
+      markReadOk();
       if (onFresh) onFresh(json.data);
       return json.data;
     } catch (e) {
