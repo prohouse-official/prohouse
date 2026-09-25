@@ -24,6 +24,9 @@ const Custody = {
   }
 };
 
+// نموذج مصروفات الكاش (قوقل فورم) — فيه رفع صورة فاتورة فلازم الموظف يفتحه ويرفقها بنفسه
+const CASH_EXPENSE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdgBfXmWQWjuqvwuV-GQWV2Ry7vrxfnF_EPV-XSfYiSyLS6Fg/viewform";
+
 const numOrBlank = (v) => (v === null || v === undefined ? "" : String(v));
 const toNum = (v) => (v === "" || v === null || v === undefined || isNaN(Number(v)) ? null : Number(v));
 const sar = (n) => `${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ر.س`;
@@ -116,6 +119,7 @@ function renderCustodyView(payments) {
             </div>`).join("")}
         </div>
         <button type="button" class="cust-add" id="custodyAddExpense">➕ أضف مصروف</button>
+        ${c.expenses.length ? `<a class="cust-add cust-form-link" href="${CASH_EXPENSE_FORM_URL}" target="_blank" rel="noopener">📋 سجّل المصروف بنموذج المصروفات (مع صورة الفاتورة)</a>` : ""}
         ${c.expenses.length ? `<div class="cust-total">مجموع المصاريف: <b>${sar(custodyExpensesTotal(c.expenses))}</b></div>` : ""}
       </div>
 

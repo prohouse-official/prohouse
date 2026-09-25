@@ -3146,3 +3146,6 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .ph-cal-foot button{ flex:1; min-height:46px; border-radius:14px; border:0; font-family:inherit; font-size:15px; font-weight:900; cursor:pointer; }
 .ph-cal-today{ background:var(--yellow); color:#111; }
 .ph-cal-cancel{ background:#F4F2EC; color:#111; }
+
+/* رابط نموذج المصروفات تحت المصاريف */
+.cust-form-link { display: block; text-align: center; text-decoration: none; margin-top: 6px; }

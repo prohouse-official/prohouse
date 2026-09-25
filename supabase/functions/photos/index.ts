@@ -3,6 +3,7 @@
 //   POST {action:"upload", date, branch, photo:{id, dataUrl, ...}} → بترفع الصورة وبتسجّلها باليوم
 //   POST {action:"delete", date, branch, id}                        → بتشيلها من اليوم ومن التخزين
 //   POST {action:"migrate"}  (المالك بس)                           → بتنقل الصور القديمة من base64 لملفات
+//   POST {action:"cleanup"}  (المالك بس)                           → بتمسح ملفات صور ما إلها يوم
 // كل طلب لازم يكون معه x-session-token صالح (نفس جلسة الموقع).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -75,7 +76,7 @@ Deno.serve(async (req) => {
   const emp = (sess as any)?.employees;
   if (!sess || !emp?.active) return json({ error: "لازم تسجل دخول" }, 401);
 
-  let body: { action?: string; date?: string; branch?: string; id?: string; photo?: Photo } = {};
+  let body: { action?: string; date?: string; branch?: string; id?: string; photo?: Photo; minAge?: number } = {};
   try { body = await req.json(); } catch { return json({ error: "طلب غلط" }, 400); }
 
   try {
@@ -119,17 +120,29 @@ Deno.serve(async (req) => {
         let arr: Photo[] = [];
         try { const v = JSON.parse(r.sales_report_link); arr = Array.isArray(v) ? v : (v?.photos || []); } catch { continue; }
         const out: Photo[] = [];
+        const uploaded: string[] = [];
         for (const p of arr) {
           if (p.dataUrl && !p.url) {
-            try { const up = await upload(r.date, p.dataUrl); const { dataUrl: _d, ...rest } = p; out.push({ ...rest, ...up }); moved++; }
+            try { const up = await upload(r.date, p.dataUrl); const { dataUrl: _d, ...rest } = p; out.push({ ...rest, ...up }); uploaded.push(up.path); }
             catch { out.push(p); }
           } else out.push(p);
         }
-        // منكتب بس إذا ما حدا غيّر صور اليوم بالنص
-        await admin.from("day_meta").update({ sales_report_link: JSON.stringify(out) })
-          .eq("date", r.date).eq("branch", r.branch).eq("sales_report_link", r.sales_report_link);
+        if (!uploaded.length) continue;
+        // منكتب بس إذا ما حدا غيّر صور اليوم بالنص (المقارنة بالداتابيس — النص كبير على الرابط)
+        const { data: ok } = await admin.rpc("ph_replace_photos", { p_date: r.date, p_branch: r.branch, p_old: r.sales_report_link, p_new: JSON.stringify(out) });
+        if (ok) moved += uploaded.length; else await removeFiles(uploaded);
       }
       return json({ moved, days: (rows || []).length });
+    }
+
+    // ملفات صور ما إلها يوم (رفع انقطع بالنص مثلاً) — منمسح اللي أقدم من ساعة
+    if (body.action === "cleanup") {
+      if (emp.role !== "owner") return json({ error: "للمالك بس" }, 403);
+      const { data: orphans, error } = await admin.rpc("ph_photo_orphans", { p_min_minutes: Number(body.minAge ?? 60) });
+      if (error) throw new Error(error.message);
+      const list = ((orphans || []) as unknown[]).map((o) => typeof o === "string" ? o : Object.values(o as object)[0] as string);
+      await removeFiles(list);
+      return json({ removed: list.length });
     }
 
     return json({ error: "action?" }, 400);

@@ -1234,6 +1234,7 @@ async function saveRemainingReportData() {
       statusEl.textContent = "✅ متزامن سحابياً مع كل الأجهزة (" + new Date().toLocaleTimeString("ar-SA") + ")";
       statusEl.classList.remove("dirty");
     }
+    sendSauceFormIfChanged(payload.date, payload.branch, itemsPayload);
   } catch (err) {
     console.warn("Direct saveRemainingReport sync failed, keeping in queue:", err);
     Sync.enqueue("saveRemainingReport:" + currentRemainingDate + ":" + currentRemainingBranch, "saveRemainingReport", payload);
@@ -1248,6 +1249,48 @@ async function saveRemainingReportData() {
     isRemainingSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 حفظ تقرير المتبقي"; }
   }, 800);
+}
+
+// ==================== نموذج الصوص المتبقي (قوقل فورم) ====================
+// بعد حفظ المتبقي: الموقع بيجمع الصوص حسب النوع وبيبعت النموذج لحاله.
+// إذا الأرقام نفسها اللي انبعتت قبل ما منعيد؛ إذا تعدّلت منبعت نسخة جديدة (الشيت بيعتمد آخر رد).
+const SAUCE_FORM_BRANCHES = ["الروضة", "الشاطئ", "عبداللطيف جميل"];
+function sauceBucketOf(it) {
+  const n = it.name || it.itemName || "", c = it.category || "";
+  if (/سالمون/.test(n)) return "salmon";
+  if (/جمبري|روبيان/.test(n)) return "shrimp";
+  if (/^دجاج/.test(n) || c.includes("دجاج")) return "chicken";
+  if (/^لحم/.test(n) || c.includes("لحم")) return "meat";
+  if (c.includes("بحري") || /سمك|فيليه/.test(n)) return "fillet";
+  return null;
+}
+function sauceTotals(items) {
+  const t = { chicken: 0, meat: 0, fillet: 0, salmon: 0, shrimp: 0 };
+  items.forEach(it => {
+    if (!it.isSauce) return;
+    const g = Number(it.remainingSauce || it.remaining || 0);
+    const k = sauceBucketOf(it);
+    if (k && g > 0) t[k] += Math.round(g);
+  });
+  return t;
+}
+async function sendSauceFormIfChanged(date, branch, items) {
+  if (!SAUCE_FORM_BRANCHES.includes(branch) || typeof SupaEngine === "undefined" || !SupaEngine.sendGoogleForm) return;
+  const totals = sauceTotals(items);
+  const statusEl = document.getElementById("remainingSaveStatus");
+  try {
+    const last = await SupaEngine.getLastFormSubmission("sauce", date, branch).catch(() => null);
+    const same = last && Object.keys(totals).every(k => String(totals[k]) === String((last.payload || {})[k]));
+    if (same) return;
+    const emp = Auth.getEmployee();
+    await SupaEngine.sendGoogleForm({ form: "sauce", date, branch, name: emp ? emp.name : "", ...totals });
+    showToast(last ? "📤 انرسل تعديل نموذج الصوص" : "📤 انرسل نموذج الصوص تلقائياً");
+    if (statusEl) statusEl.textContent += " · 📤 نموذج الصوص انرسل";
+  } catch (e) {
+    if (await phConfirm("⚠ ما انرسل نموذج الصوص: " + (e.message || "تأكد من النت") + "\nنعيد المحاولة؟", { ok: "أعد الإرسال" })) {
+      return sendSauceFormIfChanged(date, branch, items);
+    }
+  }
 }
 
 async function closeOperationalDay() {
