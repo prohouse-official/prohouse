@@ -9,8 +9,9 @@ const TAB_ROLE_ACCESS = {
   receiving: ["owner", "manager", "chef", "branch_staff", "employee"],
   remaining: ["owner", "manager", "chef", "branch_staff", "employee"],
   tomorrow: ["owner", "manager", "chef"],
-  juices: ["owner", "manager", "branch_staff", "employee"],
-  checklist: ["owner", "manager", "chef", "branch_staff", "employee"],
+  // العصيرات وقائمة الفحص ما حدا عم يعبّيهم، فمخفيين عن موظفي الفروع لحتى القائمة تضل بسيطة
+  juices: ["owner", "manager"],
+  checklist: ["owner", "manager", "chef"],
   waste: ["owner", "manager", "chef"],
   report: ["owner"],
   items: ["owner"],
