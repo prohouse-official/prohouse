@@ -180,9 +180,9 @@ if (typeof document !== "undefined") {
 
 function autosaveStatusText(state, e) {
   const time = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
-  if (state === "saving") return "⏳ عم ينحفظ…";
+  if (state === "saving") return "⏳ جاري الحفظ…";
   if (state === "saved") return `✓ انحفظ تلقائياً ${time}`;
-  return "⚠ ما انحفظ، رح نعيد المحاولة — " + ((e && e.message) || "");
+  return "⚠ ما انحفظ، بنعيد المحاولة — " + ((e && e.message) || "");
 }
 
 // ---- شريط "تراجع" بعد شيل صنف ----
@@ -237,7 +237,7 @@ async function confirmNoDataLoss(kind, date, branch, itemsPayload) {
   });
   if (!lost.length) return true;
   const sample = lost.slice(0, 4).join("\n") + (lost.length > 4 ? "\n…" : "");
-  return confirm(`⚠️ انتبه: الحفظ رح يمسح أرقام محفوظة لـ ${lost.length} صنف:\n${sample}\n\nإذا الشاشة عم تعرض أصفار بالغلط، اكبس "إلغاء" وحدّث الصفحة.\nمتأكد بدك تحفظ؟`);
+  return phConfirm(`⚠️ انتبه: الحفظ بيمسح أرقام محفوظة لـ ${lost.length} صنف:\n${sample}\n\nإذا الشاشة تعرض أصفار بالغلط، اضغط "لا" وحدّث الصفحة.\nمتأكد تبي تحفظ؟`);
 }
 
 function branchList() {
@@ -261,6 +261,56 @@ function branchOptionsHtml(selected) {
 }
 
 // ---- واجهة ----
+// ---- نوافذ برو هاوس (بدل confirm/alert/prompt تبع المتصفح) ----
+function phDialog({ title = "", message = "", ok = "تمام", cancel = null, danger = false, input = null }) {
+  return new Promise((resolve) => {
+    const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const wrap = document.createElement("div");
+    wrap.className = "ph-dialog";
+    wrap.innerHTML = `
+      <div class="ph-dialog-card" role="dialog" aria-modal="true">
+        <img class="ph-dialog-logo" src="assets/logo.png" alt="">
+        ${title ? `<div class="ph-dialog-title">${esc(title)}</div>` : ""}
+        ${message ? `<div class="ph-dialog-msg">${esc(message)}</div>` : ""}
+        ${input !== null ? `<input class="ph-dialog-input" type="text" inputmode="numeric" value="${esc(input)}">` : ""}
+        <div class="ph-dialog-actions">
+          <button type="button" class="ph-dialog-ok${danger ? " danger" : ""}">${esc(ok)}</button>
+          ${cancel ? `<button type="button" class="ph-dialog-cancel">${esc(cancel)}</button>` : ""}
+        </div>
+      </div>`;
+    const field = wrap.querySelector(".ph-dialog-input");
+    const close = (val) => {
+      document.removeEventListener("keydown", onKey, true);
+      wrap.classList.add("closing");
+      setTimeout(() => wrap.remove(), 160);
+      resolve(val);
+    };
+    const okVal = () => (input !== null ? field.value : true);
+    const cancelVal = input !== null ? null : false;
+    function onKey(e) {
+      if (e.key === "Escape") { e.preventDefault(); close(cancel ? cancelVal : okVal()); }
+      if (e.key === "Enter") { e.preventDefault(); close(okVal()); }
+    }
+    wrap.querySelector(".ph-dialog-ok").addEventListener("click", () => close(okVal()));
+    const cBtn = wrap.querySelector(".ph-dialog-cancel");
+    if (cBtn) cBtn.addEventListener("click", () => close(cancelVal));
+    wrap.addEventListener("click", (e) => { if (e.target === wrap && cancel) close(cancelVal); });
+    document.addEventListener("keydown", onKey, true);
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add("open"));
+    (field || wrap.querySelector(".ph-dialog-ok")).focus({ preventScroll: true });
+  });
+}
+function phConfirm(message, opts = {}) {
+  return phDialog({ message, ok: "إيه", cancel: "لا", ...opts });
+}
+function phAlert(message, opts = {}) {
+  return phDialog({ message, ok: "تمام", ...opts });
+}
+function phPrompt(message, value = "", opts = {}) {
+  return phDialog({ message, input: value, ok: "حفظ", cancel: "إلغاء", ...opts });
+}
+
 function showToast(msg) {
   const t = document.getElementById("toast");
   if (!t) return;

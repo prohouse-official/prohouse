@@ -497,7 +497,7 @@ function onTomorrowFieldChange(e) {
 
   if (field === "qty" && e.target.value !== "" && Number(e.target.value) < 0) {
     e.target.value = "";
-    showToast("الكمية ما بتكون بالسالب");
+    showToast("الكمية ما تكون بالسالب");
   }
 
   currentTomorrowOrder[id][field] = e.target.value;
@@ -569,7 +569,7 @@ async function loadTomorrowOrder(dateStr) {
   const hasData = Object.keys(currentTomorrowOrder).length > 0;
   const st = document.getElementById("tomorrowStatus");
   if (st) {
-    st.textContent = hasData ? "تم تحميل طلبية محفوظة لهذا اليوم لهذا الفرع" : "لسا ما فيه طلبية محفوظة لهذا اليوم لهذا الفرع";
+    st.textContent = hasData ? "تم تحميل طلبية محفوظة لهذا اليوم لهذا الفرع" : "ما فيه طلبية محفوظة لهذا اليوم لهذا الفرع للحين";
   }
 }
 
@@ -628,7 +628,7 @@ function saveTomorrowNow(showStatus) {
   if (st) {
     st.textContent = missing.length
       ? `✅ محفوظ (بدون ${missing.join(" و")} — كمّلهم أول ما تقدر) — ${savedAtText}`
-      : "✅ محفوظ — بتتزامن " + savedAtText;
+      : "✅ محفوظ — بيتزامن " + savedAtText;
   }
   if (showStatus) showToast("تم حفظ طلبية الغد بنجاح!");
 }
@@ -662,9 +662,9 @@ function initTomorrowTab() {
 
 // ---- وظائف إزالة وإضافة الأصناف في طلبية الغد ----
 
-function onRemoveTomorrowItem(itemId, itemName) {
+async function onRemoveTomorrowItem(itemId, itemName) {
   if (Auth.isViewOnlyTomorrow()) return;
-  const confirmed = confirm(`هل أنت متأكد من استبعاد الصنف "${itemName || ''}" من طلبية الغد؟`);
+  const confirmed = await phConfirm(`هل أنت متأكد من استبعاد الصنف "${itemName || ''}" من طلبية الغد؟`, { ok: "شيله", danger: true });
   if (!confirmed) return;
 
   currentTomorrowRemovedIds.add(itemId);
@@ -744,7 +744,7 @@ function confirmAddTomorrowItem(category) {
   const notes = (notesInput?.value || "").trim();
 
   if (!name) {
-    alert("يرجى كتابة اسم الصنف أولاً!");
+    phAlert("يرجى كتابة اسم الصنف أولاً!");
     if (nameInput) nameInput.focus();
     return;
   }

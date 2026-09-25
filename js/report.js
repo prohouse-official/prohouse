@@ -295,7 +295,7 @@ function renderReport(data) {
         ${renderTabSenseSalesBlock(data)}
       `;
     } else {
-      view.innerHTML = '<div class="empty-state">مافي بيانات محفوظة لهذه الفترة/الفلترة بعد.<br>ابدأ بتعبئة تاب "طلبية اليوم".</div>';
+      view.innerHTML = '<div class="empty-state">ما فيه بيانات محفوظة لهذه الفترة/الفلترة بعد.<br>ابدأ بتعبئة تاب "طلبية اليوم".</div>';
     }
     return;
   }
@@ -368,7 +368,7 @@ function renderReport(data) {
 
   view.innerHTML = summary + chartBlock + branchStatsBlock + linksBlock
     + '<div id="mealsSummaryBlock"></div>'
-    + `<div class="cat-title">الإجمالي حسب الصنف</div>` + (totalsCards || '<div class="empty-state">مافي أصناف تطابق هالفلترة.</div>');
+    + `<div class="cat-title">الإجمالي حسب الصنف</div>` + (totalsCards || '<div class="empty-state">ما فيه أصناف تطابق هالفلترة.</div>');
 
   renderTrendChart(filtered.days);
   renderMealsSummary(filtered.days);
@@ -545,7 +545,7 @@ async function downloadWorkbook(workbook, filename) {
 
 async function exportExcel() {
   if (!lastFilteredDays.length) {
-    showToast("مافي بيانات للتصدير بهذه الفترة/الفلترة");
+    showToast("ما فيه بيانات للتصدير بهذه الفترة/الفلترة");
     return;
   }
   await loadReportLibs();
@@ -638,7 +638,7 @@ async function runTomorrowReport() {
 function renderTomorrowReport(rows, branches, date) {
   const view = document.getElementById("tomorrowReportView");
   if (!rows.length) {
-    view.innerHTML = '<div class="empty-state">مافي طلبية محفوظة لهذا اليوم/الفرع بعد.<br>ابدأ بتعبئة تاب "طلبية الغد".</div>';
+    view.innerHTML = '<div class="empty-state">ما فيه طلبية محفوظة لهذا اليوم/الفرع بعد.<br>ابدأ بتعبئة تاب "طلبية الغد".</div>';
     return;
   }
 
@@ -670,7 +670,7 @@ function renderTomorrowReport(rows, branches, date) {
 }
 
 async function exportTomorrowReportExcel() {
-  if (!lastTomorrowReportRows.length) { showToast("مافي بيانات للتصدير"); return; }
+  if (!lastTomorrowReportRows.length) { showToast("ما فيه بيانات للتصدير"); return; }
   await loadReportLibs();
   if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel ما تحمّلت — تأكد من الاتصال بالنت"); return; }
 

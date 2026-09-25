@@ -101,7 +101,7 @@
       const fn = path.slice(4);
       if (fn === "login") {
         const e = EMPLOYEES[String((body && body.p_pin) || "").trim()];
-        if (!e) return [200, { error: "رقم سري غير صحيح — بالمعاينة جرّب 1111 أو 2222" }];
+        if (!e) return [200, { error: "رقم سري غير صحيح — في المعاينة جرّب 1111 أو 2222" }];
         const { token, ...employee } = e;
         return [200, { token, employee }];
       }
@@ -164,7 +164,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     const bar = document.createElement("div");
     bar.className = "demo-banner";
-    bar.innerHTML = '🧪 نسخة معاينة — بيانات وهمية وما بتنحفظ بالنظام الحقيقي · دخول: <b>1111</b> مالك · <b>2222</b> موظف <button type="button">إعادة البيانات</button>';
+    bar.innerHTML = '🧪 نسخة معاينة — بيانات وهمية وما تنحفظ في النظام الحقيقي · دخول: <b>1111</b> مالك · <b>2222</b> موظف <button type="button">إعادة البيانات</button>';
     bar.querySelector("button").addEventListener("click", () => window.PH_DEMO_RESET());
     document.body.prepend(bar);
     document.body.classList.add("is-demo");

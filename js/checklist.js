@@ -266,7 +266,7 @@ function saveChecklistData() {
   if (typeof Toast !== "undefined" && Toast.show) {
     Toast.show("🎉 تم حفظ وتوثيق قائمة الفحص بنجاح!");
   } else {
-    alert("تم حفظ قائمة الفحص بنجاح!");
+    phAlert("تم حفظ قائمة الفحص بنجاح!");
   }
 
   renderChecklistView();

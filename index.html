@@ -12,7 +12,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=5.4.0">
+<link rel="stylesheet" href="css/style.css?v=5.5.0">
 <script>
 // الشغل بدون نت انلغى: منشيل الـ Service Worker القديم (sw.js) ومنمسح ملفاته لحتى الجهاز يجيب أحدث نسخة دايماً.
 // عامل الإشعارات (push-sw.js) ما بيخزّن شي، فمنخليه.
@@ -71,7 +71,7 @@ if ('caches' in window) {
       <input type="password" inputmode="numeric" id="pinCurrent" autocomplete="off" maxlength="8">
     </div>
     <div class="field">
-      <label>الرقم الجديد (من ٤ لـ ٨ أرقام)</label>
+      <label>الرقم الجديد (من ٤ إلى ٨ أرقام)</label>
       <input type="password" inputmode="numeric" id="pinNew" autocomplete="off" maxlength="8">
     </div>
     <div class="field">
@@ -83,7 +83,7 @@ if ('caches' in window) {
       <button class="btn gold" id="pinSaveBtn">حفظ</button>
       <button class="btn" id="pinCancelBtn">إلغاء</button>
     </div>
-    <div class="pin-note">بعد الحفظ رح تحتاج تسجّل دخول بالرقم الجديد.</div>
+    <div class="pin-note">بعد الحفظ بتحتاج تسجّل دخول بالرقم الجديد.</div>
   </div>
 </div>
 
@@ -201,7 +201,7 @@ if ('caches' in window) {
         <div class="topbar-brand brand-name">Pro House Operations Center</div>
       </div>
       <div class="topbar-right">
-        <button class="sync-badge" id="syncBadge" title="حالة المزامنة">🔄 متصل</button>
+        <button class="sync-badge hidden" id="syncBadge" title="حالة المزامنة"></button>
       </div>
     </header>
 
@@ -257,7 +257,7 @@ if ('caches' in window) {
     </div>
 
     <main class="app-main">
-      <div id="offlineBanner" class="offline-banner hidden">⚠ ما في اتصال بالإنترنت — ما رح تنحفظ ولا تنعرض بيانات لحد ما يرجع النت</div>
+      <div id="offlineBanner" class="offline-banner hidden">⚠ ما فيه اتصال بالإنترنت — ما راح تنحفظ ولا تنعرض بيانات لين يرجع النت</div>
 
       <div id="dashboardView" class="view"></div>
       <div id="branchesView" class="view hidden"></div>
@@ -338,46 +338,47 @@ if ('caches' in window) {
 
 
 <div class="save-bar hidden" id="saveBarTomorrow">
-  <div class="save-status" id="tomorrowStatus">لسا ما تحفظ شيء لطلبية الغد</div>
+  <div class="save-status" id="tomorrowStatus">ما انحفظ شي لطلبية الغد للحين</div>
   <button class="save-btn" id="tomorrowSaveBtn" onclick="saveTomorrowData()">💾 حفظ وإرسال طلبية الغد</button>
 </div>
 
 <div class="save-bar hidden" id="saveBarJuices">
-  <div class="save-status" id="juiceStatus">لسا ما تحفظ شيء لجرد العصيرات</div>
+  <div class="save-status" id="juiceStatus">ما انحفظ شي لجرد العصيرات للحين</div>
   <button class="save-btn" id="juiceSaveBtn" onclick="saveJuiceDayData()">💾 حفظ جرد العصيرات</button>
 </div>
 
 <div class="save-bar hidden" id="saveBarChecklist">
-  <div class="save-status" id="checklistStatus">لسا ما تحفظ شيء لقائمة الفحص</div>
+  <div class="save-status" id="checklistStatus">ما انحفظ شي لقائمة الفحص للحين</div>
   <button class="save-btn" id="checklistSaveBtn" onclick="saveChecklistData()">💾 حفظ وإعتماد الفحص</button>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<script src="js/demo.js?v=5.4.0"></script>
-<script src="js/config.js?v=5.4.0"></script>
-<script src="js/supabase-engine.js?v=5.4.0"></script>
-<script src="js/shared.js?v=5.4.0"></script>
-<script src="js/auth.js?v=5.4.0"></script>
-<script src="js/sync.js?v=5.4.0"></script>
-<script src="js/items.js?v=5.4.0"></script>
-<script src="js/camera.js?v=5.4.0"></script>
-<script src="js/branches.js?v=5.4.0"></script>
-<script src="js/receiving.js?v=5.4.0"></script>
-<script src="js/remaining.js?v=5.4.0"></script>
-<script src="js/custody.js?v=5.4.0"></script>
-<script src="js/push.js?v=5.4.0"></script>
-<script src="js/waste.js?v=5.4.0"></script>
-<script src="js/users.js?v=5.4.0"></script>
-<script src="js/audit.js?v=5.4.0"></script>
-<script src="js/forecast.js?v=5.4.0"></script>
-<script src="js/tomorrow.js?v=5.4.0"></script>
-<script src="js/juices.js?v=5.4.0"></script>
-<script src="js/checklist.js?v=5.4.0"></script>
-<script src="js/report.js?v=5.4.0"></script>
-<script src="js/settings.js?v=5.4.0"></script>
-<script src="js/dashboard.js?v=5.4.0"></script>
-<script src="js/main.js?v=5.4.0"></script>
+<script src="js/demo.js?v=5.5.0"></script>
+<script src="js/config.js?v=5.5.0"></script>
+<script src="js/supabase-engine.js?v=5.5.0"></script>
+<script src="js/shared.js?v=5.5.0"></script>
+<script src="js/auth.js?v=5.5.0"></script>
+<script src="js/sync.js?v=5.5.0"></script>
+<script src="js/items.js?v=5.5.0"></script>
+<script src="js/camera.js?v=5.5.0"></script>
+<script src="js/branches.js?v=5.5.0"></script>
+<script src="js/receiving.js?v=5.5.0"></script>
+<script src="js/remaining.js?v=5.5.0"></script>
+<script src="js/custody.js?v=5.5.0"></script>
+<script src="js/push.js?v=5.5.0"></script>
+<script src="js/ptr.js?v=5.5.0"></script>
+<script src="js/waste.js?v=5.5.0"></script>
+<script src="js/users.js?v=5.5.0"></script>
+<script src="js/audit.js?v=5.5.0"></script>
+<script src="js/forecast.js?v=5.5.0"></script>
+<script src="js/tomorrow.js?v=5.5.0"></script>
+<script src="js/juices.js?v=5.5.0"></script>
+<script src="js/checklist.js?v=5.5.0"></script>
+<script src="js/report.js?v=5.5.0"></script>
+<script src="js/settings.js?v=5.5.0"></script>
+<script src="js/dashboard.js?v=5.5.0"></script>
+<script src="js/main.js?v=5.5.0"></script>
 
 </body>
 </html>

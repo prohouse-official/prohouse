@@ -36,7 +36,7 @@ const Push = (() => {
 
   async function enable() {
     const perm = await Notification.requestPermission();
-    if (perm !== "granted") throw new Error(perm === "denied" ? "رفضت الإشعارات — فعّلها من إعدادات المتصفح" : "ما انعطى إذن");
+    if (perm !== "granted") throw new Error(perm === "denied" ? "رفضت الإشعارات — فعّلها من إعدادات المتصفح" : "ما تم إعطاء الإذن");
     const reg = await registration();
     await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
@@ -82,9 +82,9 @@ const Push = (() => {
 
 // ---- كرت "شغّل التنبيهات" (بالرئيسية وبالإعدادات) ----
 const PUSH_HINTS = {
-  "needs-home-screen": "على الآيفون: افتح الموقع بـ Safari ← زر المشاركة ⬆️ ← «إضافة إلى الشاشة الرئيسية»، وافتحه من الأيقونة وبعدين شغّل التنبيهات.",
-  "denied": "الإشعارات مسكّرة لهالموقع. من إعدادات المتصفح ← الإشعارات ← اسمح للموقع، وبعدين ارجع هون.",
-  "unsupported": "هالمتصفح ما بيدعم التنبيهات. جرّب Chrome على أندرويد، أو أضف الموقع للشاشة الرئيسية على الآيفون."
+  "needs-home-screen": "على الآيفون: افتح الموقع بـ Safari ← زر المشاركة ⬆️ ← «إضافة إلى الشاشة الرئيسية»، وافتحه من الأيقونة وبعدها شغّل التنبيهات.",
+  "denied": "الإشعارات مقفلة لهالموقع. من إعدادات المتصفح ← الإشعارات ← اسمح للموقع، وبعدها ارجع هنا.",
+  "unsupported": "هالمتصفح ما يدعم التنبيهات. جرّب Chrome على أندرويد، أو أضف الموقع للشاشة الرئيسية على الآيفون."
 };
 
 async function pushCardHtml({ compact } = {}) {
@@ -94,10 +94,10 @@ async function pushCardHtml({ compact } = {}) {
   if (st === "on") {
     return `<div class="push-card on"><div class="push-card-text"><b>🔔 التنبيهات شغّالة على هالجوال</b></div>
       <div class="push-card-actions"><button type="button" class="btn ghost" data-push="test">جرّب تنبيه</button>
-      <button type="button" class="btn ghost" data-push="off">وقّفها</button></div></div>`;
+      <button type="button" class="btn ghost" data-push="off">أوقفها</button></div></div>`;
   }
   if (st === "off") {
-    return `<div class="push-card"><div class="push-card-text"><b>🔔 شغّل التنبيهات</b><span>بيجيك تذكير عالجوال إذا نسيت الاستلام أو الجرد أو العهدة.</span></div>
+    return `<div class="push-card"><div class="push-card-text"><b>🔔 شغّل التنبيهات</b><span>يجيك تذكير على الجوال إذا نسيت الاستلام أو الجرد أو العهدة.</span></div>
       <div class="push-card-actions"><button type="button" class="btn gold" data-push="on">تشغيل</button></div></div>`;
   }
   return `<div class="push-card muted"><div class="push-card-text"><b>🔔 التنبيهات</b><span>${PUSH_HINTS[st]}</span></div></div>`;
@@ -112,7 +112,7 @@ async function mountPushCard(el, opts) {
       const act = btn.dataset.push;
       if (act === "on") { await Push.enable(); showToast("✅ انشغلت التنبيهات"); }
       if (act === "off") { await Push.disable(); showToast("انطفت التنبيهات على هالجوال"); }
-      if (act === "test") { await Push.sendTest(); showToast("📨 انبعت — لازم يوصلك هلأ"); }
+      if (act === "test") { await Push.sendTest(); showToast("📨 انرسل — المفروض يوصلك الحين"); }
     } catch (e) {
       showToast("⚠ " + (e.message || e));
     }
@@ -135,12 +135,12 @@ function reminderSettingsCardHtml() {
   return `
     <div class="settings-card">
       <h3>⏰ تذكيرات الجوال</h3>
-      <p class="settings-hint">بوقت كل تذكير، إذا الفرع لسا ما بلّش هالخطوة لهاليوم، بيوصل تنبيه لموظفين الفرع. فضّي الوقت لتلغي التذكير.</p>
+      <p class="settings-hint">في وقت كل تذكير، إذا الفرع ما بدأ هالخطوة لليوم، يوصل تنبيه لموظفين الفرع. امسح الوقت عشان تلغي التذكير.</p>
       <label class="rem-switch"><input type="checkbox" id="remEnabled" ${r.enabled ? "checked" : ""}> التذكيرات شغّالة</label>
-      ${row("receiving", "📦 استلام الصبح", "إذا ما انسجل ولا صنف مستلم")}
-      ${row("remaining", "📊 جرد المتبقي", "إذا ما انسجل ولا متبقي")}
-      ${row("custody", "💰 إغلاق العهدة", "إذا ما انسكرت العهدة (بعد نص الليل بيحسب لليوم اللي قبل)")}
-      <label class="rem-switch"><input type="checkbox" id="remOwners" ${r.owners === false ? "" : "checked"}> ابعت نسخة للمالكين كمان</label>
+      ${row("receiving", "📦 استلام الصبح", "إذا ما تسجّل ولا صنف مستلم")}
+      ${row("remaining", "📊 جرد المتبقي", "إذا ما تسجّل أي متبقي")}
+      ${row("custody", "💰 إغلاق العهدة", "إذا ما تقفّلت العهدة (بعد نص الليل يحسب لليوم اللي قبله)")}
+      <label class="rem-switch"><input type="checkbox" id="remOwners" ${r.owners === false ? "" : "checked"}> أرسل نسخة للمالكين بعد</label>
       <button class="btn gold" id="saveRemindersBtn">حفظ التذكيرات</button>
       <div id="pushCardSettings" class="push-card-slot"></div>
     </div>`;
@@ -158,7 +158,7 @@ function bindReminderSettings() {
       receiving: val("receiving"), remaining: val("remaining"), custody: val("custody")
     };
     if (reminders.enabled && !reminders.receiving && !reminders.remaining && !reminders.custody) {
-      showToast("⚠ حط وقت لتذكير واحد عالأقل");
+      showToast("⚠ حط وقت لتذكير واحد على الأقل");
       return;
     }
     const payload = { reminders: JSON.stringify(reminders) };

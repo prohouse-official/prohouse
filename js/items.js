@@ -158,7 +158,7 @@ function renderItemsAdminView() {
     .sort((a, b) => categoryRank(a) - categoryRank(b));
 
   view.innerHTML = `
-    ${!isOwner ? '<div class="offline-banner">هون بس الأصناف اللي ضفتها إلك لفرعك — الكتالوج المشترك بيديره المالك</div>' : ""}
+    ${!isOwner ? '<div class="offline-banner">هنا بس الأصناف اللي أضفتها لفرعك — القائمة المشتركة يديرها المالك</div>' : ""}
     <div class="toolbar">
       <button class="btn primary" id="addItemBtn">+ إضافة صنف جديد</button>
     </div>
@@ -173,7 +173,7 @@ function renderItemsAdminView() {
         <label style="margin:0;" for="newCustomName">اسم الطبخة يُكتب يدوياً كل مرة (مثل دجاج الشيف/لحم الشيف)</label>
       </div>
       <div class="field">
-        <label>يظهر بشاشة الاستلام لهاي الفروع بس (اترك الكل بدون تحديد = يظهر عند الكل)</label>
+        <label>يظهر بشاشة الاستلام لهذي الفروع بس (اترك الكل بدون تحديد = يظهر عند الكل)</label>
         <div class="badges" id="newBranchChecks">${branchCheckboxesHtml([])}</div>
       </div>` : `
       <div class="field"><label>الفرع</label>${branchLockedFieldHtml("newBranchLocked", mine[0] || "")}</div>`}
@@ -194,11 +194,11 @@ function renderItemsAdminView() {
     const hasCustomName = isOwner ? document.getElementById("newCustomName").checked : false;
     const branches = isOwner ? checkedBranches(document.getElementById("newBranchChecks")) : document.getElementById("newBranchLocked").value;
     if (!category || !name) { showToast("لازم تعبي التصنيف واسم الصنف"); return; }
-    if (!isOwner && !branches) { showToast("ما في فرع مرتبط بحسابك"); return; }
+    if (!isOwner && !branches) { showToast("ما فيه فرع مرتبط بحسابك"); return; }
     Items.save({ category, name, unit, hasCustomName, branches, sortOrder: Items.current.length + 1 });
     document.getElementById("itemAddForm").classList.add("hidden");
     renderItemsAdminView();
-    showToast("انضاف الصنف");
+    showToast("تمت إضافة الصنف");
   });
 
   const list = document.getElementById("itemsList");
@@ -226,7 +226,7 @@ function renderItemsAdminView() {
         </label>
       </div>
       <div class="field" style="margin-top:8px;">
-        <label>يظهر بشاشة الاستلام لهاي الفروع بس (بدون تحديد = يظهر عند الكل)</label>
+        <label>يظهر بشاشة الاستلام لهذي الفروع بس (بدون تحديد = يظهر عند الكل)</label>
         <div class="badges" data-branch-checks>${branchCheckboxesHtml(itemBranches(item))}</div>
       </div>` : `
       <div class="field" style="margin-top:8px;"><label>الفرع</label>${branchLockedFieldHtml("editBranchLocked-" + item.id, itemBranches(item)[0] || mine[0] || "")}</div>`}
@@ -251,8 +251,8 @@ function renderItemsAdminView() {
       showToast("تم حفظ التعديل");
       renderItemsAdminView();
     });
-    card.querySelector('[data-act="del"]').addEventListener("click", () => {
-      if (!confirm(`متأكد من حذف "${item.name}"؟`)) return;
+    card.querySelector('[data-act="del"]').addEventListener("click", async () => {
+      if (!(await phConfirm(`متأكد من حذف "${item.name}"؟`, { ok: "احذف", danger: true }))) return;
       Items.remove(item.id);
       renderItemsAdminView();
       showToast("تم حذف الصنف");

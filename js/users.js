@@ -108,10 +108,10 @@ function openAddUserModal() {
   showToast("ℹ️ يمكنك إضافة موظف جديد وتخصيص رمزه السري وفروعه المسموحة.");
 }
 
-function editUserRole(idx) {
+async function editUserRole(idx) {
   const u = usersListState[idx];
   if (!u) return;
-  const newPin = prompt(`تعديل الرمز السري للموظف (${u.name}):`, u.pin);
+  const newPin = await phPrompt(`تعديل الرمز السري للموظف (${u.name}):`, u.pin);
   if (newPin && newPin.trim()) {
     u.pin = newPin.trim();
     showToast("✓ تم تحديث الرمز السري بنجاح!");

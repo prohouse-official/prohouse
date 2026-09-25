@@ -166,7 +166,7 @@ function applyRoleUiGating() {
 function updateSyncBadge({ pending, readError }) {
   const el = document.getElementById("syncBadge");
   if (!API_URL) {
-    el.textContent = "⚙ لسا ما انربط الباك اند";
+    el.textContent = "⚙ الباك اند ما انربط للحين";
     el.classList.remove("ok");
     return;
   }
@@ -179,10 +179,12 @@ function updateSyncBadge({ pending, readError }) {
     el.classList.remove("ok");
     el.classList.add("pending");
   } else {
-    el.textContent = "✅ كل شي متزامن";
+    el.textContent = "";
     el.classList.add("ok");
     el.classList.remove("pending");
   }
+  // كل شي محفوظ؟ منخفي الشارة. بتطلع بس إذا في شي ناطر حفظ أو في مشكلة اتصال
+  el.classList.toggle("hidden", !readError && !(pending > 0));
 }
 Sync.onStatusChange(updateSyncBadge);
 // ضغطة عادية: تدفع الحفظ المعلّق. ضغطة مطوّلة: تمسح الكاش وتعيد التحميل من السيرفر —
@@ -196,7 +198,7 @@ Sync.onStatusChange(updateSyncBadge);
     held = false;
     timer = setTimeout(async () => {
       held = true;
-      if (!confirm("تحديث كامل للتطبيق من السيرفر؟\nسيتم مسح الكاش وتحميل أحدث إصدار.")) return;
+      if (!(await phConfirm("تحديث كامل للتطبيق من السيرفر؟\nسيتم مسح الكاش وتحميل أحدث إصدار."))) return;
       if ('caches' in window) {
         try {
           const keys = await caches.keys();
@@ -372,15 +374,15 @@ document.getElementById("pinSaveBtn").addEventListener("click", async () => {
   const errEl = document.getElementById("pinError");
   const showErr = (msg) => { errEl.textContent = msg; errEl.classList.remove("hidden"); };
 
-  if (!currentPin || !newPin) return showErr("عبّي كل الخانات");
-  if (newPin !== confirmPin) return showErr("الرقم الجديد ما تطابق بالخانتين");
-  if (!/^\d{4,8}$/.test(newPin)) return showErr("الرقم الجديد لازم يكون من ٤ لـ ٨ أرقام");
+  if (!currentPin || !newPin) return showErr("عبّ كل الخانات");
+  if (newPin !== confirmPin) return showErr("الرقم الجديد مو نفسه في الخانتين");
+  if (!/^\d{4,8}$/.test(newPin)) return showErr("الرقم الجديد لازم يكون من ٤ إلى ٨ أرقام");
 
   const btn = document.getElementById("pinSaveBtn");
   btn.disabled = true;
   try {
     await Auth.changePin(currentPin, newPin);
-    alert("تم تغيير رقمك. سجّل دخول بالرقم الجديد.");
+    await phAlert("تم تغيير رقمك. سجّل دخول بالرقم الجديد.");
     location.reload(); // الجلسات القديمة انلغت عالسيرفر — لازم دخول جديد
   } catch (e) {
     showErr(String(e).replace(/^(Error:\s*)+/, ""));
@@ -390,7 +392,7 @@ document.getElementById("pinSaveBtn").addEventListener("click", async () => {
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
-  if (!confirm("تسجيل الخروج؟")) return;
+  if (!(await phConfirm("متأكد تبي تطلع من حسابك؟", { title: "تسجيل الخروج", ok: "خروج", cancel: "إلغاء", danger: true }))) return;
   await Auth.logout();
   location.reload();
 });
