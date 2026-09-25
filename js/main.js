@@ -8,6 +8,7 @@ const TAB_ROLE_ACCESS = {
   inspection: ["owner", "manager", "chef", "branch_staff", "employee"],
   receiving: ["owner", "manager", "chef", "branch_staff", "employee"],
   remaining: ["owner", "manager", "chef", "branch_staff", "employee"],
+  custody: ["owner", "manager", "branch_staff", "employee"],
   tomorrow: ["owner", "manager", "chef"],
   // العصيرات وقائمة الفحص ما حدا عم يعبّيهم، فمخفيين عن موظفي الفروع لحتى القائمة تضل بسيطة
   juices: ["owner", "manager"],
@@ -49,7 +50,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -64,6 +65,7 @@ function setActiveTab(tab) {
   if (recDateBar) recDateBar.classList.toggle("hidden", tab !== "receiving");
   if (remDateBar) remDateBar.classList.toggle("hidden", tab !== "remaining");
 
+  document.getElementById("custodyDateBar").classList.toggle("hidden", tab !== "custody");
   document.getElementById("tomorrowDateBar").classList.toggle("hidden", tab !== "tomorrow");
   document.getElementById("juiceDateBar").classList.toggle("hidden", tab !== "juices");
   document.getElementById("checklistDateBar").classList.toggle("hidden", tab !== "checklist");
@@ -99,6 +101,7 @@ function setActiveTab(tab) {
     }
     loadRemainingData(currentRemainingDate, currentRemainingBranch); 
   }
+  if (tab === "custody") { loadCustody(currentCustodyDate, Branch.get()); }
   if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
   if (tab === "users") { renderUsersView(); }
   if (tab === "audit") { renderAuditView(); }
@@ -312,6 +315,7 @@ async function startApp() {
   await Promise.all([Items.load(), ActiveBranches.refresh()]);
   initReceivingTab();
   initRemainingTab();
+  if (tabAllowed("custody")) initCustodyTab();
   initDashboardTab();
   initTomorrowTab();
   if (tabAllowed("juices")) initJuicesTab();

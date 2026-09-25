@@ -910,6 +910,25 @@ const SupaEngine = (() => {
     return existingPhotos;
   }
 
+  // --- إغلاق العهدة ---
+  async function getCustody(date, branch) {
+    const rows = await query(`custody_closings?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
+    return (rows && rows[0]) || null;
+  }
+
+  async function saveCustody(row) {
+    await query("custody_closings?on_conflict=date,branch", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(row)
+    });
+  }
+
+  // مبيعات تابسنس حسب طريقة الدفع — الداتابيس بترجّعها للمالك بس
+  async function getPayments(date, branch) {
+    return (await query(`tabsense_payments?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`)) || [];
+  }
+
   // نسخة من صف صنف بيوم معيّن قبل ما ينشال — لزر التراجع
   async function getEntryRows(date, branch, itemId) {
     return (await query(`daily_entries?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&item_id=eq.${encodeURIComponent(itemId)}`)) || [];
@@ -976,6 +995,9 @@ const SupaEngine = (() => {
     getDay,
     getActiveBranches,
     getEntryRows,
+    getCustody,
+    saveCustody,
+    getPayments,
     restoreEntryRows,
     saveDay,
     saveRemainingReport,

@@ -52,7 +52,10 @@
       day_meta: [], tomorrow_orders: [], waste_log: [], juices: [], juice_counts: [], juice_sales: [],
       settings: [{ key: "branches", value: "الروضة,الشاطئ," + AJL }],
       employees: Object.values(EMPLOYEES).map(({ token, ...e }) => ({ ...e, active: true })),
-      tabsense_payments: [{ date: riyadh(-1), branch: AJL, method: "cash", amount: 1840 }, { date: riyadh(-1), branch: AJL, method: "card", amount: 4125 }],
+      tabsense_payments: [
+        { date: riyadh(-1), branch: AJL, channel: "Cash", transactions: 6, amount: 212.4 },
+        { date: riyadh(-1), branch: AJL, channel: "Mada", transactions: 79, amount: 1498.5 }
+      ],
       custody_closings: [], push_subscriptions: [], reminder_settings: []
     };
   }
@@ -64,7 +67,7 @@
   const KEYS = {
     daily_entries: ["date", "branch", "item_id"], day_meta: ["date", "branch"], items: ["id"], settings: ["key"], juices: ["id"],
     juice_counts: ["date", "branch", "juice_id"], employees: ["id"], custody_closings: ["date", "branch"],
-    push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"]
+    push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"], tabsense_payments: ["date", "branch", "channel"]
   };
 
   function parseList(v) { return v.slice(v.indexOf("(") + 1, v.lastIndexOf(")")).split(",").map(s => decodeURIComponent(s.replace(/^"|"$/g, ""))); }

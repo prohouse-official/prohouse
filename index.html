@@ -130,6 +130,10 @@ if ('caches' in window) {
         <span class="nav-icon">📊</span>
         <span class="nav-text">تقرير المتبقي والجرد</span>
       </button>
+      <button class="tab-btn nav-item" data-tab="custody">
+        <span class="nav-icon">💰</span>
+        <span class="nav-text">إغلاق العهدة</span>
+      </button>
 
       <div class="nav-group-title">📋 التشغيل والمبيعات</div>
       <button class="tab-btn nav-item" data-tab="tomorrow">
@@ -216,6 +220,15 @@ if ('caches' in window) {
           <button type="button" data-day="next" title="اليوم التالي" aria-label="اليوم التالي">←</button>
         </div>
       </div>
+      <div class="datebar hidden" id="custodyDateBar">
+        <input type="date" id="custodyDateInput">
+        <div class="day-jump">
+          <button type="button" data-day="prev" title="اليوم السابق" aria-label="اليوم السابق">→</button>
+          <button type="button" data-day="yesterday">أمس</button>
+          <button type="button" data-day="today">اليوم</button>
+          <button type="button" data-day="next" title="اليوم التالي" aria-label="اليوم التالي">←</button>
+        </div>
+      </div>
       <div class="datebar hidden" id="tomorrowDateBar">
         <input type="date" id="tomorrowDateInput">
       </div>
@@ -249,6 +262,7 @@ if ('caches' in window) {
       <div id="inspectionView" class="view hidden"></div>
       <div id="receivingView" class="view hidden"></div>
       <div id="remainingView" class="view hidden"></div>
+      <div id="custodyView" class="view hidden"></div>
       <div id="tomorrowView" class="view hidden"></div>
       <div id="juicesView" class="view hidden"></div>
       <div id="checklistView" class="view hidden"></div>
@@ -347,6 +361,7 @@ if ('caches' in window) {
 <script src="js/branches.js?v=5.3.0"></script>
 <script src="js/receiving.js?v=5.3.0"></script>
 <script src="js/remaining.js?v=5.3.0"></script>
+<script src="js/custody.js?v=5.3.0"></script>
 <script src="js/waste.js?v=5.3.0"></script>
 <script src="js/users.js?v=5.3.0"></script>
 <script src="js/audit.js?v=5.3.0"></script>
