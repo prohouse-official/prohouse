@@ -168,7 +168,9 @@ async function renderDashboard() {
   }
 
   await Items.load();
-  const branches = workingBranchList();
+  // الموظف: فرعه الشغّال. المالك: كل الفروع (الشغّالة أول) ببطاقات بتنسحب
+  const working = workingBranchList();
+  const branches = Auth.isBranchStaff() ? working : [...working, ...allowedBranchList().filter(b => !working.includes(b))];
   const today = todayStr();
   const dash = await Sync.get("getDashboard", { date: today }, "dashboard:" + today, (fresh) => applyDashboardPayload(fresh));
   applyDashboardPayload(dash);
@@ -205,10 +207,25 @@ async function renderDashboard() {
     view.innerHTML = `
       <div class="home-hello">${greeting}، ${name}</div>
       <div class="home-sub">${dateLabel}</div>
-      ${statuses.map(s => stepsCardHtml(s, true)).join("")}
+      <div class="home-swiper" id="homeSwiper">
+        ${statuses.map(s => `<div class="home-slide">${stepsCardHtml(s, true)}</div>`).join("")}
+      </div>
+      ${statuses.length > 1 ? `<div class="home-dots">${statuses.map((s, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${s.branch}"></button>`).join("")}</div>` : ""}
       ${flagged.length ? `<button type="button" class="home-flag" data-tab="report">⚠ ${flagged.length} صنف إرجاعه مرتفع هالشهر ‹</button>` : ""}
       <div id="pushCardHome" class="push-card-slot"></div>
     `;
+  }
+
+  const swiper = document.getElementById("homeSwiper");
+  if (swiper) {
+    const dots = view.querySelectorAll(".home-dot");
+    const slides = swiper.querySelectorAll(".home-slide");
+    swiper.addEventListener("scroll", () => {
+      const w = swiper.clientWidth;
+      const i = Math.round(Math.abs(swiper.scrollLeft) / (slides[0] ? slides[0].offsetWidth + 12 : w));
+      dots.forEach((d, k) => d.classList.toggle("active", k === i));
+    }, { passive: true });
+    dots.forEach(d => d.addEventListener("click", () => slides[Number(d.dataset.slide)].scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" })));
   }
 
   view.querySelectorAll("[data-tab]").forEach(btn => {

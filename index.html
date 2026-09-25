@@ -12,7 +12,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=5.7.0">
+<link rel="stylesheet" href="css/style.css?v=5.8.0">
 <script>
 // الشغل بدون نت انلغى: منشيل الـ Service Worker القديم (sw.js) ومنمسح ملفاته لحتى الجهاز يجيب أحدث نسخة دايماً.
 // عامل الإشعارات (push-sw.js) ما بيخزّن شي، فمنخليه.
@@ -116,10 +116,6 @@ if ('caches' in window) {
         <span class="nav-icon">📷</span>
         <span class="nav-text">التوثيق والمراقبة (3 جولات)</span>
       </button>
-      <button class="tab-btn nav-item sub-item" data-tab="closing">
-        <span class="nav-icon">🔒</span>
-        <span class="nav-text">إغلاق الفرع</span>
-      </button>
       <button class="tab-btn nav-item sub-item" data-tab="inspection">
         <span class="nav-icon">📷</span>
         <span class="nav-text">المراقبة الميدانية</span>
@@ -137,6 +133,10 @@ if ('caches' in window) {
       <button class="tab-btn nav-item" data-tab="custody">
         <span class="nav-icon">💰</span>
         <span class="nav-text">إغلاق العهدة</span>
+      </button>
+      <button class="tab-btn nav-item" data-tab="closing">
+        <span class="nav-icon">🔒</span>
+        <span class="nav-text">إغلاق الفرع</span>
       </button>
 
       <div class="nav-group-title">📋 التشغيل والمبيعات</div>
@@ -354,31 +354,31 @@ if ('caches' in window) {
 
 <div class="toast" id="toast"></div>
 
-<script src="js/demo.js?v=5.7.0"></script>
-<script src="js/config.js?v=5.7.0"></script>
-<script src="js/supabase-engine.js?v=5.7.0"></script>
-<script src="js/shared.js?v=5.7.0"></script>
-<script src="js/auth.js?v=5.7.0"></script>
-<script src="js/sync.js?v=5.7.0"></script>
-<script src="js/items.js?v=5.7.0"></script>
-<script src="js/camera.js?v=5.7.0"></script>
-<script src="js/branches.js?v=5.7.0"></script>
-<script src="js/receiving.js?v=5.7.0"></script>
-<script src="js/remaining.js?v=5.7.0"></script>
-<script src="js/custody.js?v=5.7.0"></script>
-<script src="js/push.js?v=5.7.0"></script>
-<script src="js/ptr.js?v=5.7.0"></script>
-<script src="js/waste.js?v=5.7.0"></script>
-<script src="js/users.js?v=5.7.0"></script>
-<script src="js/audit.js?v=5.7.0"></script>
-<script src="js/forecast.js?v=5.7.0"></script>
-<script src="js/tomorrow.js?v=5.7.0"></script>
-<script src="js/juices.js?v=5.7.0"></script>
-<script src="js/checklist.js?v=5.7.0"></script>
-<script src="js/report.js?v=5.7.0"></script>
-<script src="js/settings.js?v=5.7.0"></script>
-<script src="js/dashboard.js?v=5.7.0"></script>
-<script src="js/main.js?v=5.7.0"></script>
+<script src="js/demo.js?v=5.8.0"></script>
+<script src="js/config.js?v=5.8.0"></script>
+<script src="js/supabase-engine.js?v=5.8.0"></script>
+<script src="js/shared.js?v=5.8.0"></script>
+<script src="js/auth.js?v=5.8.0"></script>
+<script src="js/sync.js?v=5.8.0"></script>
+<script src="js/items.js?v=5.8.0"></script>
+<script src="js/camera.js?v=5.8.0"></script>
+<script src="js/branches.js?v=5.8.0"></script>
+<script src="js/receiving.js?v=5.8.0"></script>
+<script src="js/remaining.js?v=5.8.0"></script>
+<script src="js/custody.js?v=5.8.0"></script>
+<script src="js/push.js?v=5.8.0"></script>
+<script src="js/ptr.js?v=5.8.0"></script>
+<script src="js/waste.js?v=5.8.0"></script>
+<script src="js/users.js?v=5.8.0"></script>
+<script src="js/audit.js?v=5.8.0"></script>
+<script src="js/forecast.js?v=5.8.0"></script>
+<script src="js/tomorrow.js?v=5.8.0"></script>
+<script src="js/juices.js?v=5.8.0"></script>
+<script src="js/checklist.js?v=5.8.0"></script>
+<script src="js/report.js?v=5.8.0"></script>
+<script src="js/settings.js?v=5.8.0"></script>
+<script src="js/dashboard.js?v=5.8.0"></script>
+<script src="js/main.js?v=5.8.0"></script>
 
 </body>
 </html>

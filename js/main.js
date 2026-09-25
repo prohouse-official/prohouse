@@ -5,7 +5,7 @@ const TAB_ROLE_ACCESS = {
   branches: ["owner", "manager", "chef"],
   opening: ["owner", "manager", "chef", "branch_staff", "employee"],
   closing: ["owner", "manager", "chef", "branch_staff", "employee"],
-  inspection: ["owner", "manager", "chef", "branch_staff", "employee"],
+  inspection: ["owner"], // المراقبة الميدانية للمالك بس
   receiving: ["owner", "manager", "chef", "branch_staff", "employee"],
   remaining: ["owner", "manager", "chef", "branch_staff", "employee"],
   custody: ["owner", "manager", "branch_staff", "employee"],
@@ -127,9 +127,13 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("sidebarBackdrop")?.addEventListener("click", closeMobileSidebar);
 });
 
+// شاشات مخفية من القائمة (الكود موجود — لترجيع أي وحدة شيلها من هون)
+// المستخدمون والصلاحيات صارت زر جوّا الإعدادات
+const NAV_HIDDEN_TABS = ["branches", "items", "users"];
+
 function applyRoleUiGating() {
   document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.classList.toggle("hidden", !tabAllowed(btn.dataset.tab));
+    btn.classList.toggle("hidden", !tabAllowed(btn.dataset.tab) || NAV_HIDDEN_TABS.includes(btn.dataset.tab));
   });
 
   // إخفاء عناوين الأقسام الفارغة بالقائمة الجانبية تلقائياً

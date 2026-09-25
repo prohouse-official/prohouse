@@ -65,6 +65,12 @@ function renderSettingsView() {
   initCategoryOrderState();
   view.innerHTML = `
     <div class="settings-card">
+      <h3>👥 المستخدمون والصلاحيات</h3>
+      <p class="settings-hint">إضافة الموظفين، أدوارهم، أرقامهم السرية والفروع المسموحة.</p>
+      <button class="btn gold" id="openUsersBtn">فتح المستخدمين والصلاحيات</button>
+    </div>
+
+    <div class="settings-card">
       <h3>هوية المطعم</h3>
       <div class="field"><label>اسم النظام/المطعم</label><input type="text" id="setRestaurantName" value="${currentSettings.restaurantName || "Pro House"}"></div>
       <div class="field"><label>رابط صورة الشعار (اختياري)</label><input type="url" id="setLogoUrl" value="${currentSettings.logoUrl || ""}"></div>
@@ -193,6 +199,7 @@ function renderSettingsView() {
   });
 
   if (typeof bindReminderSettings === "function") bindReminderSettings();
+  document.getElementById("openUsersBtn").addEventListener("click", () => setActiveTab("users"));
 
   document.getElementById("saveThresholdsBtn").addEventListener("click", () => {
     const payload = {
