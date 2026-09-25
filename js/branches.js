@@ -149,24 +149,33 @@ function getAutoInspectionStage() {
   return "closing";                            // بعد 3:30 عصراً -> الإغلاق
 }
 
+// تاريخ شاشة التوثيق: اليوم افتراضياً، وأي يوم قديم للمراجعة (عرض فقط)
+let currentOpeningDate = todayStr();
+
 async function renderOpeningView() {
   const view = document.getElementById("openingView");
   if (!view) return;
 
   const branch = Branch.get() || allowedBranchList()[0] || "";
-  const date = todayStr();
+  const date = currentOpeningDate || todayStr();
+  const isPast = date !== todayStr();
+  const dateInput = document.getElementById("openingDateInput");
+  if (dateInput && dateInput.value !== date) dateInput.value = date;
   const activeStage = INSPECTION_STAGES.find(s => s.id === currentInspectionStage) || INSPECTION_STAGES[0];
   const sessionId = "INSP-" + branch.replace(/\s+/g, "_") + "-" + date.replace(/-/g, "") + "-" + activeStage.id.toUpperCase();
 
-  const photos = await getPhotosForSession(sessionId);
+  // كل صور اليوم بطلب واحد، وبعدين منفرزها حسب الجولة
+  const allDayPhotos = await getAllPhotos(branch, date);
+  const sessionPhotos = (sid) => allDayPhotos.filter(p => p.sessionId === sid);
+  const photos = sessionPhotos(sessionId);
   const checkpoints = typeof getCheckpointsForBranch === "function" ? getCheckpointsForBranch(branch) : DEFAULT_INSPECTION_CHECKPOINTS;
   const completedCount = checkpoints.filter(cp => photos.some(p => p.checkpointId === cp.id)).length;
   const isFullyCompleted = completedCount >= checkpoints.length && checkpoints.length > 0;
 
   // جلب إحصائيات كل جولة لمعرفة المكتمل منها
-  const morningPhotos = await getPhotosForSession("INSP-" + branch.replace(/\s+/g, "_") + "-" + date.replace(/-/g, "") + "-MORNING");
-  const lunchPhotos = await getPhotosForSession("INSP-" + branch.replace(/\s+/g, "_") + "-" + date.replace(/-/g, "") + "-LUNCH");
-  const closingPhotos = await getPhotosForSession("INSP-" + branch.replace(/\s+/g, "_") + "-" + date.replace(/-/g, "") + "-CLOSING");
+  const morningPhotos = sessionPhotos("INSP-" + branch.replace(/\s+/g, "_") + "-" + date.replace(/-/g, "") + "-MORNING");
+  const lunchPhotos = sessionPhotos("INSP-" + branch.replace(/\s+/g, "_") + "-" + date.replace(/-/g, "") + "-LUNCH");
+  const closingPhotos = sessionPhotos("INSP-" + branch.replace(/\s+/g, "_") + "-" + date.replace(/-/g, "") + "-CLOSING");
 
   const stageStats = {
     morning: checkpoints.filter(cp => morningPhotos.some(p => p.checkpointId === cp.id)).length,
@@ -190,6 +199,8 @@ async function renderOpeningView() {
           </select>
         </div>
       </div>
+
+      ${isPast ? `<div class="opening-past-banner">📅 صور يوم ${new Date(date + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long" })} — للمشاهدة بس</div>` : ""}
 
       <!-- تبويبات المراحل الثلاث للتوثيق -->
       <div class="stage-nav-tabs">
@@ -243,7 +254,7 @@ async function renderOpeningView() {
                   </div>
                 </div>
 
-                <div class="cp-actions-bar" style="display:flex;gap:8px;margin-top:12px;width:100%;">
+                ${isPast ? "" : `<div class="cp-actions-bar" style="display:flex;gap:8px;margin-top:12px;width:100%;">
                   <button class="btn ${hasPhoto ? 'secondary' : 'primary'} snap-cp-btn" style="flex:1;" onclick="snapCheckpointPhoto('${sessionId}', '${cp.id}', '${cp.name}')">
                     ${hasPhoto ? '🔄 تغيير / إعادة تصوير' : '📷 تصوير'}
                   </button>
@@ -252,18 +263,18 @@ async function renderOpeningView() {
                       🗑️ حذف
                     </button>
                   ` : ''}
-                </div>
+                </div>`}
               </div>
             `;
           }).join("")}
         </div>
       </div>
 
-      <div style="text-align:center;margin-top:24px;">
+      ${isPast ? "" : `<div style="text-align:center;margin-top:24px;">
         <button class="btn ${isFullyCompleted ? 'gold' : 'secondary'}" style="font-size:16px;padding:15px 36px;" onclick="completeInspectionStage('${sessionId}', '${activeStage.name}')">
           ✓ اعتماد وتأكيد ${activeStage.name}
         </button>
-      </div>
+      </div>`}
     </div>
   `;
 
@@ -350,3 +361,14 @@ function onClosingBranchChange(branch) {
   Branch.set(branch);
   renderClosingView();
 }
+
+
+(function initOpeningDateBar() {
+  const el = document.getElementById("openingDateInput");
+  if (!el) return;
+  el.value = currentOpeningDate;
+  el.addEventListener("change", () => {
+    currentOpeningDate = el.value || todayStr();
+    renderOpeningView();
+  });
+})();

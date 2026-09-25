@@ -3084,3 +3084,5 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .sub-tabs button{ flex:1; min-height:46px; border:0; border-radius:12px; background:transparent; font-family:inherit; font-size:14.5px; font-weight:900; color:var(--muted); cursor:pointer; }
 .sub-tabs button.active{ background:#111; color:var(--yellow); }
 .sub-tabs button.hidden{ display:none; }
+
+.opening-past-banner{ background:var(--yellow-tint); border:1px solid #F2E29A; border-radius:14px; padding:10px 14px; font-weight:900; margin:0 0 12px; }
