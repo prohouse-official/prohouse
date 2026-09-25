@@ -609,8 +609,8 @@ function updateReceivingItemCardUI(itemId) {
 
 // ---- وظائف إزالة وإضافة الأصناف في الاستلام ----
 
-function onRemoveReceivingItem(itemId, itemName) {
-  const confirmed = confirm(`هل أنت متأكد من إزالة الصنف "${itemName || ''}" من استلام اليوم؟`);
+async function onRemoveReceivingItem(itemId, itemName) {
+  const confirmed = await phConfirm(`هل أنت متأكد من إزالة الصنف "${itemName || ''}" من استلام اليوم؟`, { ok: "شيله", danger: true });
   if (!confirmed) return;
 
   const date = currentReceivingDate;
@@ -709,7 +709,7 @@ function confirmAddReceivingItem(category) {
   const qty = (qtyInput?.value || "").trim();
 
   if (!name) {
-    alert("يرجى كتابة اسم الصنف أولاً!");
+    phAlert("يرجى كتابة اسم الصنف أولاً!");
     if (nameInput) nameInput.focus();
     return;
   }
@@ -857,7 +857,7 @@ async function saveReceivingReportData() {
   if (!(await confirmNoDataLoss("received", payload.date, payload.branch, itemsPayload))) {
     isReceivingSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 حفظ تقرير الاستلام"; }
-    showToast("تم إلغاء الحفظ — الأرقام المحفوظة ما انمسّت");
+    showToast("تم إلغاء الحفظ — الأرقام المحفوظة ما انمسحت");
     return;
   }
 

@@ -59,7 +59,7 @@ const Sync = (() => {
 
   function reportReadError(action, e) {
     const offline = e.name === "AbortError" || e.name === "TypeError" || !navigator.onLine;
-    const msg = offline ? "ما في اتصال بالإنترنت" : String(e.message || e).replace(/^(Error:\s*)+/, "");
+    const msg = offline ? "ما فيه اتصال بالإنترنت" : String(e.message || e).replace(/^(Error:\s*)+/, "");
     console.error("فشل قراءة " + action + ": " + msg);
     lastReadError = { action, msg, at: Date.now() };
     readFailing = true;

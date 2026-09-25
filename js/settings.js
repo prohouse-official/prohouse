@@ -83,7 +83,7 @@ function renderSettingsView() {
     <div class="settings-card">
       <h3>ترتيب التصنيفات</h3>
       <div class="field">
-        <label>رتّب التصنيفات بالأسهم (بنفس الترتيب اللي بدك ياه يظهر بكل الشاشات والتقارير)</label>
+        <label>رتّب التصنيفات بالأسهم (بنفس الترتيب اللي تبيه يظهر بكل الشاشات والتقارير)</label>
         <div id="categoryOrderList" class="cat-order-list">${categoryOrderListHtml()}</div>
       </div>
       <button class="btn gold" id="saveCategoryOrderBtn">حفظ الترتيب</button>
@@ -124,8 +124,8 @@ function renderSettingsView() {
         <input type="text" id="setWhatsappToken" value="${currentSettings.whatsappToken || ""}" placeholder="رمز API">
       </div>
       <div class="pin-note" style="margin-bottom:8px;">
-        الثلاثة بتاخدهم من لوحة تحكم Green API بعد ما تربط رقم المطعم بمسح QR.
-        الباقة المجانية بتسمح بـ <b>٣ أرقام مستقبِلة</b> بس — اختارهم بعناية.
+        الثلاثة تاخذهم من لوحة تحكم Green API بعد ما تربط رقم المطعم بمسح QR.
+        الباقة المجانية تسمح بـ <b>٣ أرقام مستقبِلة</b> بس — اختارهم بعناية.
       </div>
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn gold" id="saveWhatsappBtn">حفظ إعدادات الواتساب</button>
@@ -263,7 +263,7 @@ function renderSettingsView() {
   const clearDataBtn = document.getElementById("clearAllDataBtn");
   if (clearDataBtn) {
     clearDataBtn.addEventListener("click", async () => {
-      if (!confirm("⚠️ هل أنت متأكد من مسح جميع بيانات وإدخالات الاستلام والمرتجعات والجرد السابقة كلياً للبدء من جديد؟")) return;
+      if (!(await phConfirm("⚠️ هل أنت متأكد من مسح جميع بيانات وإدخالات الاستلام والمرتجعات والجرد السابقة كلياً للبدء من جديد؟", { ok: "امسح", danger: true }))) return;
 
       clearDataBtn.disabled = true;
       clearDataBtn.textContent = "جاري مسح البيانات...";
@@ -278,7 +278,7 @@ function renderSettingsView() {
         console.warn("تنبيه أثناء مسح بيانات الباك اند:", e);
       }
 
-      alert("🎉 تم مسح كافة البيانات والإدخالات السابقة بنجاح! يمكنك الآن البدء من جديد اعتبارا من الأحد إن شاء الله.");
+      await phAlert("🎉 تم مسح كافة البيانات والإدخالات السابقة بنجاح! يمكنك الآن البدء من جديد اعتبارا من الأحد إن شاء الله.");
       location.reload();
     });
   }
@@ -306,7 +306,7 @@ function clearAllLocalEntries() {
 
 async function doBackup() {
   const status = document.getElementById("backupStatus");
-  if (!API_URL) { status.textContent = "⚠ لسا ما انربط رابط الباك اند (API_URL)"; return; }
+  if (!API_URL) { status.textContent = "⚠ رابط الباك اند ما انربط للحين (API_URL)"; return; }
   status.textContent = "جاري التصدير…";
   try {
     const qs = new URLSearchParams({ action: "backupAll" }).toString();
@@ -329,8 +329,8 @@ async function doRestore(e) {
   const file = e.target.files[0];
   if (!file) return;
   const status = document.getElementById("backupStatus");
-  if (!API_URL) { status.textContent = "⚠ لسا ما انربط رابط الباك اند (API_URL)"; return; }
-  if (!confirm("استعادة النسخة الاحتياطية بتستبدل كل البيانات الحالية بالشيت. متأكد؟")) { e.target.value = ""; return; }
+  if (!API_URL) { status.textContent = "⚠ رابط الباك اند ما انربط للحين (API_URL)"; return; }
+  if (!(await phConfirm("استعادة النسخة الاحتياطية بتستبدل كل البيانات الحالية باللي في الشيت. متأكد؟"))) { e.target.value = ""; return; }
   status.textContent = "جاري الاستعادة…";
   try {
     const text = await file.text();

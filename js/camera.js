@@ -132,7 +132,7 @@ async function savePhotoRecord(photoData) {
 }
 
 async function deletePhotoRecord(photoId) {
-  if (!confirm("هل أنت متأكد من حذف هذه الصورة؟ يمكنك التقاط صورة جديدة بدلاً منها.")) return;
+  if (!(await phConfirm("هل أنت متأكد من حذف هذه الصورة؟ يمكنك التقاط صورة جديدة بدلاً منها.", { ok: "احذف", danger: true }))) return;
 
   // 1. Delete from IndexedDB
   const db = await openMediaDatabase();

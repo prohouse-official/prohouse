@@ -73,17 +73,23 @@ const Auth = (() => {
     return true;
   }
 
+  // تسجيل الخروج: منلغي الجلسة بالداتابيس (بحد أقصى ثانية ونص) ومنمسحها من الجهاز فوراً
   async function logout() {
     const token = getToken();
     clearSession();
-    if (!API_URL || !token) return;
+    if (!token || typeof SUPABASE_URL === "undefined" || !SUPABASE_URL) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1500);
     try {
-      await fetch(API_URL, {
+      await fetch(SUPABASE_URL + "/rest/v1/rpc/logout_session", {
         method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "logout", token })
+        keepalive: true,
+        signal: controller.signal,
+        headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY, "Content-Type": "application/json", "x-session-token": token },
+        body: "{}"
       });
-    } catch (e) { /* أوفلاين — بلا فرق، الجلسة انمسحت محلياً أصلاً */ }
+    } catch (e) { /* بلا نت: الجلسة انمسحت من الجهاز أصلاً */ }
+    finally { clearTimeout(timer); }
   }
 
   // بتتحقق من الجلسة عالسيرفر (مرة وحدة وقت الإقلاع) وبتحدّث بيانات الموظف محلياً

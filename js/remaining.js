@@ -653,14 +653,14 @@ function renderRemainingView(receivingData, salesData) {
                 <button type="button" class="rem-mini-zero-btn" ${isClosed ? 'disabled' : ''} onclick="onQuickRemWeightZero('${it.id}')" title="نفد (0)">0</button>
               </div>
 
-              <!-- زر تبديل الصوص: لو كان متبقي الوزن صوص مانه دجاج/لحم -->
+              <!-- زر تبديل الصوص: لو كان متبقي الوزن صوص مو دجاج/لحم -->
               ${isWeightMeal ? `
                 <button type="button" 
                         id="remsauce-btn-${it.id}"
                         class="rem-btn-sauce-toggle ${isSauceWeight ? 'active' : ''}" 
                         ${isClosed ? 'disabled' : ''} 
                         onclick="toggleRemainingIsSauce('${it.id}')" 
-                        title="${isSauceWeight ? 'الوزن المسجل محسوب كصوص (اضغط لإعادته كدجاج/لحم)' : 'اضغط هنا لو كان متبقي الوزن صوص مانه دجاج/لحم'}">
+                        title="${isSauceWeight ? 'الوزن المسجل محسوب كصوص (اضغط لإعادته كدجاج/لحم)' : 'اضغط هنا لو كان متبقي الوزن صوص مو دجاج/لحم'}">
                   ${isSauceWeight ? '✅ 🥣 صوص' : '🥣 صوص'}
                 </button>
               ` : ''}
@@ -1050,7 +1050,7 @@ function toggleRemainingIsSauce(itemId) {
   if (btn) {
     btn.classList.toggle("active", newIsSauce);
     btn.innerHTML = newIsSauce ? `✅ 🥣 صوص` : `🥣 صوص`;
-    btn.title = newIsSauce ? "الوزن المسجل محسوب كصوص (اضغط لإعادته كدجاج/لحم)" : "اضغط هنا لو كان متبقي الوزن صوص مانه دجاج/لحم";
+    btn.title = newIsSauce ? "الوزن المسجل محسوب كصوص (اضغط لإعادته كدجاج/لحم)" : "اضغط هنا لو كان متبقي الوزن صوص مو دجاج/لحم";
   }
 
   const card = document.querySelector(`.remaining-card-mobile[data-item-id="${itemId}"]`);
@@ -1192,7 +1192,7 @@ async function saveRemainingReportData() {
   if (!(await confirmNoDataLoss("remaining", payload.date, payload.branch, itemsPayload))) {
     isRemainingSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 حفظ تقرير المتبقي"; }
-    showToast("تم إلغاء الحفظ — الأرقام المحفوظة ما انمسّت");
+    showToast("تم إلغاء الحفظ — الأرقام المحفوظة ما انمسحت");
     return;
   }
 
@@ -1226,7 +1226,7 @@ async function saveRemainingReportData() {
 }
 
 async function closeOperationalDay() {
-  if (!confirm("هل أنت متأكد من إغلاق اليوم التشغيلي واعتماد كافة الكميات والجرد؟ بعد الإغلاق لن يمكن التعديل إلا بإذن المدير.")) {
+  if (!(await phConfirm("هل أنت متأكد من إغلاق اليوم التشغيلي واعتماد كافة الكميات والجرد؟ بعد الإغلاق لن يمكن التعديل إلا بإذن المدير."))) {
     return;
   }
 
@@ -1245,8 +1245,8 @@ async function closeOperationalDay() {
 
 // ---- وظائف إزالة وإضافة الأصناف في جرد المتبقي ----
 
-function onRemoveRemainingItem(itemId, itemName) {
-  const confirmed = confirm(`هل أنت متأكد من استبعاد الصنف "${itemName || ''}" من جرد المتبقي اليوم؟`);
+async function onRemoveRemainingItem(itemId, itemName) {
+  const confirmed = await phConfirm(`هل أنت متأكد من استبعاد الصنف "${itemName || ''}" من جرد المتبقي اليوم؟`, { ok: "شيله", danger: true });
   if (!confirmed) return;
 
   const date = currentRemainingDate;
@@ -1344,7 +1344,7 @@ function confirmAddRemainingItem(category) {
   const qty = (qtyInput?.value || "").trim();
 
   if (!name) {
-    alert("يرجى كتابة اسم الصنف أولاً!");
+    phAlert("يرجى كتابة اسم الصنف أولاً!");
     if (nameInput) nameInput.focus();
     return;
   }

@@ -126,17 +126,17 @@ function dayStepsFor(s) {
 
   steps.push({ tab: "receiving", icon: "📦", title: "استلام الصبح", state: state(s.touched, s.total), note: fraction(s.touched, s.total) });
   if (tabAllowed("opening")) {
-    steps.push({ tab: "opening", icon: "📷", title: "صور التوثيق", state: s.photosCount > 0 ? "done" : "todo", note: s.photosCount > 0 ? `${s.photosCount} صورة` : "لسا" });
+    steps.push({ tab: "opening", icon: "📷", title: "صور التوثيق", state: s.photosCount > 0 ? "done" : "todo", note: s.photosCount > 0 ? `${s.photosCount} صورة` : "باقي" });
   }
   steps.push({ tab: "remaining", icon: "📊", title: "جرد المتبقي", state: state(s.remainingCounted, s.remainingTotal), note: fraction(s.remainingCounted, s.remainingTotal) });
   if (tabAllowed("custody")) {
-    steps.push({ tab: "custody", icon: "💰", title: "إغلاق العهدة", state: s.custodyClosed ? "done" : "todo", note: s.custodyClosed ? "انسكرت" : "لسا" });
+    steps.push({ tab: "custody", icon: "💰", title: "إغلاق العهدة", state: s.custodyClosed ? "done" : "todo", note: s.custodyClosed ? "تقفّلت" : "باقي" });
   }
   return steps;
 }
 
 function stepRowHtml(step, branch, isNext) {
-  const label = step.state === "done" ? "✓ تم" : step.note === "لسا" ? "لسا" : step.note;
+  const label = step.state === "done" ? "✓ تم" : step.note === "باقي" ? "باقي" : step.note;
   return `
     <button type="button" class="day-step ${step.state}${isNext ? " next" : ""}" data-tab="${step.tab}" data-branch="${branch}">
       <span class="day-step-icon">${step.icon}</span>

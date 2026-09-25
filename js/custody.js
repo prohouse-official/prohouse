@@ -46,7 +46,7 @@ function custodyReconciliation(c, payments) {
 }
 
 function diffPillHtml(diff) {
-  if (diff === null) return `<span class="cust-diff neutral">لسا ما انعبّى</span>`;
+  if (diff === null) return `<span class="cust-diff neutral">باقي ما تعبّى</span>`;
   if (Math.abs(diff) < 1) return `<span class="cust-diff ok">✓ مطابق</span>`;
   return diff < 0
     ? `<span class="cust-diff short">عجز ${sar(Math.abs(diff))}</span>`
@@ -88,7 +88,7 @@ function renderCustodyView(payments) {
           <h2 class="cust-title">💰 إغلاق العهدة</h2>
           <div class="cust-sub">${currentCustodyDate}${branches.length > 1 ? "" : " · " + currentCustodyBranch}</div>
         </div>
-        ${closed ? `<span class="cust-state done">✅ انسكرت ${closedAt}${c.closed_by ? " · " + c.closed_by : ""}</span>` : `<span class="cust-state">لسا ما انسكرت</span>`}
+        ${closed ? `<span class="cust-state done">✅ تقفّلت ${closedAt}${c.closed_by ? " · " + c.closed_by : ""}</span>` : `<span class="cust-state">باقي ما تقفّلت</span>`}
       </div>
       ${branches.length > 1 ? `<select class="cust-branch" id="custodyBranchSelect">${branchOptionsHtml(currentCustodyBranch)}</select>` : ""}
 
@@ -97,7 +97,7 @@ function renderCustodyView(payments) {
         <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" data-field="opening_float" value="${numOrBlank(c.opening_float)}">
       </label>
       <label class="cust-field">
-        <span class="cust-label"><b>2</b> الكاش الموجود بالدرج هلأ</span>
+        <span class="cust-label"><b>2</b> الكاش الموجود بالدرج الحين</span>
         <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" data-field="cash_counted" value="${numOrBlank(c.cash_counted)}">
       </label>
       <label class="cust-field">
@@ -111,11 +111,11 @@ function renderCustodyView(payments) {
           ${c.expenses.map((e, i) => `
             <div class="cust-expense">
               <input type="number" inputmode="decimal" step="any" min="0" placeholder="المبلغ" data-exp="${i}" data-key="amount" value="${numOrBlank(e.amount)}">
-              <input type="text" placeholder="على شو؟ (مثلاً: ثلج)" data-exp="${i}" data-key="note" value="${String(e.note || "").replace(/"/g, "&quot;")}">
+              <input type="text" placeholder="على إيش؟ (مثلاً: ثلج)" data-exp="${i}" data-key="note" value="${String(e.note || "").replace(/"/g, "&quot;")}">
               <button type="button" class="cust-exp-del" data-del="${i}" aria-label="حذف">✕</button>
             </div>`).join("")}
         </div>
-        <button type="button" class="cust-add" id="custodyAddExpense">➕ زيد مصروف</button>
+        <button type="button" class="cust-add" id="custodyAddExpense">➕ أضف مصروف</button>
         ${c.expenses.length ? `<div class="cust-total">مجموع المصاريف: <b>${sar(custodyExpensesTotal(c.expenses))}</b></div>` : ""}
       </div>
 
@@ -156,13 +156,13 @@ function renderCustodyView(payments) {
 
 function custodyOwnerCardHtml(c, payments) {
   if (!payments.length) {
-    return `<div class="cust-owner"><div class="cust-owner-title">🔎 المطابقة مع تابسنس (إلك بس)</div>
-      <div class="cust-missing">مبيعات تابسنس لهاليوم لسا ما انسحبت — بتطلع المطابقة لحالها بعد السحب.</div></div>`;
+    return `<div class="cust-owner"><div class="cust-owner-title">🔎 المطابقة مع تابسنس (لك بس)</div>
+      <div class="cust-missing">مبيعات تابسنس لهاليوم باقي ما انسحبت — المطابقة بتطلع لحالها بعد السحب.</div></div>`;
   }
   const r = custodyReconciliation(c, payments);
   return `
     <div class="cust-owner">
-      <div class="cust-owner-title">🔎 المطابقة مع تابسنس (إلك بس)</div>
+      <div class="cust-owner-title">🔎 المطابقة مع تابسنس (لك بس)</div>
       <div class="cust-row"><span>مبيعات الكاش</span><b>${sar(r.cashSales)}</b></div>
       <div class="cust-row"><span>المتوقع بالدرج (العهدة + الكاش − المصاريف)</span><b>${sar(r.expectedCash)}</b></div>
       <div class="cust-row"><span>الكاش الموجود</span><b>${toNum(c.cash_counted) === null ? "—" : sar(c.cash_counted)}</b></div>
@@ -181,12 +181,12 @@ async function saveCustody(payments) {
   if (toNum(c.cash_counted) === null) missing.push("الكاش الموجود");
   if (toNum(c.card_total) === null) missing.push("مجموع الشبكة");
   if (missing.length) {
-    showToast("⚠ عبّي: " + missing.join("، ") + " (إذا صفر اكتب 0)");
+    showToast("⚠ عبّ: " + missing.join("، ") + " (إذا صفر اكتب 0)");
     return;
   }
   const expenses = c.expenses.filter(e => toNum(e.amount) !== null || String(e.note || "").trim());
   if (expenses.some(e => toNum(e.amount) === null)) {
-    showToast("⚠ في مصروف بلا مبلغ");
+    showToast("⚠ فيه مصروف بدون مبلغ");
     return;
   }
   const btn = document.getElementById("custodyCloseBtn");
@@ -207,7 +207,7 @@ async function saveCustody(payments) {
   try {
     await SupaEngine.saveCustody(row);
     currentCustody = row;
-    showToast("✅ انسكرت العهدة وانحفظت");
+    showToast("✅ تقفّلت العهدة وانحفظت");
     renderCustodyView(payments);
   } catch (e) {
     btn.disabled = false;

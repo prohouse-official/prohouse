@@ -136,7 +136,7 @@ function renderJuicesView() {
             : `<select id="juiceBranchSelect">${branchOptionsHtml(currentJuiceBranch)}</select>`}
         </div>
       </div>
-      ${Auth.isViewOnlyEntry() ? '<div class="badges"><span class="badge neutral">👁 عرض فقط — الشيف ما بيعدّل هون</span></div>' : ""}
+      ${Auth.isViewOnlyEntry() ? '<div class="badges"><span class="badge neutral">👁 عرض فقط — الشيف ما يعدّل هنا</span></div>' : ""}
     </div>
     <div id="juiceSummary"></div>
     <div id="juiceList"></div>
@@ -156,7 +156,7 @@ function renderJuicesView() {
   currentVisibleJuices = visible;
 
   if (!visible.length) {
-    list.innerHTML = '<div class="empty-state">ما في عصيرات مضافة لهذا الفرع بعد — ضيفها من الكرت تحت.</div>';
+    list.innerHTML = '<div class="empty-state">ما فيه عصيرات مضافة لهذا الفرع — أضفها من الكرت تحت.</div>';
   }
 
   visible.forEach(juice => {
@@ -220,7 +220,7 @@ function updateJuiceBadges(juice) {
       ? `<span class="badge warn">✎ معدّل يدوياً — تابسنس: ${auto}</span>`
       : `<span class="badge ok">🔗 مبيعات تابسنس: ${auto}</span>`;
   } else if (Object.keys(juiceSalesMap).length) {
-    html += `<span class="badge neutral">ما لقينا اسم مطابق بتابسنس — دخّل المبيعات يدوياً أو اضبط "اسم تابسنس"</span>`;
+    html += `<span class="badge neutral">ما لقينا اسم مطابق في تابسنس — دخّل المبيعات يدوياً أو اضبط "اسم تابسنس"</span>`;
   }
 
   const expected = juiceExpected(e);
@@ -294,7 +294,7 @@ function saveJuiceDayNow(showToastMsg) {
 
   const at = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
   const statusEl = document.getElementById("juiceStatus");
-  if (statusEl) statusEl.textContent = branch ? "✅ محفوظ — بتتزامن " + at : `✅ محفوظ (بدون الفرع — كمّله أول ما تقدر) — ${at}`;
+  if (statusEl) statusEl.textContent = branch ? "✅ محفوظ — بيتزامن " + at : `✅ محفوظ (بدون الفرع — كمّله أول ما تقدر) — ${at}`;
   if (showToastMsg) showToast("تم حفظ جرد العصيرات");
 }
 
@@ -368,7 +368,7 @@ async function loadJuiceDay(dateStr) {
   if (statusEl) {
     statusEl.textContent = (data && data.items && data.items.length)
       ? "تم تحميل جرد محفوظ لهذا اليوم لهذا الفرع — عدّل واحفظ لو احتجت"
-      : "لسا ما تحفظ جرد لهذا اليوم لهذا الفرع";
+      : "ما انحفظ جرد لهذا اليوم لهذا الفرع للحين";
   }
 }
 
@@ -391,7 +391,7 @@ function renderJuiceCatalog() {
         </div>
         ${isOwner ? `
         <div class="field">
-          <label>يظهر لهاي الفروع بس (بدون تحديد = كل الفروع)</label>
+          <label>يظهر لهذي الفروع بس (بدون تحديد = كل الفروع)</label>
           <div class="badges" id="newJuiceBranchChecks">${branchCheckboxesHtml([])}</div>
         </div>` : `
         <div class="field"><label>الفرع</label>${branchLockedFieldHtml("newJuiceBranchLocked", mine[0] || "")}</div>`}
@@ -413,9 +413,9 @@ function renderJuiceCatalog() {
       ? checkedBranches(document.getElementById("newJuiceBranchChecks"))
       : document.getElementById("newJuiceBranchLocked").value;
     if (!name) { showToast("اكتب اسم العصير"); return; }
-    if (!isOwner && !branches) { showToast("ما في فرع مرتبط بحسابك"); return; }
+    if (!isOwner && !branches) { showToast("ما فيه فرع مرتبط بحسابك"); return; }
     Juices.save({ name, unit, tabsenseName, branches, sortOrder: Juices.current.length + 1 });
-    showToast("انضاف العصير");
+    showToast("تمت إضافة العصير");
     renderJuicesView();
   });
 
@@ -458,8 +458,8 @@ function renderJuiceCatalog() {
       showToast("تم الحفظ");
       renderJuicesView();
     });
-    row.querySelector('[data-jact="del"]').addEventListener("click", () => {
-      if (!confirm(`متأكد من حذف "${juice.name}"؟`)) return;
+    row.querySelector('[data-jact="del"]').addEventListener("click", async () => {
+      if (!(await phConfirm(`متأكد من حذف "${juice.name}"؟`, { ok: "احذف", danger: true }))) return;
       Juices.remove(juice.id);
       renderJuicesView();
       showToast("تم حذف العصير");
@@ -468,7 +468,7 @@ function renderJuiceCatalog() {
   });
 
   if (!editable.length) {
-    list.innerHTML = '<div class="empty-state">ما في عصيرات بعد.</div>';
+    list.innerHTML = '<div class="empty-state">ما فيه عصيرات للحين.</div>';
   }
 }
 
