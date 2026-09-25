@@ -195,6 +195,10 @@ function renderTomorrowView() {
     </div>
   `;
   view.appendChild(headerCard);
+  const avgCard = document.createElement("div");
+  avgCard.className = "wd-avg";
+  view.appendChild(avgCard);
+  renderWeekdayAverage(avgCard, currentTomorrowDate, currentTomorrowBranch);
 
   if (!allActiveItems.length) {
     view.insertAdjacentHTML("beforeend", '<div class="empty-state">لا توجد أصناف مسجلة.</div>');
@@ -798,3 +802,79 @@ function toggleTomorrowNote(itemId) {
   }
 }
 
+
+// ---- متوسط استهلاك نفس اليوم من الأسبوع (دجاج / لحم / بحري بالجرام) ----
+// من مبيعات تابسنس (عدد الأطباق × وزن الوجبة)، ومعه الاستهلاك الفعلي (المستلم − المتبقي) للأيام اللي انجرد فيها
+const WD_CATS = [["دجاج", "🍗"], ["لحم", "🥩"], ["بحري", "🐟"]];
+const WD_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+const wdCache = {};
+
+function weekdayAverageDates(date) {
+  // أيام نفس اليوم من الأسبوع بهالشهر قبل تاريخ الطلبية، وإذا أقل من يومين منكمّل من الأسابيع اللي قبل (لحد 4)
+  const out = [];
+  let d = addDaysStr(date, -7);
+  const month = date.slice(0, 7);
+  while (d.slice(0, 7) === month) { out.push(d); d = addDaysStr(d, -7); }
+  while (out.length < 2 && out.length < 4) { out.push(d); d = addDaysStr(d, -7); }
+  return out;
+}
+
+async function renderWeekdayAverage(el, date, branch) {
+  if (!date || !branch || typeof SupaEngine === "undefined") return;
+  const wd = new Date(date + "T12:00:00Z").getUTCDay();
+  const dates = weekdayAverageDates(date);
+  el.innerHTML = `<div class="wd-avg-title">📊 متوسط استهلاك أيام ${WD_NAMES[wd]}</div><div class="wd-avg-sub">جاري الحساب…</div>`;
+  const key = date + "|" + branch;
+  try {
+    const data = wdCache[key] || (wdCache[key] = await (async () => {
+      const sorted = [...dates].sort();
+      const [sales, days] = await Promise.all([
+        SupaEngine.getSalesByCategory(sorted[0], sorted[sorted.length - 1], branch),
+        Promise.all(dates.map(dt => SupaEngine.getDay(dt, branch).catch(() => null)))
+      ]);
+      return { sales, days };
+    })());
+    const catOf = {};
+    (Items.current || []).forEach(it => { catOf[it.id] = it.category; });
+
+    const soldDays = dates.filter(dt => data.sales.some(r => r.date === dt && Number(r.qty) > 0));
+    const actualDays = [];
+    const rows = WD_CATS.map(([cat, icon]) => {
+      const dishes = soldDays.reduce((sum, dt) => sum + data.sales.filter(r => r.date === dt && r.category === cat).reduce((a, r) => a + Number(r.qty || 0), 0), 0);
+      const avgDishes = soldDays.length ? dishes / soldDays.length : 0;
+      // الفعلي: بس الأيام اللي انسجل فيها متبقي لهالتصنيف
+      let used = 0, n = 0;
+      data.days.forEach((day, i) => {
+        const items = ((day && day.items) || []).filter(x => catOf[x.itemId] === cat);
+        const counted = items.some(x => x.remainingWeight != null || x.remaining != null);
+        if (!counted) return;
+        const rec = items.reduce((a, x) => a + Number(x.received || 0), 0);
+        const rem = items.reduce((a, x) => a + Number(x.remainingWeight ?? x.remaining ?? 0), 0);
+        used += Math.max(0, rec - rem); n++;
+        if (!actualDays.includes(dates[i])) actualDays.push(dates[i]);
+      });
+      return { cat, icon, grams: Math.round(avgDishes * MEAL_WEIGHT_G), dishes: avgDishes, actual: n ? Math.round(used / n) : null };
+    });
+    const fmt = (g) => g.toLocaleString("en-US");
+    const dayList = (list) => list.slice().sort().map(dt => Number(dt.slice(8))).join("، ");
+    if (!soldDays.length) {
+      el.innerHTML = `<div class="wd-avg-title">📊 متوسط استهلاك أيام ${WD_NAMES[wd]}</div><div class="wd-avg-sub">ما فيه مبيعات مسحوبة من تابسنس لأيام ${WD_NAMES[wd]} اللي قبل.</div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="wd-avg-title">📊 متوسط استهلاك أيام ${WD_NAMES[wd]}</div>
+      <div class="wd-avg-sub">من مبيعات تابسنس لأيام: ${dayList(soldDays)} · الطبق = ${MEAL_WEIGHT_G} جم</div>
+      <div class="wd-avg-grid">
+        ${rows.map(r => `
+          <div class="wd-avg-cell">
+            <span class="wd-avg-cat">${r.icon} ${r.cat}</span>
+            <b class="wd-avg-num">${fmt(r.grams)} <small>جم</small></b>
+            <span class="wd-avg-dishes">${r.dishes.toFixed(1).replace(/\.0$/, "")} طبق</span>
+            ${r.actual != null ? `<span class="wd-avg-actual">فعلي: ${fmt(r.actual)} جم</span>` : ""}
+          </div>`).join("")}
+      </div>
+      ${actualDays.length ? `<div class="wd-avg-note">«فعلي» = المستلم − المتبقي بأيام: ${dayList(actualDays)}</div>` : ""}`;
+  } catch (e) {
+    el.innerHTML = `<div class="wd-avg-title">📊 متوسط الاستهلاك</div><div class="wd-avg-sub">⚠ تعذّر الحساب — ${e.message || e}</div>`;
+  }
+}
