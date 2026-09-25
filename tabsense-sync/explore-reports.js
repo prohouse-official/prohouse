@@ -3,6 +3,7 @@
 const { chromium } = require("playwright");
 const fs = require("fs");
 const path = require("path");
+const { PAYMENT_REPORT_URL, extractPaymentRows } = require("./payments");
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
 const BASE = "https://app.tabsense.ai/prohouse/dashboard";
@@ -32,6 +33,24 @@ async function dumpTables(page) {
       page.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
       page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')
     ]);
+
+    // اختبار استخراج طرق الدفع بنفس طريقة سكربت السحب (بالواجهة العربية)
+    await page.goto(PAYMENT_REPORT_URL, { waitUntil: "networkidle" });
+    await page.waitForTimeout(2500);
+    const ar = page.locator('a:has-text("ع"), button:has-text("ع")').first();
+    if (await ar.isVisible().catch(() => false)) { await ar.click().catch(() => {}); await page.waitForTimeout(2000); }
+    await page.evaluate((d) => {
+      const input = document.querySelector('input[name="datefilter"]');
+      if (input && window.$ && $(input).data("daterangepicker")) {
+        const picker = $(input).data("daterangepicker"); picker.setStartDate(d); picker.setEndDate(d); $(input).val(d + " - " + d);
+      }
+      const btn = document.querySelector("#applyChartFilter") || document.querySelector("#applyChartFilterBlur") || document.querySelector(".applyBtn");
+      if (btn) btn.click();
+    }, yesterdayDisplay());
+    await page.waitForTimeout(3500);
+    const headers = await page.evaluate(() => Array.from(document.querySelectorAll("table thead th")).map(th => th.innerText.trim()));
+    console.log("EXPLORE_PAYMENTS_AR", JSON.stringify({ headers, rows: await extractPaymentRows(page) }));
+    if (process.env.EXPLORE_PAYMENTS_ONLY === "1") return;
 
     const links = new Map();
     for (const start of [`${BASE}/reports/sales-by-category`, BASE]) {

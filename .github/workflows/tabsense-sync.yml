@@ -53,5 +53,7 @@ jobs:
       - name: Explore TabSense reports (read-only)
         if: github.ref_name != 'main'
         working-directory: ./tabsense-sync
+        env:
+          EXPLORE_PAYMENTS_ONLY: "1"
         run: |
           node explore-reports.js
