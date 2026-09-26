@@ -412,16 +412,23 @@ function focusEntryById(id) {
   if (inp) { inp.scrollIntoView({ block: "center", behavior: "smooth" }); inp.focus({ preventScroll: true }); }
 }
 
-// نافذة اختيار الطبخة: بتعبّي أول خانة شيف فاضية (1 ثم 2 ثم 3)
+// خانة شيف جديدة (دجاج الشيف 4، 5…) لما الخانات الموجودة كلها مستخدمة — ما فيه حد
+function chefNextSlotDraft(category, branch) {
+  const all = (Items.current || []).filter(it => it.category === category && /الشيف\s*\d+\s*$/.test(String(it.name || "")));
+  const slots = chefSlotsFor(category, branch);
+  const last = slots[slots.length - 1] || all[all.length - 1];
+  const prefix = last ? String(last.name).replace(/\s*\d+\s*$/, "") : `${category} الشيف`;
+  const n = Math.max(0, ...all.map(s => Number((String(s.name).match(/(\d+)\s*$/) || [])[1] || 0))) + 1;
+  return { category, name: `${prefix} ${n}`, unit: (last && last.unit) || "جرام", optional: true, hasCustomName: false,
+           branches: "", sortOrder: Math.max(0, ...all.map(s => Number(s.sortOrder) || 0)) + 1 };
+}
+
+// نافذة اختيار الطبخة: بتعبّي أول خانة شيف فاضية (1 ثم 2 ثم 3)، وإذا خلصوا تنضاف خانة جديدة
 async function openChefPicker({ category, branch, isUsed, extraNames, onPick }) {
   await loadChefNameMemory();
   const slots = chefSlotsFor(category, branch);
   const free = slots.filter(it => !isUsed(it.id));
-  if (!free.length) {
-    phAlert(slots.length ? `كل خانات ${category} الشيف (${slots.length}) مستخدمة.` : `ما فيه خانات شيف لتصنيف ${category}.`);
-    return;
-  }
-  const slot = free[0];
+  let slot = free[0] || chefNextSlotDraft(category, branch);
   const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const options = chefDishOptions(category, extraNames);
   const wrap = document.createElement("div");
@@ -444,6 +451,7 @@ async function openChefPicker({ category, branch, isUsed, extraNames, onPick }) 
   const close = () => { wrap.classList.add("closing"); setTimeout(() => wrap.remove(), 160); };
   const pick = (name) => {
     close();
+    if (!slot.id) slot = Items.save(slot); // الخانة الجديدة تنحفظ بس لما يختار فعلاً
     const full = normalizeCookName(category, name);
     rememberCookName(category, full);
     onPick(slot, full);
