@@ -185,7 +185,7 @@ function applyRoleUiGating() {
 function updateSyncBadge({ pending, readError }) {
   const el = document.getElementById("syncBadge");
   if (!API_URL) {
-    el.textContent = "⚙ الباك اند ما انربط للحين";
+    el.textContent = "⚙ الباك اند غير مربوط بعد";
     el.classList.remove("ok");
     return;
   }
@@ -466,7 +466,7 @@ document.getElementById("pinSaveBtn").addEventListener("click", async () => {
   const showErr = (msg) => { errEl.textContent = msg; errEl.classList.remove("hidden"); };
 
   if (!currentPin || !newPin) return showErr("عبّ كل الخانات");
-  if (newPin !== confirmPin) return showErr("الرقم الجديد مو نفسه في الخانتين");
+  if (newPin !== confirmPin) return showErr("الرقم الجديد غير متطابق في الخانتين");
   if (!/^\d{4,8}$/.test(newPin)) return showErr("الرقم الجديد لازم يكون من ٤ إلى ٨ أرقام");
 
   const btn = document.getElementById("pinSaveBtn");

@@ -1,16 +1,25 @@
 // ==================== طريقة الاستخدام (مختصر ومصوّر) ====================
 // خطوات قليلة وكلام قليل. كل خطوة مربوطة بشاشة وبتظهر بس للي عنده صلاحية عليها.
+const HELP_BASICS = {
+  icon: "✅", title: "قبل ما تبدأ", imgs: [["00-date", 330], ["00-add", 230]],
+  lines: [
+    "📅 تأكد من التاريخ فوق الشاشة — لازم يكون «اليوم». غلط؟ اضغط «اليوم».",
+    "🏪 تأكد إن الفرع صح.",
+    "➕ وصلك صنف غير موجود بالقائمة؟ انزل لآخر القسم واضغط «➕ إضافة صنف».",
+    "💾 بالأخير دائماً اضغط «حفظ»."
+  ]
+};
 const HELP_SECTIONS = [
   { tab: "receiving", icon: "📦", title: "الصبح: الاستلام", img: "05-receiving-item",
-    lines: ["اوزن كل صنف واكتب الرقم.", "ما وصل؟ اضغط «لم يصل». بالأخير «💾 حفظ»."] },
+    lines: ["وزّن كل صنف واكتب الرقم بالجرام.", "زيادة عن الطلب؟ اكتب الرقم عادي — يطلع «زائد».", "ما وصل؟ اضغط «لم يصل». بالأخير «💾 حفظ»."] },
   { tab: "opening", icon: "📷", title: "التوثيق بالصور", img: "07-docs",
     lines: ["3 مرات باليوم: صوّر كل منطقة.", "بالأخير اضغط «✓ اعتماد»."] },
   { tab: "remaining", icon: "🌙", title: "آخر الدوام: المتبقي", img: "09-remaining-item",
-    lines: ["اوزن اللي باقي واكتبه.", "انرمى شي؟ اضغط 🗑. بالأخير «💾 حفظ»."] },
+    lines: ["وزّن اللي باقي واكتبه.", "خلص الصنف؟ اضغط «نفد (0)».", "رميت شيء؟ اضغط 🗑. بالأخير «💾 حفظ»."] },
   { tab: "custody", icon: "💰", title: "إغلاق العهدة", img: "11-custody",
     lines: ["اكتب الكاش والشبكة والمصاريف.", "اضغط «🔒 إغلاق العهدة»."] },
   { tab: "tomorrow", icon: "📋", title: "طلبية الغد", img: "21-tomorrow",
-    lines: ["اختر الفرع واضغط «⚡ تطبيق كل المقترحات».", "عدّل اللي تبيه واضغط «💾 حفظ»."] },
+    lines: ["تأكد إن التاريخ «بكرة» واختر الفرع.", "اضغط «⚡ تطبيق كل المقترحات»، عدّل اللي تبيه واضغط «💾 حفظ»."] },
   { tab: "report", icon: "📈", title: "التقارير", img: "25-report",
     lines: ["اختر النوع والشهر واضغط «عرض»."] },
   { tab: "settings", icon: "⚙️", title: "الإعدادات والموظفين", img: "28-settings",
@@ -21,7 +30,7 @@ function renderHelpView() {
   const el = document.getElementById("helpView");
   if (!el) return;
   const allowed = (t) => typeof tabAllowed !== "function" || tabAllowed(t);
-  const secs = HELP_SECTIONS.filter(s => allowed(s.tab));
+  const secs = [HELP_BASICS, ...HELP_SECTIONS.filter(s => allowed(s.tab))];
   el.innerHTML = `
     <div class="help-head">
       <h2>📘 طريقة الاستخدام</h2>
@@ -31,7 +40,7 @@ function renderHelpView() {
       <section class="help-sec">
         <h3><span class="help-num">${i + 1}</span><span>${s.icon} ${s.title}</span></h3>
         ${s.lines.map(t => `<p class="help-line">${t}</p>`).join("")}
-        <img class="help-shot" src="assets/guide/${s.img}.jpg" alt="" loading="lazy" width="390" height="780">
+        ${(s.imgs || [[s.img, 780]]).map(([src, h]) => `<img class="help-shot${h < 780 ? " help-shot-wide" : ""}" src="assets/guide/${src}.jpg" alt="" loading="lazy" width="390" height="${h}">`).join("")}
       </section>`).join("")}
-    <p class="help-foot">كل شي ينحفظ لحاله. أي مشكلة كلّم المدير.</p>`;
+    <p class="help-foot">كل شيء يُحفظ تلقائياً. أي مشكلة كلّم المدير.</p>`;
 }

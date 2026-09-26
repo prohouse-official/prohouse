@@ -8,7 +8,7 @@
     const today = todayStr();
     if (iso === today) return "اليوم";
     if (iso === addDaysStr(today, -1)) return "أمس";
-    if (iso === addDaysStr(today, 1)) return "بكرا";
+    if (iso === addDaysStr(today, 1)) return "بكرة";
     return "";
   }
 

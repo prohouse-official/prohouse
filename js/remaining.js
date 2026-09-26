@@ -673,14 +673,14 @@ function renderRemainingView(receivingData, salesData) {
                 <button type="button" class="rem-mini-zero-btn" ${isClosed ? 'disabled' : ''} onclick="onQuickRemWeightZero('${it.id}')" title="نفد (0)">0</button>
               </div>
 
-              <!-- زر تبديل الصوص: لو كان متبقي الوزن صوص مو دجاج/لحم -->
+              <!-- زر تبديل الصوص: لو كان متبقي الوزن صوص وليس دجاج/لحم -->
               ${isWeightMeal ? `
                 <button type="button" 
                         id="remsauce-btn-${it.id}"
                         class="rem-btn-sauce-toggle ${isSauceWeight ? 'active' : ''}" 
                         ${isClosed ? 'disabled' : ''} 
                         onclick="toggleRemainingIsSauce('${it.id}')" 
-                        title="${isSauceWeight ? 'الوزن المسجل محسوب كصوص (اضغط لإعادته كدجاج/لحم)' : 'اضغط هنا لو كان متبقي الوزن صوص مو دجاج/لحم'}">
+                        title="${isSauceWeight ? 'الوزن المسجل محسوب كصوص (اضغط لإعادته كدجاج/لحم)' : 'اضغط هنا لو كان متبقي الوزن صوص وليس دجاج/لحم'}">
                   ${isSauceWeight ? '✅ 🥣 صوص' : '🥣 صوص'}
                 </button>
               ` : ''}
@@ -1073,7 +1073,7 @@ function toggleRemainingIsSauce(itemId) {
   if (btn) {
     btn.classList.toggle("active", newIsSauce);
     btn.innerHTML = newIsSauce ? `✅ 🥣 صوص` : `🥣 صوص`;
-    btn.title = newIsSauce ? "الوزن المسجل محسوب كصوص (اضغط لإعادته كدجاج/لحم)" : "اضغط هنا لو كان متبقي الوزن صوص مو دجاج/لحم";
+    btn.title = newIsSauce ? "الوزن المسجل محسوب كصوص (اضغط لإعادته كدجاج/لحم)" : "اضغط هنا لو كان متبقي الوزن صوص وليس دجاج/لحم";
   }
 
   const card = document.querySelector(`.remaining-card-mobile[data-item-id="${itemId}"]`);
@@ -1179,7 +1179,7 @@ function updateSaveBarRemainingStatus() {
 async function saveRemainingReportData() {
   if (isRemainingSaving) return;
   // منحفظ على اليوم والفرع المحمّلين فعلاً — إذا الشاشة لسا عم تحمّل يوم تاني ما منحفظ
-  if (!remainingDataKey) { showToast("⏳ لحظة، الشاشة لسا عم تحمّل"); return; }
+  if (!remainingDataKey) { showToast("⏳ لحظة، الشاشة ما زالت تحمّل"); return; }
   isRemainingSaving = true;
 
   const saveBtn = document.getElementById("remainingSaveBtn");
@@ -1217,7 +1217,7 @@ async function saveRemainingReportData() {
   if (!(await confirmNoDataLoss("remaining", payload.date, payload.branch, itemsPayload))) {
     isRemainingSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 حفظ تقرير المتبقي"; }
-    showToast("تم إلغاء الحفظ — الأرقام المحفوظة ما انمسحت");
+    showToast("تم إلغاء الحفظ — الأرقام المحفوظة لم تُمسح");
     return;
   }
 
@@ -1284,10 +1284,10 @@ async function sendSauceFormIfChanged(date, branch, items) {
     if (same) return;
     const emp = Auth.getEmployee();
     await SupaEngine.sendGoogleForm({ form: "sauce", date, branch, name: emp ? emp.name : "", ...totals });
-    showToast(last ? "📤 انرسل تعديل نموذج الصوص" : "📤 انرسل نموذج الصوص تلقائياً");
-    if (statusEl) statusEl.textContent += " · 📤 نموذج الصوص انرسل";
+    showToast(last ? "📤 تم إرسال تعديل نموذج الصوص" : "📤 تم إرسال نموذج الصوص تلقائياً");
+    if (statusEl) statusEl.textContent += " · 📤 تم إرسال نموذج الصوص";
   } catch (e) {
-    if (await phConfirm("⚠ ما انرسل نموذج الصوص: " + (e.message || "تأكد من النت") + "\nنعيد المحاولة؟", { ok: "أعد الإرسال" })) {
+    if (await phConfirm("⚠ لم يُرسل نموذج الصوص: " + (e.message || "تأكد من النت") + "\nنعيد المحاولة؟", { ok: "أعد الإرسال" })) {
       return sendSauceFormIfChanged(date, branch, items);
     }
   }
@@ -1338,7 +1338,7 @@ async function onRemoveRemainingItem(itemId, itemName) {
     await SupaEngine.saveRemainingReport({ date, branch, removedItemIds: removedList }).catch(e => console.warn("Auto sync remaining removal error:", e));
   })();
 
-  showUndoBar(`🗑️ انشال "${itemName || ''}" من جرد المتبقي`, async () => {
+  showUndoBar(`🗑️ تمت إزالة "${itemName || ''}" من جرد المتبقي`, async () => {
     await removal;
     if (currentRemainingDate === date && currentRemainingBranch === branch) {
       currentRemainingRemovedIds.delete(itemId);
@@ -1531,7 +1531,7 @@ function openRemainingWaste(itemId) {
   }));
   wrap.querySelectorAll(".waste-del").forEach(b => b.addEventListener("click", () => {
     currentRemainingWaste = currentRemainingWaste.filter(w => String(w.id) !== b.dataset.id);
-    saveRemainingWaste(); close(); rerender(); showToast("انحذف سجل الهدر");
+    saveRemainingWaste(); close(); rerender(); showToast("تم حذف سجل الهدر");
   }));
   wrap.querySelector(".waste-add").addEventListener("click", () => {
     const qty = Number(wrap.querySelector(".waste-qty").value);
@@ -1543,7 +1543,7 @@ function openRemainingWaste(itemId) {
       notes: wrap.querySelector(".waste-note").value.trim(),
       employeeName: emp ? emp.name : "", timestamp: new Date().toISOString()
     });
-    saveRemainingWaste(); close(); rerender(); showToast(`🗑 انسجل هدر ${qty} ${unit}`);
+    saveRemainingWaste(); close(); rerender(); showToast(`🗑 تم تسجيل هدر ${qty} ${unit}`);
   });
   wrap.querySelector(".ph-dialog-cancel").addEventListener("click", close);
   wrap.addEventListener("click", (e) => { if (e.target === wrap) close(); });

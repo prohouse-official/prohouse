@@ -37,9 +37,9 @@ Deno.serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   let b: any = {};
   try { b = await req.json(); } catch { return json({ error: "طلب غلط" }, 400); }
-  if (b.form !== "sauce") return json({ error: "نموذج مش معروف" }, 400);
+  if (b.form !== "sauce") return json({ error: "نموذج غير معروف" }, 400);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(b.date || "")) return json({ error: "التاريخ غلط" }, 400);
-  if (!SAUCE.branches.includes(b.branch)) return json({ error: "الفرع مش موجود بالنموذج" }, 400);
+  if (!SAUCE.branches.includes(b.branch)) return json({ error: "الفرع غير موجود في النموذج" }, 400);
 
   const [y, m, d] = b.date.split("-");
   const values = { chicken: grams(b.chicken), meat: grams(b.meat), fillet: grams(b.fillet), salmon: grams(b.salmon), shrimp: grams(b.shrimp) };

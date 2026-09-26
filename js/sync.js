@@ -231,7 +231,7 @@ const Sync = (() => {
   // نداء مباشر بانتظار النتيجة — للأفعال اللي بدنا نعرف نتيجتها فوراً (متل اختبار الواتساب)
   // وإعادة المحاولة التلقائية إلها ما إلها معنى. مو للحفظ — الحفظ بيمر من enqueue.
   async function call(action, payload) {
-    if (!API_URL) throw new Error("الباك اند مو مربوط");
+    if (!API_URL) throw new Error("الباك اند غير مربوط");
     return await postOnce(action, payload);
   }
 

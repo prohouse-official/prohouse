@@ -56,7 +56,7 @@ const Push = (() => {
 
   async function sendTest() {
     const sub = await currentSubscription();
-    if (!sub) throw new Error("التنبيهات مو شغّالة على هالجوال");
+    if (!sub) throw new Error("التنبيهات غير مفعّلة على هذا الجوال");
     const res = await fetch(PUSH_FUNCTION_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SUPABASE_ANON_KEY, "apikey": SUPABASE_ANON_KEY },
@@ -110,9 +110,9 @@ async function mountPushCard(el, opts) {
     btn.disabled = true;
     try {
       const act = btn.dataset.push;
-      if (act === "on") { await Push.enable(); showToast("✅ انشغلت التنبيهات"); }
-      if (act === "off") { await Push.disable(); showToast("انطفت التنبيهات على هالجوال"); }
-      if (act === "test") { await Push.sendTest(); showToast("📨 انرسل — المفروض يوصلك الحين"); }
+      if (act === "on") { await Push.enable(); showToast("✅ تم تفعيل التنبيهات"); }
+      if (act === "off") { await Push.disable(); showToast("تم إيقاف التنبيهات على هذا الجوال"); }
+      if (act === "test") { await Push.sendTest(); showToast("📨 تم الإرسال — المفروض يوصلك الحين"); }
     } catch (e) {
       showToast("⚠ " + (e.message || e));
     }
@@ -165,6 +165,6 @@ function bindReminderSettings() {
     currentSettings = { ...currentSettings, ...payload };
     Sync.cacheSet("settings", currentSettings);
     Sync.enqueue("saveSettings:reminders", "saveSettings", payload);
-    showToast(reminders.enabled ? "✅ انحفظت أوقات التذكير" : "انحفظ — التذكيرات موقّفة");
+    showToast(reminders.enabled ? "✅ تم حفظ أوقات التذكير" : "تم الحفظ — التذكيرات موقّفة");
   });
 }

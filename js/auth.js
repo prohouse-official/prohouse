@@ -61,7 +61,7 @@ const Auth = (() => {
       return true;
     }
 
-    if (!API_URL) throw new Error("الباك اند مو مربوط");
+    if (!API_URL) throw new Error("الباك اند غير مربوط");
     const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
