@@ -542,8 +542,8 @@ async function downloadWorkbook(workbook, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
 async function exportExcel() {
@@ -586,11 +586,37 @@ async function exportExcel() {
   await downloadWorkbook(workbook, `تقرير_${lastReportRange.start}_${lastReportRange.end}.xlsx`);
 }
 
-// ==================== طلبية الغد (تقرير جاهز للشيف) — فرع واحد أو كل الفروع بنفس الشكل ====================
+// ==================== طلبية الغد (للشيف) — نفس "نموذج طلب الاكل" بالضبط ====================
+// ورقة لكل فرع: اليوم / التاريخ / الفرع، وتحتها: الفئة | تسليم | اسم الصنف | حجم السفنديش | العدد | المستلمة | المتبقية | ملاحظات
+// نفس عرض الأعمدة وارتفاع الصفوف والخطوط تبع ملف الإكسل، وتطلع Excel أو PDF جاهز للطباعة وينرسل واتساب.
 
-let lastTomorrowReportRows = [];
-let lastTomorrowReportBranches = [];
+let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
 let lastTomorrowReportDate = "";
+
+// مقاسات ملف الإكسل الأصلي (عرض الأعمدة بوحدة الإكسل، ارتفاع الصفوف بالنقطة)
+const CHEF_SHEET = {
+  cols: [15.2, 15.2, 37.93, 23.68, 22.73, 24.35, 23.95, 70.63],
+  headers: ["الفئة", "تسليم", "اسم الصنف", "حجم السفنديش", "العدد", "الكمية المستلمة", "الكمية المتبقية", "ملاحظات"],
+  titleH: 69.75, headH: 92.25, rowH: 51.75,
+  titleFont: 47, bodyFont: 26, boxFont: 42,
+  headFill: "BFBFBF", border: "505050"
+};
+const chefColPx = (w) => Math.trunc(w * 7 + 5);  // عرض عمود الإكسل ← بكسل
+const chefPtPx = (pt) => Math.round(pt * 4 / 3); // نقطة ← بكسل
+
+function chefDayName(date) {
+  return new Date(date + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", timeZone: "UTC" });
+}
+function chefDateText(date) { const [y, m, d] = date.split("-"); return `${d}-${m}-${y}`; }
+
+// "دجاج الشيف 1" + "دجاج بيكانت" ← "دجاج الشيف (بيكانت)"، وبدون اسم ← "دجاج الشيف……" (متل النموذج)
+function chefReportName(it, cookName) {
+  const base = String(it.name || "").trim();
+  if (!/الشيف/.test(base)) return base;
+  const plain = base.replace(/\s*\d+\s*$/, "");
+  const dish = String(cookName || "").trim().replace(new RegExp("^" + String(it.category || "").trim() + "\\s+"), "");
+  return dish ? `${plain} (${dish})` : `${plain}……`;
+}
 
 function initTomorrowReportControls() {
   document.getElementById("tomorrowReportBranch").innerHTML =
@@ -598,6 +624,7 @@ function initTomorrowReportControls() {
   document.getElementById("tomorrowReportDate").value = addDaysStr(todayStr(), 1);
   document.getElementById("tomorrowReportGoBtn").addEventListener("click", runTomorrowReport);
   document.getElementById("tomorrowReportExportBtn").addEventListener("click", exportTomorrowReportExcel);
+  document.getElementById("tomorrowReportPdfBtn").addEventListener("click", shareTomorrowReportPdf);
 }
 
 async function runTomorrowReport() {
@@ -609,116 +636,214 @@ async function runTomorrowReport() {
   const branchFilter = document.getElementById("tomorrowReportBranch").value;
   const branches = branchFilter ? [branchFilter] : branchList();
   lastTomorrowReportDate = date;
-  lastTomorrowReportBranches = branches;
 
   const perBranch = await Promise.all(branches.map(b =>
     Sync.get("getTomorrowOrder", { date, branch: b }, "tomorrow:" + date + ":" + b)
   ));
+  const order = new Map((Items.current || []).map((it, i) => [it.id, i]));
+  lastTomorrowReportSheets = branches.map((branch, i) => {
+    const rows = (perBranch[i] || [])
+      .filter(e => e.qty !== "" && e.qty != null && Number(e.qty) > 0)
+      .map(e => {
+        const it = Items.byId(e.itemId) || { name: e.itemName, category: "-", unit: e.unit, sortOrder: 999 };
+        return {
+          category: it.category || "-", name: chefReportName(it, e.cookName),
+          size: String(it.unit || e.unit || ""), qty: Number(e.qty), notes: e.notes || "",
+          rank: categoryRank(it.category), sort: order.has(e.itemId) ? order.get(e.itemId) : 9999
+        };
+      })
+      .sort((a, b) => a.rank - b.rank || a.sort - b.sort);
+    return { branch, rows };
+  }).filter(s => s.rows.length);
 
-  // نجمع الأصناف (بترتيب/تصنيف القائمة الأساسية) مع كمية كل فرع بعمود لحاله
-  const rowsByItem = {};
-  Items.current.forEach(it => {
-    rowsByItem[it.id] = { itemId: it.id, category: it.category, name: it.name, unit: it.unit, sortOrder: it.sortOrder, qtyByBranch: {}, notes: [] };
-  });
-  branches.forEach((b, i) => {
-    (perBranch[i] || []).forEach(entry => {
-      if (!rowsByItem[entry.itemId]) {
-        rowsByItem[entry.itemId] = { itemId: entry.itemId, category: "-", name: entry.itemName, unit: entry.unit, sortOrder: 999, qtyByBranch: {}, notes: [] };
-      }
-      rowsByItem[entry.itemId].qtyByBranch[b] = entry.qty;
-      if (entry.notes) rowsByItem[entry.itemId].notes.push(branchFilter ? entry.notes : `${b}: ${entry.notes}`);
-    });
-  });
-
-  const rows = Object.values(rowsByItem)
-    .filter(r => Object.values(r.qtyByBranch).some(q => q !== "" && q != null && Number(q) > 0))
-    .sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || (Number(a.sortOrder) - Number(b.sortOrder)));
-
-  lastTomorrowReportRows = rows;
-  renderTomorrowReport(rows, branches, date);
+  renderTomorrowReport();
 }
 
-function renderTomorrowReport(rows, branches, date) {
+// ورقة HTML بنفس مقاسات الإكسل بالبكسل (تنعرض مصغّرة بالشاشة، وتتصوّر للـ PDF بحجمها الحقيقي)
+function chefSheetHtml(sheet, date) {
+  const S = CHEF_SHEET;
+  const colW = S.cols.map(chefColPx);
+  const totalW = colW.reduce((a, b) => a + b, 0);
+  const esc = (t) => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const bd = `1px solid #${S.border}`;
+  const cell = (txt, extra = "") => `<td style="border:${bd};${extra}">${esc(txt)}</td>`;
+  // تجميع الفئات عشان خلية الفئة تندمج عمودياً
+  const groups = [];
+  sheet.rows.forEach(r => { const g = groups[groups.length - 1]; if (g && g.category === r.category) g.rows.push(r); else groups.push({ category: r.category, rows: [r] }); });
+  const body = groups.map(g => g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
+      ${i === 0 ? `<td rowspan="${g.rows.length}" style="border:${bd}">${esc(g.category)}</td>` : ""}
+      ${cell("□", `font-size:${chefPtPx(S.boxFont)}px`)}${cell(r.name)}${cell(r.size)}${cell(r.qty)}${cell("")}${cell("")}${cell(r.notes)}
+    </tr>`).join("")).join("");
+  return `<div class="chef-sheet" style="width:${totalW}px">
+    <table style="width:${totalW}px">
+      <colgroup>${colW.map(w => `<col style="width:${w}px">`).join("")}</colgroup>
+      <tr class="chef-title" style="height:${chefPtPx(S.titleH)}px">
+        <td colspan="2" style="text-align:left">اليوم:</td><td style="text-align:right">${esc(chefDayName(date))}</td>
+        <td style="text-align:right">التاريخ:</td><td colspan="2" style="text-align:right">${esc(chefDateText(date))}</td>
+        <td colspan="2">فرع ${esc(sheet.branch)}</td>
+      </tr>
+      <tr class="chef-head" style="height:${chefPtPx(S.headH)}px">${S.headers.map(h => cell(h, `background:#${S.headFill}`)).join("")}</tr>
+      ${body}
+    </table>
+  </div>`;
+}
+
+function renderTomorrowReport() {
   const view = document.getElementById("tomorrowReportView");
-  if (!rows.length) {
+  if (!lastTomorrowReportSheets.length) {
     view.innerHTML = '<div class="empty-state">ما فيه طلبية محفوظة لهذا اليوم/الفرع بعد.<br>ابدأ بتعبئة تاب "طلبية الغد".</div>';
     return;
   }
-
-  const branchCols = branches.map(b => `<th>${b} (الكمية)</th>`).join("");
-  const showTotal = branches.length > 1;
-
-  const bodyRows = rows.map(r => {
-    const catCell = `<td class="cat-cell">${r.category}</td>`;
-    const qtyCells = branches.map(b => {
-      const q = r.qtyByBranch[b];
-      return `<td>${q !== undefined && q !== null && q !== "" ? `${q} ${r.unit || ""}` : "—"}</td>`;
-    }).join("");
-    const total = branches.reduce((sum, b) => sum + (Number(r.qtyByBranch[b]) || 0), 0);
-    const totalCell = showTotal ? `<td class="total-cell">${total} ${r.unit || ""}</td>` : "";
-    return `<tr>${catCell}<td class="name-cell">${r.name}</td>${qtyCells}${totalCell}<td>${r.notes.join(" / ")}</td></tr>`;
-  }).join("");
-
-  view.innerHTML = `
-    <div class="order-table-wrap">
-      <div class="order-header">طلبية الغد — ${date} — ${branches.length > 1 ? "كل الفروع" : branches[0]}</div>
-      <table class="order-table">
-        <thead><tr>
-          <th>الفئة</th><th>اسم الصنف</th>${branchCols}${showTotal ? "<th>المجموع</th>" : ""}<th>ملاحظات</th>
-        </tr></thead>
-        <tbody>${bodyRows}</tbody>
-      </table>
-    </div>
-  `;
+  view.innerHTML = lastTomorrowReportSheets.map(s => `<div class="chef-sheet-frame">${chefSheetHtml(s, lastTomorrowReportDate)}</div>`).join("");
+  fitChefSheets();
+}
+// النص الطويل يصغر لين يدخل بالخلية (متل "تصغير للاحتواء" بالإكسل) بدل ما ينكسر على سطرين
+function fitChefCells(sheetEl) {
+  sheetEl.querySelectorAll("td").forEach(td => {
+    if (!td.textContent.trim()) return;
+    let size = parseFloat(getComputedStyle(td).fontSize);
+    while ((td.scrollWidth > td.clientWidth + 1 || td.scrollHeight > td.clientHeight + 1) && size > 14) {
+      size -= 1;
+      td.style.fontSize = size + "px";
+    }
+  });
 }
 
+// الورقة عرضها ~1600 بكسل: نصغّرها لعرض الشاشة
+function fitChefSheets() {
+  document.querySelectorAll("#tomorrowReportView .chef-sheet-frame").forEach(frame => {
+    const sheet = frame.firstElementChild;
+    sheet.style.transform = "";
+    fitChefCells(sheet);
+    const s = Math.min(1, frame.clientWidth / sheet.offsetWidth);
+    sheet.style.transform = `scale(${s})`;
+    frame.style.height = Math.ceil(sheet.offsetHeight * s) + "px";
+  });
+}
+window.addEventListener("resize", () => { if (lastTomorrowReportSheets.length) fitChefSheets(); });
+
 async function exportTomorrowReportExcel() {
-  if (!lastTomorrowReportRows.length) { showToast("ما فيه بيانات للتصدير"); return; }
+  if (!lastTomorrowReportSheets.length) { showToast("اضغط «عرض» أول"); return; }
   await loadReportLibs();
   if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel ما تحمّلت — تأكد من الاتصال بالنت"); return; }
-
-  const branches = lastTomorrowReportBranches;
-  const showTotal = branches.length > 1;
-  const qtyCell = (r, b) => {
-    const q = r.qtyByBranch[b];
-    return q !== undefined && q !== null && q !== "" ? `${q} ${r.unit || ""}` : "—";
-  };
-
+  const S = CHEF_SHEET;
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("طلبية الغد");
-  sheet.addRow(["الفئة", "اسم الصنف", ...branches, ...(showTotal ? ["المجموع"] : []), "ملاحظات"]);
-
-  const grouped = [];
-  lastTomorrowReportRows.forEach(r => {
-    const last = grouped[grouped.length - 1];
-    if (last && last.category === r.category) last.items.push(r); else grouped.push({ category: r.category, items: [r] });
-  });
-
-  let rowIdx = 1; // الصف 1 = العناوين (1-indexed بـ ExcelJS)
-  grouped.forEach(group => {
-    const startRow = rowIdx + 1;
-    group.items.forEach(r => {
-      const total = branches.reduce((s, b) => s + (Number(r.qtyByBranch[b]) || 0), 0);
-      sheet.addRow([
-        r.category, r.name,
-        ...branches.map(b => qtyCell(r, b)),
-        ...(showTotal ? [`${total} ${r.unit || ""}`] : []),
-        r.notes.join(" / ")
-      ]);
-      rowIdx++;
+  const thin = { style: "thin", color: { argb: "FF" + S.border } };
+  const border = { top: thin, bottom: thin, left: thin, right: thin };
+  const font = (sz) => ({ name: "Aptos Narrow", size: sz, color: { argb: "FF000000" } });
+  const center = { horizontal: "center", vertical: "middle", wrapText: true, readingOrder: "rtl" };
+  lastTomorrowReportSheets.forEach(sheetData => {
+    const ws = workbook.addWorksheet(String(sheetData.branch).slice(0, 31));
+    ws.views = [{ rightToLeft: true }];
+    ws.columns = S.cols.map(w => ({ width: w }));
+    ws.pageSetup = { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 1,
+      margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 } };
+    // الصف 1: اليوم / التاريخ / الفرع
+    ws.mergeCells("A1:B1"); ws.mergeCells("E1:F1"); ws.mergeCells("G1:H1");
+    const [y, m, d] = lastTomorrowReportDate.split("-").map(Number);
+    const title = [["A1", "اليوم:", "left"], ["C1", chefDayName(lastTomorrowReportDate), "right"], ["D1", "التاريخ:", "right"],
+      ["E1", new Date(Date.UTC(y, m - 1, d)), "right"], ["G1", "فرع " + sheetData.branch, "center"]];
+    title.forEach(([a, v, h]) => { const c = ws.getCell(a); c.value = v; c.font = font(S.titleFont); c.alignment = { horizontal: h, vertical: "middle" }; });
+    ws.getCell("E1").numFmt = "dd-mm-yyyy";
+    ws.getRow(1).height = S.titleH;
+    // الصف 2: العناوين
+    const head = ws.getRow(2);
+    S.headers.forEach((h, i) => {
+      const c = head.getCell(i + 1);
+      c.value = h; c.font = font(S.bodyFont); c.alignment = center; c.border = border;
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + S.headFill } };
     });
-    if (group.items.length > 1) sheet.mergeCells(startRow, 1, rowIdx, 1);
+    head.height = S.headH;
+    // الأصناف
+    let r = 3;
+    const groups = [];
+    sheetData.rows.forEach(x => { const g = groups[groups.length - 1]; if (g && g.category === x.category) g.rows.push(x); else groups.push({ category: x.category, rows: [x] }); });
+    groups.forEach(g => {
+      const start = r;
+      g.rows.forEach((x, i) => {
+        const row = ws.getRow(r);
+        [i === 0 ? g.category : null, "□", x.name, x.size, x.qty, null, null, x.notes || null].forEach((v, ci) => {
+          const c = row.getCell(ci + 1);
+          if (v !== null) c.value = v;
+          c.font = font(ci === 1 ? S.boxFont : S.bodyFont); c.alignment = center; c.border = border;
+        });
+        row.getCell(4).numFmt = "@";
+        row.height = S.rowH;
+        r++;
+      });
+      if (g.rows.length > 1) ws.mergeCells(start, 1, r - 1, 1);
+    });
   });
+  const suffix = lastTomorrowReportSheets.length === 1 ? "_" + lastTomorrowReportSheets[0].branch : "";
+  await downloadWorkbook(workbook, `طلبية_الغد_${lastTomorrowReportDate}${suffix}.xlsx`);
+}
 
-  styleExcelSheet(sheet, [14, 26, ...branches.map(() => 16), ...(showTotal ? [14] : []), 24]);
-  // خلية الفئة المدموجة: خلفية صفراء برضو (متل رأس الجدول) لتبرز الأقسام
-  sheet.eachRow((row, num) => {
-    if (num === 1) return;
-    row.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: EXCEL_HEADER_FILL } };
-    row.getCell(1).font = EXCEL_HEADER_FONT;
+// ---- PDF جاهز للطباعة: صفحة A4 لكل فرع، وينرسل واتساب من زر المشاركة ----
+function loadPdfLibs() {
+  const load = (src) => new Promise((resolve) => {
+    const s = document.createElement("script"); s.src = src;
+    s.onload = () => resolve(true); s.onerror = () => resolve(false);
+    document.head.appendChild(s);
   });
+  return Promise.all([
+    window.html2canvas ? true : load("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"),
+    window.jspdf ? true : load("https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js")
+  ]);
+}
 
-  await downloadWorkbook(workbook, `طلبية_الغد_${lastTomorrowReportDate}.xlsx`);
+async function buildTomorrowReportPdf() {
+  await loadPdfLibs();
+  if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  const pageW = 210, pageH = 297;
+  const mX = 0.7 * 25.4, mY = 0.75 * 25.4; // نفس هوامش الإكسل
+  // نرسم الورقة بحجمها الحقيقي خارج الشاشة ونصوّرها
+  const stage = document.createElement("div");
+  stage.style.cssText = "position:fixed;left:-99999px;top:0;background:#fff;";
+  document.body.appendChild(stage);
+  try {
+    for (let i = 0; i < lastTomorrowReportSheets.length; i++) {
+      stage.innerHTML = chefSheetHtml(lastTomorrowReportSheets[i], lastTomorrowReportDate);
+      const el = stage.firstElementChild;
+      fitChefCells(el);
+      const canvas = await html2canvas(el, { scale: 1.5, backgroundColor: "#ffffff", logging: false });
+      const img = canvas.toDataURL("image/jpeg", 0.92);
+      const maxW = pageW - 2 * mX, maxH = pageH - 2 * mY;
+      const ratio = Math.min(maxW / canvas.width, maxH / canvas.height);
+      const w = canvas.width * ratio, h = canvas.height * ratio;
+      if (i) pdf.addPage();
+      pdf.addImage(img, "JPEG", (pageW - w) / 2, mY, w, h);
+    }
+  } finally { stage.remove(); }
+  return pdf.output("blob");
+}
+
+async function shareTomorrowReportPdf() {
+  if (!lastTomorrowReportSheets.length) { showToast("اضغط «عرض» أول"); return; }
+  const btn = document.getElementById("tomorrowReportPdfBtn");
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳ جاري تجهيز PDF…";
+  try {
+    const blob = await buildTomorrowReportPdf();
+    const suffix = lastTomorrowReportSheets.length === 1 ? "_" + lastTomorrowReportSheets[0].branch : "";
+    const name = `طلبية_${chefDayName(lastTomorrowReportDate)}_${lastTomorrowReportDate}${suffix}.pdf`.replace(/\s+/g, "_");
+    const file = new File([blob], name, { type: "application/pdf" });
+    // بالجوال: نافذة المشاركة (واتساب ← الشيف). بالكمبيوتر: ينزل الملف
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "طلبية الغد", text: `طلبية ${chefDayName(lastTomorrowReportDate)} ${chefDateText(lastTomorrowReportDate)}` });
+        return;
+      } catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    showToast("✅ نزل الـ PDF — أرسله للشيف بالواتساب");
+  } catch (e) {
+    showToast("⚠ " + (e.message || e));
+  } finally { btn.disabled = false; btn.textContent = label; }
 }
 
 

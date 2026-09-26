@@ -3267,3 +3267,12 @@ html[dir="ltr"] .sidebar-nav .tab-btn { white-space: normal; }
 .tom-cat-total.ok { background: #EEF8F2; border-color: #BfE3CD; color: #137A50; }
 .tom-cat-total.over { background: #FFF4E5; border-color: #F5C98A; color: #9A5B00; }
 .tom-cat-total.under { background: #FFECEC; border-color: #F3B4B4; color: #B42323; }
+
+/* ==================== طلبية الغد للشيف: نفس نموذج الإكسل ==================== */
+.chef-sheet-frame { overflow: hidden; background: #fff; border: 1px solid var(--line, #e5e2d8); border-radius: 12px; margin-bottom: 16px; }
+.chef-sheet { direction: rtl; background: #fff; color: #000; transform-origin: top right; }
+html[dir="ltr"] .chef-sheet { transform-origin: top left; }
+.chef-sheet table { border-collapse: collapse; table-layout: fixed; font-size: 35px; font-weight: 400; }
+.chef-sheet td { text-align: center; vertical-align: middle; padding: 0 8px; overflow: hidden; line-height: 1.15; white-space: nowrap; }
+.chef-sheet .chef-title td { font-size: 63px; border: 0 !important; white-space: nowrap; }
+.chef-sheet .chef-head td { white-space: normal; line-height: 1.2; }
