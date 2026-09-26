@@ -618,6 +618,19 @@ function chefReportName(it, cookName) {
   return dish ? `${plain} (${dish})` : `${plain}……`;
 }
 
+// حجم السفنديش المكتوب بالنموذج (من شاشة الأصناف)، وإذا فاضي: البروتين 1/3 والباقي نفس الوحدة
+const isWeightUnit = (u) => /جرام|جم|كجم|كيلو/.test(String(u || ""));
+function itemPanSize(it) {
+  if (it.panSize) return it.panSize;
+  if (["دجاج", "لحم", "بحري"].includes(String(it.category || "").trim())) return "1/3";
+  return isWeightUnit(it.unit) ? "" : String(it.unit || "");
+}
+// العدد: للأصناف اللي تنطلب بالوزن نكتب الجرامات صريحة عشان ما تنفهم عدد سفنديشات
+function chefQtyText(qty, unit) {
+  if (/كجم|كيلو/.test(String(unit || ""))) return `${qty} كجم`;
+  return isWeightUnit(unit) ? `${qty} جم` : qty;
+}
+
 function initTomorrowReportControls() {
   document.getElementById("tomorrowReportBranch").innerHTML =
     `<option value="">كل الفروع</option>` + branchList().map(b => `<option value="${b}">${b}</option>`).join("");
@@ -648,7 +661,7 @@ async function runTomorrowReport() {
         const it = Items.byId(e.itemId) || { name: e.itemName, category: "-", unit: e.unit, sortOrder: 999 };
         return {
           category: it.category || "-", name: chefReportName(it, e.cookName),
-          size: String(it.unit || e.unit || ""), qty: Number(e.qty), notes: e.notes || "",
+          size: itemPanSize({ ...it, unit: it.unit || e.unit }), qty: chefQtyText(Number(e.qty), it.unit || e.unit), notes: e.notes || "",
           rank: categoryRank(it.category), sort: order.has(e.itemId) ? order.get(e.itemId) : 9999
         };
       })
@@ -694,7 +707,7 @@ function renderTomorrowReport() {
     view.innerHTML = '<div class="empty-state">ما فيه طلبية محفوظة لهذا اليوم/الفرع بعد.<br>ابدأ بتعبئة تاب "طلبية الغد".</div>';
     return;
   }
-  view.innerHTML = lastTomorrowReportSheets.map(s => `<div class="chef-sheet-frame">${chefSheetHtml(s, lastTomorrowReportDate)}</div>`).join("");
+  view.innerHTML = lastTomorrowReportSheets.map(s => `<div class="chef-page"><img class="chef-logo" src="assets/logo.png" alt="Pro House"><div class="chef-sheet-frame">${chefSheetHtml(s, lastTomorrowReportDate)}</div></div>`).join("");
   fitChefSheets();
 }
 // النص الطويل يصغر لين يدخل بالخلية (متل "تصغير للاحتواء" بالإكسل) بدل ما ينكسر على سطرين
@@ -799,6 +812,12 @@ async function buildTomorrowReportPdf() {
   const pageW = 210, pageH = 297;
   const mX = 0.7 * 25.4, mY = 0.75 * 25.4; // نفس هوامش الإكسل
   // نرسم الورقة بحجمها الحقيقي خارج الشاشة ونصوّرها
+  // لوقو برو هاوس بالمساحة الفاضية فوق الجدول (هامش الصفحة) — مقاسات الجدول ما تتغير
+  let logo = null;
+  try {
+    const blob = await (await fetch("assets/logo.png")).blob();
+    logo = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(blob); });
+  } catch (e) { logo = null; }
   const stage = document.createElement("div");
   stage.style.cssText = "position:fixed;left:-99999px;top:0;background:#fff;";
   document.body.appendChild(stage);
@@ -814,6 +833,7 @@ async function buildTomorrowReportPdf() {
       const w = canvas.width * ratio, h = canvas.height * ratio;
       if (i) pdf.addPage();
       pdf.addImage(img, "JPEG", (pageW - w) / 2, mY, w, h);
+      if (logo) { const lh = mY - 6, lw = lh * 197 / 132; pdf.addImage(logo, "PNG", (pageW - lw) / 2, 3, lw, lh); }
     }
   } finally { stage.remove(); }
   return pdf.output("blob");

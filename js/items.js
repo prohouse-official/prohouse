@@ -69,11 +69,13 @@ const Items = (() => {
     item.hasCustomName = !!item.hasCustomName;
     item.active = true;
     const idx = current.findIndex(it => it.id === item.id);
-    if (idx >= 0) current[idx] = { ...current[idx], ...item };
-    else current.push(item);
+    // نبعت الصنف كامل (مع اللي ما تعدّل مثل optional وحجم السفنديش) عشان الحفظ ما يمسحهم
+    const full = idx >= 0 ? { ...current[idx], ...item } : item;
+    if (idx >= 0) current[idx] = full;
+    else current.push(full);
     Sync.cacheSet("items_v2", current);
-    Sync.enqueue("saveItem:" + item.id, "saveItem", item);
-    return item;
+    Sync.enqueue("saveItem:" + item.id, "saveItem", full);
+    return full;
   }
 
   function remove(id) {
@@ -167,6 +169,7 @@ function renderItemsAdminView() {
       <div class="field" id="newCatGroup"><label>التصنيف</label>${categorySelectHtml(cats, "")}</div>
       <div class="field"><label>اسم الصنف</label><input type="text" id="newName"></div>
       <div class="field"><label>الوحدة</label><input type="text" id="newUnit"></div>
+      <div class="field"><label>حجم السفنديش (للطباعة)</label><input type="text" id="newPanSize" placeholder="مثال: 1/3 ، 1/2 ، طاسة"></div>
       ${isOwner ? `
       <div class="field" style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="newCustomName" style="width:auto;">
@@ -191,11 +194,12 @@ function renderItemsAdminView() {
     const category = categoryValue(document.getElementById("newCatGroup"));
     const name = document.getElementById("newName").value.trim();
     const unit = document.getElementById("newUnit").value.trim();
+    const panSize = document.getElementById("newPanSize").value.trim();
     const hasCustomName = isOwner ? document.getElementById("newCustomName").checked : false;
     const branches = isOwner ? checkedBranches(document.getElementById("newBranchChecks")) : document.getElementById("newBranchLocked").value;
     if (!category || !name) { showToast("لازم تعبي التصنيف واسم الصنف"); return; }
     if (!isOwner && !branches) { showToast("ما فيه فرع مرتبط بحسابك"); return; }
-    Items.save({ category, name, unit, hasCustomName, branches, sortOrder: Items.current.length + 1 });
+    Items.save({ category, name, unit, panSize, hasCustomName, branches, sortOrder: Items.current.length + 1 });
     document.getElementById("itemAddForm").classList.add("hidden");
     renderItemsAdminView();
     showToast("تمت إضافة الصنف");
@@ -214,6 +218,7 @@ function renderItemsAdminView() {
       <div class="inputs-row">
         <div class="field"><label>الاسم</label><input type="text" data-f="name" value="${item.name}"></div>
         <div class="field"><label>الوحدة</label><input type="text" data-f="unit" value="${item.unit}"></div>
+        <div class="field"><label>حجم السفنديش</label><input type="text" data-f="panSize" value="${item.panSize || ""}" placeholder="1/3"></div>
       </div>
       <div class="inputs-row" style="margin-top:8px;">
         <div class="field" data-cat-group><label>التصنيف</label>${categorySelectHtml(cats, item.category)}</div>
@@ -241,6 +246,7 @@ function renderItemsAdminView() {
         id: item.id,
         name: card.querySelector('[data-f="name"]').value.trim(),
         unit: card.querySelector('[data-f="unit"]').value.trim(),
+        panSize: card.querySelector('[data-f="panSize"]').value.trim(),
         category: categoryValue(card.querySelector("[data-cat-group]")),
         hasCustomName: isOwner ? card.querySelector('[data-f="hasCustomName"]').checked : !!item.hasCustomName,
         branches: isOwner ? checkedBranches(card.querySelector('[data-branch-checks]')) : document.getElementById("editBranchLocked-" + item.id).value,
