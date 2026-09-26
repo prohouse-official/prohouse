@@ -3197,3 +3197,32 @@ html[dir="ltr"] .sidebar-nav .tab-btn { white-space: normal; }
 .home-help-link { display: block; text-align: center; margin: 12px 0 0; padding: 12px; border-radius: 14px; border: 1.5px dashed var(--line-strong, #d8d3c4); font-weight: 800; font-size: 14px; color: inherit; text-decoration: none; background: transparent; width: 100%; font-family: inherit; cursor: pointer; }
 /* مساحة تحت آخر صنف عشان زر "الصنف الجاي" العائم ما يغطيه */
 #receivingView::after, #remainingView::after { content: ""; display: block; height: 70px; }
+
+/* ==================== بطاقة المتبقي: سطرين بس (اسم + أزرار صغيرة / خانة الإدخال) ==================== */
+#remainingView .remaining-card-mobile { padding: 10px 12px; margin-bottom: 8px; gap: 6px; box-shadow: 0 1px 0 rgba(0,0,0,.08); border: 1px solid var(--line-strong, #d8d3c4); border-radius: 14px; }
+#remainingView .rem-single-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "info actions" "inputs inputs"; gap: 8px; align-items: center; }
+#remainingView .rem-info-group { grid-area: info; min-width: 0; gap: 4px 6px; }
+#remainingView .rem-item-name { font-size: 15px; font-weight: 900; }
+#remainingView .rem-item-unit { font-size: 11px; color: var(--gray); }
+#remainingView .rem-inline-actions { grid-area: actions; display: flex; gap: 6px; }
+#remainingView .rem-inline-actions button { min-width: 36px; min-height: 36px; height: 36px; padding: 0 8px; border-radius: 10px; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; }
+#remainingView .rem-inputs-group { grid-area: inputs; display: flex; flex-wrap: nowrap; gap: 8px; align-items: stretch; }
+#remainingView .rem-inline-input-group.protein { flex: 1; display: flex; gap: 8px; padding: 0; background: none; border: 0; }
+#remainingView .rem-mini-input-wrap { flex: 1; display: flex; }
+#remainingView .rem-mini-input { width: 100%; height: 50px; min-height: 50px; padding: 0 12px; padding-inline-end: 56px; border-radius: 12px; border: 1.5px solid var(--line-strong, #d8d3c4); font-size: 20px !important; }
+#remainingView .rem-mini-input.border-green { border-color: var(--green); }
+#remainingView .rem-mini-unit { left: auto; right: auto; inset-inline-end: 12px; top: 50%; transform: translateY(-50%); font-size: 12px; }
+#remainingView .rem-mini-zero-btn { height: 50px; min-width: 50px; border-radius: 12px; border: 1.5px solid var(--line-strong, #d8d3c4); font-size: 16px; }
+#remainingView .rem-btn-sauce-toggle { height: 50px; padding: 0 12px; border-radius: 12px; border: 1.5px solid var(--line-strong, #d8d3c4); font-size: 13px; }
+#remainingView .rem-btn-sauce-toggle.active { border-color: var(--black); }
+/* شريط التقدم أنحف عشان ما يغطي الشاشة وهو ثابت فوق */
+.entry-progress { padding: 8px 12px; margin-bottom: 10px; border-radius: 12px; }
+.entry-progress-top { margin-bottom: 6px; }
+.entry-progress-text { font-size: 13px; }
+.entry-progress-track { height: 6px; }
+#remainingView .rem-inline-actions .rem-mini-note-btn { border: 1px solid var(--line-strong, #d8d3c4); background: #fff; }
+#remainingView .rem-inline-actions .rem-mini-note-btn.has-notes { background: #FFF6CC; border-color: #E6CB3A; }
+/* رأس التصنيف بالمتبقي أصغر */
+#remainingView .category-header { padding: 10px 12px; margin-bottom: 8px; }
+#remainingView .category-header .cat-title { margin: 0; padding: 0; background: none; border: 0; box-shadow: none; font-size: 16px; font-weight: 900; }
+#remainingView .cat-metrics-bar { margin-top: 6px; gap: 6px; }
