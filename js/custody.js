@@ -234,12 +234,15 @@ function initCustodyTab() {
 }
 
 
+const CUSTODY_START = "2026-09-26";
+
 // ---- ملخص الشهر (للمالك): كل يوم فيه مبيعات أو إغلاق — انسكر؟ وفرق الكاش والشبكة ----
 async function renderCustodyMonth() {
   const el = document.getElementById("custodyMonthCard");
   if (!el) return;
   const month = currentCustodyDate.slice(0, 7);
-  const start = month + "-01";
+  // إغلاق العهدة بدأ ٢٦ سبتمبر ٢٠٢٦ — الأيام قبلها ما تنعرض
+  const start = [month + "-01", CUSTODY_START].sort().pop();
   const [y, m] = month.split("-").map(Number);
   const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10); // آخر يوم بالشهر
   let data;
