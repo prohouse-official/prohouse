@@ -898,7 +898,7 @@ async function saveReceivingReportData() {
     itemsPayload.forEach(i => { receivingBaseline[i.itemId] = { received: i.received, notes: i.notes }; });
     showToast("✅ تم رفع تقرير الاستلام ومزامنته سحابياً بنجاح!");
     if (statusEl) {
-      statusEl.textContent = "✅ متزامن سحابياً مع كل الأجهزة (" + new Date().toLocaleTimeString("ar-SA") + ")";
+      statusEl.textContent = "✅ متزامن سحابياً مع كل الأجهزة (" + new Date().toLocaleTimeString(phLocale()) + ")";
       statusEl.classList.remove("dirty");
     }
   } catch (err) {

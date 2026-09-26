@@ -186,7 +186,7 @@ if (typeof document !== "undefined") {
 }
 
 function autosaveStatusText(state, e) {
-  const time = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+  const time = new Date().toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" });
   if (state === "saving") return "⏳ جاري الحفظ…";
   if (state === "saved") return `✓ انحفظ تلقائياً ${time}`;
   return "⚠ ما انحفظ، بنعيد المحاولة — " + ((e && e.message) || "");

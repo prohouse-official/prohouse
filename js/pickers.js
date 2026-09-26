@@ -2,8 +2,8 @@
 // بدل حقل التاريخ وقائمة الفرع العاديين: كرت تاريخ كبير (اسم اليوم + التاريخ) بأسهم،
 // وأزرار فروع أسود/أصفر. العناصر الأصلية بتضل موجودة ومخفية، فكل الكود القديم بيضل شغّال.
 (function () {
-  const dayName = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", timeZone: "UTC" });
-  const dayDate = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { day: "numeric", month: "long", timeZone: "UTC" });
+  const dayName = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", timeZone: "UTC" });
+  const dayDate = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString(phLocale(), { day: "numeric", month: "long", timeZone: "UTC" });
   function relative(iso) {
     const today = todayStr();
     if (iso === today) return "اليوم";
@@ -84,7 +84,7 @@
       const first = new Date(Date.UTC(y, m, 1));
       const daysIn = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
       const lead = first.getUTCDay();
-      const title = first.toLocaleDateString("ar-SA-u-ca-gregory", { month: "long", year: "numeric", timeZone: "UTC" });
+      const title = first.toLocaleDateString(phLocale(), { month: "long", year: "numeric", timeZone: "UTC" });
       const cells = [];
       for (let i = 0; i < lead; i++) cells.push('<span class="ph-cal-empty"></span>');
       for (let d = 1; d <= daysIn; d++) {

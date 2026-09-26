@@ -90,7 +90,7 @@ async function renderAuditView() {
               <tbody>
                 ${logs.map(l => `
                   <tr>
-                    <td>${new Date(l.timestamp).toLocaleString("ar-SA")}</td>
+                    <td>${new Date(l.timestamp).toLocaleString(phLocale())}</td>
                     <td><strong>${l.user}</strong></td>
                     <td>${l.branch}</td>
                     <td><span class="badge neutral">${l.action}</span></td>

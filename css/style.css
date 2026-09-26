@@ -184,7 +184,7 @@ input, select, textarea{ transition:border-color .15s ease, background .15s ease
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  text-align: right;
+  text-align:start;
   transition: all 0.18s var(--ease);
   position: relative;
 }
@@ -444,17 +444,17 @@ input, select, textarea{ transition:border-color .15s ease, background .15s ease
   width:100%; border:2px solid var(--black); border-radius:11px; padding:10px 8px;
   font-size:15px; font-family:inherit; font-weight:600; background:#fff; text-align:center;
 }
-.field input[type=text], .field input[type=url]{ text-align:right; }
+.field input[type=text], .field input[type=url]{ text-align:start; }
 .field input:focus, .field select:focus{ outline:3px solid var(--yellow); outline-offset:1px; border-color:var(--black); }
 .notes-row{ margin-top:8px; }
 .notes-row input[type=text], .notes-row input[type=url]{
   width:100%; border:2px solid var(--black); border-radius:11px; padding:9px 10px;
-  font-size:13px; font-family:inherit; font-weight:600; background:#fff; text-align:right;
+  font-size:13px; font-family:inherit; font-weight:600; background:#fff; text-align:start;
 }
 .cookname-row{ margin-top:8px; }
 .cookname-row input{
   width:100%; border:2px solid var(--yellow-dark); border-radius:11px; padding:9px 10px;
-  font-size:13px; font-family:inherit; font-weight:600; background:#FFFCF2; text-align:right;
+  font-size:13px; font-family:inherit; font-weight:600; background:#FFFCF2; text-align:start;
 }
 .badges{ display:flex; gap:6px; margin-top:9px; flex-wrap:wrap; }
 .badge{
@@ -564,7 +564,7 @@ table.order-table{ width:100%; border-collapse:collapse; font-size:13px; white-s
 table.order-table th, table.order-table td{ border:1px solid var(--border-soft); padding:8px 10px; text-align:center; }
 table.order-table thead th{ background:var(--black); color:var(--yellow); font-weight:800; position:sticky; top:0; }
 table.order-table td.cat-cell{ background:var(--yellow); font-weight:800; color:var(--black); text-align:center; }
-table.order-table td.name-cell{ text-align:right; font-weight:700; }
+table.order-table td.name-cell{ text-align:start; font-weight:700; }
 table.order-table tbody tr:nth-child(even){ background:var(--surface2); }
 table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
 .order-header{ text-align:center; font-weight:800; padding:10px; }
@@ -610,7 +610,7 @@ table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
 .dash-tasks-title{ font-size:13.5px; font-weight:900; margin-bottom:10px; }
 .dash-tasks-done{ font-size:12.5px; font-weight:700; color:var(--green); }
 .dash-task{
-  display:flex; align-items:center; gap:10px; width:100%; text-align:right;
+  display:flex; align-items:center; gap:10px; width:100%; text-align:start;
   background:var(--surface2); border:2px solid var(--black); border-radius:11px;
   padding:11px 12px; margin-bottom:8px; cursor:pointer; font-family:inherit;
   transition:transform .12s var(--ease), background .12s var(--ease);
@@ -1183,7 +1183,7 @@ table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
   box-shadow: var(--shadow);
   transition: all 0.2s var(--ease);
   position: relative;
-  text-align: right;
+  text-align:start;
 }
 
 .stage-tab-btn:hover {
@@ -2705,7 +2705,7 @@ body{ background:var(--canvas); color:var(--ink); font-variant-numeric:tabular-n
 .home-hello{ font-size:22px; font-weight:900; color:var(--ink); margin:4px 0 2px; }
 .home-sub{ font-size:13px; font-weight:700; color:var(--muted); margin-bottom:16px; }
 .home-next{
-  display:flex; flex-direction:column; align-items:flex-start; gap:4px; width:100%; text-align:right; cursor:pointer;
+  display:flex; flex-direction:column; align-items:flex-start; gap:4px; width:100%; text-align:start; cursor:pointer;
   font-family:inherit; border:none; border-radius:20px; padding:18px 20px; margin-bottom:16px;
   background:linear-gradient(135deg, var(--yellow) 0%, #FBE77F 100%); color:var(--ink);
   box-shadow:0 12px 28px -14px rgba(200,165,20,.8);
@@ -2719,7 +2719,7 @@ body{ background:var(--canvas); color:var(--ink); font-variant-numeric:tabular-n
 .day-steps-count{ font-size:12.5px; color:var(--muted); background:var(--canvas); border-radius:999px; padding:3px 10px; }
 .day-step{
   display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:10px 12px; margin-top:6px;
-  font-family:inherit; text-align:right; cursor:pointer; background:var(--canvas); border:1px solid var(--line); border-radius:14px;
+  font-family:inherit; text-align:start; cursor:pointer; background:var(--canvas); border:1px solid var(--line); border-radius:14px;
 }
 .day-step.next{ border-color:#E6CB3A; background:var(--yellow-tint); box-shadow:inset 0 0 0 1px #F2E29A; }
 .day-step-icon{ font-size:20px; width:28px; text-align:center; }
@@ -2728,7 +2728,7 @@ body{ background:var(--canvas); color:var(--ink); font-variant-numeric:tabular-n
 .day-step.done .day-step-status{ background:#EEF8F2; color:#137A50; border-color:#CDEBDB; }
 .day-step.partial .day-step-status{ background:#FFF5E8; color:#9A5B00; border-color:#F7DDBB; }
 .day-step-go{ font-size:18px; color:var(--muted); }
-.home-flag{ width:100%; text-align:right; font-family:inherit; font-weight:800; font-size:13.5px; cursor:pointer; padding:12px 14px; border-radius:14px; border:1px solid #F4CFCF; background:#FDF0F0; color:#B42318; }
+.home-flag{ width:100%; text-align:start; font-family:inherit; font-weight:800; font-size:13.5px; cursor:pointer; padding:12px 14px; border-radius:14px; border:1px solid #F4CFCF; background:#FDF0F0; color:#B42318; }
 
 /* ==================== الإدخال السريع (الاستلام والجرد) ==================== */
 .entry-progress{
@@ -2765,7 +2765,7 @@ input.entry-input:focus{ border-color:#E6CB3A !important; box-shadow:var(--ring)
   width:100%; min-height:52px; padding:12px 14px; border-radius:14px; border:1.5px solid var(--line-strong); background:#fff;
   font-family:inherit; font-size:20px; font-weight:800; color:var(--ink); text-align:center;
 }
-.cust-field input[type=text]{ font-size:15px; text-align:right; }
+.cust-field input[type=text]{ font-size:15px; text-align:start; }
 .cust-field input:focus{ outline:none; border-color:#E6CB3A; box-shadow:var(--ring); }
 .cust-expense{ display:grid; grid-template-columns:110px 1fr 44px; gap:8px; margin-bottom:8px; }
 .cust-expense input{ min-height:48px; font-size:16px; }
@@ -3063,7 +3063,7 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 
 /* ملخص شهر العهدة (للمالك) */
 .cust-month{ width:100%; border-collapse:collapse; margin-top:8px; font-size:14px; }
-.cust-month th{ text-align:right; font-size:12px; color:var(--muted); font-weight:800; padding:6px 4px; border-bottom:1px solid var(--line); }
+.cust-month th{ text-align:start; font-size:12px; color:var(--muted); font-weight:800; padding:6px 4px; border-bottom:1px solid var(--line); }
 .cust-month td{ padding:8px 4px; border-bottom:1px solid var(--line); }
 .cust-month tr[data-date]{ cursor:pointer; }
 .cust-month tr[data-date]:active td{ background:var(--yellow-tint); }
@@ -3075,7 +3075,7 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .waste-dialog .ph-dialog-input{ margin-bottom:10px; }
 .waste-reasons{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:10px; }
 .waste-reason.active{ background:#111; color:var(--yellow); border-color:#111; }
-.waste-list{ text-align:right; margin-bottom:10px; }
+.waste-list{ text-align:start; margin-bottom:10px; }
 .waste-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; background:var(--canvas); border:1px solid var(--line); border-radius:12px; margin-bottom:6px; font-size:14px; }
 .waste-del{ border:0; background:transparent; color:#B42323; font-size:18px; cursor:pointer; min-width:36px; min-height:36px; }
 
@@ -3128,7 +3128,7 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .ph-date-day, .ph-date-full{ white-space:nowrap; }
 
 /* ==================== تقويم برو هاوس ==================== */
-.ph-date-card{ border:0; font-family:inherit; text-align:right; }
+.ph-date-card{ border:0; font-family:inherit; text-align:start; }
 .ph-cal{ width:100%; max-width:360px; background:#fff; border-radius:24px; border-top:6px solid var(--yellow); padding:14px 14px 12px; box-shadow:0 24px 60px -18px rgba(0,0,0,.45); transform:translateY(12px) scale(.97); transition:transform .22s cubic-bezier(.34,1.4,.5,1); }
 .ph-dialog.open .ph-cal{ transform:none; }
 .ph-cal-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
@@ -3156,3 +3156,28 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .month-alerts-title { font-weight: 800; margin-bottom: 6px; }
 .month-alerts ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
 .month-alerts li.bad b { color: #c62828; }
+
+/* ==================== اللغات (عربي / English / বাংলা) ==================== */
+.ph-lang { display: flex; gap: 6px; justify-content: center; margin-top: 14px; }
+.ph-lang button {
+  flex: 1; max-width: 110px; padding: 7px 8px; border-radius: 10px; border: 1.5px solid rgba(128,128,128,.35);
+  background: transparent; color: inherit; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.ph-lang button.active { background: var(--gold, #F7DC4E); color: #111; border-color: var(--gold, #F7DC4E); }
+#menuLangSlot .ph-lang { margin: 10px 0 0; }
+#menuLangSlot .ph-lang button { color: #fff; border-color: rgba(255,255,255,.25); }
+#menuLangSlot .ph-lang button.active { color: #111; }
+body.lang-bn, body.lang-bn button, body.lang-bn input, body.lang-bn select, body.lang-bn textarea {
+  font-family: "Noto Sans Bengali", "Tajawal", "Segoe UI", sans-serif;
+}
+/* الإنجليزي والبنغالي من اليسار: الشريط الجانبي بينتقل لليسار */
+html[dir="ltr"] .app-sidebar { right: auto; left: 0; border-left: 0; border-right: 3px solid var(--black); box-shadow: -4px 0 25px rgba(0, 0, 0, 0.15); }
+html[dir="ltr"] .app-body { margin-right: 0; margin-left: 275px; }
+@media (max-width: 860px) {
+  html[dir="ltr"] .app-body { margin-left: 0; }
+  html[dir="ltr"] .app-sidebar { transform: translateX(-100%); }
+  html[dir="ltr"] .app-sidebar.mobile-open { transform: translateX(0); }
+}
+/* أسهم التاريخ والتقويم بتنعكس باليسار (السابق ← والتالي →) */
+html[dir="ltr"] .ph-date-arrow, html[dir="ltr"] .ph-cal-nav { transform: scaleX(-1); }
+html[dir="ltr"] .sidebar-nav .tab-btn { white-space: normal; }

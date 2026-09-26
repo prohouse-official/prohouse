@@ -728,7 +728,7 @@ function renderTabsenseDetailsBlock(d) {
   const branch = document.getElementById("reportBranchFilter").value;
   const inBranch = (r) => !branch || r.branch === branch;
   const fmt = (n) => Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
-  const dayLabel = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "short", day: "numeric", month: "numeric" });
+  const dayLabel = (iso) => new Date(iso + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "short", day: "numeric", month: "numeric" });
   let html = "";
 
   // 1) الكاش ومدى لكل يوم (للمالك)

@@ -200,7 +200,7 @@ async function renderOpeningView() {
         </div>
       </div>
 
-      ${isPast ? `<div class="opening-past-banner">📅 صور يوم ${new Date(date + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long" })} — للمشاهدة بس</div>` : ""}
+      ${isPast ? `<div class="opening-past-banner">📅 صور يوم ${new Date(date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long" })} — للمشاهدة بس</div>` : ""}
 
       <!-- تبويبات المراحل الثلاث للتوثيق -->
       <div class="stage-nav-tabs">
@@ -250,7 +250,7 @@ async function renderOpeningView() {
                   <div class="cp-info" style="flex:1;">
                     <strong style="font-size:15px;">${cp.name}</strong>
                     <span class="cp-status" style="display:block;margin-top:2px;">${hasPhoto ? '✓ تم التوثيق' : 'مطلوب التوثيق 📷'}</span>
-                    ${photo ? `<div class="cp-time" style="font-size:12px;color:var(--text-muted);margin-top:2px;">🕒 ${new Date(photo.timestamp).toLocaleTimeString("ar-SA", { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
+                    ${photo ? `<div class="cp-time" style="font-size:12px;color:var(--text-muted);margin-top:2px;">🕒 ${new Date(photo.timestamp).toLocaleTimeString(phLocale(), { hour: '2-digit', minute: '2-digit' })}</div>` : ''}
                   </div>
                 </div>
 

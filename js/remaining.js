@@ -1231,7 +1231,7 @@ async function saveRemainingReportData() {
     itemsPayload.forEach(i => { remainingBaseline[i.itemId] = remainingSnapshot(currentRemainingData[i.itemId]); });
     showToast("✅ تم رفع تقرير المتبقي ومزامنته سحابياً بنجاح!");
     if (statusEl) {
-      statusEl.textContent = "✅ متزامن سحابياً مع كل الأجهزة (" + new Date().toLocaleTimeString("ar-SA") + ")";
+      statusEl.textContent = "✅ متزامن سحابياً مع كل الأجهزة (" + new Date().toLocaleTimeString(phLocale()) + ")";
       statusEl.classList.remove("dirty");
     }
     sendSauceFormIfChanged(payload.date, payload.branch, itemsPayload);

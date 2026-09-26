@@ -12,7 +12,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=5.22.0">
+<link rel="stylesheet" href="css/style.css?v=5.23.0">
 <script>
 // الشغل بدون نت انلغى: منشيل الـ Service Worker القديم (sw.js) ومنمسح ملفاته لحتى الجهاز يجيب أحدث نسخة دايماً.
 // عامل الإشعارات (push-sw.js) ما بيخزّن شي، فمنخليه.
@@ -58,6 +58,7 @@ if ('caches' in window) {
     <input type="tel" inputmode="numeric" pattern="[0-9]*" id="loginPinInput" class="login-pin-input" placeholder="••••" maxlength="8" autocomplete="off">
     <button class="btn gold login-btn" id="loginSubmitBtn">دخول</button>
     <div class="login-error hidden" id="loginError"></div>
+    <div id="loginLangSlot"></div>
   </div>
 </div>
 
@@ -190,6 +191,7 @@ if ('caches' in window) {
           <button class="logout-btn" id="changePinBtn" title="تغيير الرقم السري">🔑 الرقم السري</button>
           <button class="logout-btn danger" id="logoutBtn" title="خروج">🚪 خروج</button>
         </div>
+        <div id="menuLangSlot"></div>
       </div>
     </div>
   </aside>
@@ -381,32 +383,37 @@ if ('caches' in window) {
 
 <div class="toast" id="toast"></div>
 
-<script src="js/demo.js?v=5.22.0"></script>
-<script src="js/config.js?v=5.22.0"></script>
-<script src="js/supabase-engine.js?v=5.22.0"></script>
-<script src="js/shared.js?v=5.22.0"></script>
-<script src="js/pickers.js?v=5.22.0"></script>
-<script src="js/auth.js?v=5.22.0"></script>
-<script src="js/sync.js?v=5.22.0"></script>
-<script src="js/items.js?v=5.22.0"></script>
-<script src="js/camera.js?v=5.22.0"></script>
-<script src="js/branches.js?v=5.22.0"></script>
-<script src="js/receiving.js?v=5.22.0"></script>
-<script src="js/remaining.js?v=5.22.0"></script>
-<script src="js/custody.js?v=5.22.0"></script>
-<script src="js/push.js?v=5.22.0"></script>
-<script src="js/ptr.js?v=5.22.0"></script>
-<script src="js/waste.js?v=5.22.0"></script>
-<script src="js/users.js?v=5.22.0"></script>
-<script src="js/audit.js?v=5.22.0"></script>
-<script src="js/forecast.js?v=5.22.0"></script>
-<script src="js/tomorrow.js?v=5.22.0"></script>
-<script src="js/juices.js?v=5.22.0"></script>
-<script src="js/checklist.js?v=5.22.0"></script>
-<script src="js/report.js?v=5.22.0"></script>
-<script src="js/settings.js?v=5.22.0"></script>
-<script src="js/dashboard.js?v=5.22.0"></script>
-<script src="js/main.js?v=5.22.0"></script>
+<script src="js/demo.js?v=5.23.0"></script>
+<script src="js/config.js?v=5.23.0"></script>
+<script src="js/i18n.js?v=5.23.0"></script>
+<script src="js/supabase-engine.js?v=5.23.0"></script>
+<script src="js/shared.js?v=5.23.0"></script>
+<script src="js/pickers.js?v=5.23.0"></script>
+<script src="js/auth.js?v=5.23.0"></script>
+<script src="js/sync.js?v=5.23.0"></script>
+<script src="js/items.js?v=5.23.0"></script>
+<script src="js/camera.js?v=5.23.0"></script>
+<script src="js/branches.js?v=5.23.0"></script>
+<script src="js/receiving.js?v=5.23.0"></script>
+<script src="js/remaining.js?v=5.23.0"></script>
+<script src="js/custody.js?v=5.23.0"></script>
+<script src="js/push.js?v=5.23.0"></script>
+<script src="js/ptr.js?v=5.23.0"></script>
+<script src="js/waste.js?v=5.23.0"></script>
+<script src="js/users.js?v=5.23.0"></script>
+<script src="js/audit.js?v=5.23.0"></script>
+<script src="js/forecast.js?v=5.23.0"></script>
+<script src="js/tomorrow.js?v=5.23.0"></script>
+<script src="js/juices.js?v=5.23.0"></script>
+<script src="js/checklist.js?v=5.23.0"></script>
+<script src="js/report.js?v=5.23.0"></script>
+<script src="js/settings.js?v=5.23.0"></script>
+<script src="js/dashboard.js?v=5.23.0"></script>
+<script src="js/main.js?v=5.23.0"></script>
+<script>
+  // أزرار اللغة (عربي / English / বাংলা)
+  ["loginLangSlot", "menuLangSlot"].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = phLangSwitcherHtml(); });
+</script>
 
 </body>
 </html>

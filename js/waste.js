@@ -142,7 +142,7 @@ function renderWasteView(wasteRecords) {
                   <td><span class="text-red"><strong>${r.qty} ${r.unit || 'جرام'}</strong></span></td>
                   <td><span class="badge warn">${r.reason}</span></td>
                   <td>${r.notes || '—'}</td>
-                  <td>${new Date(r.timestamp || Date.now()).toLocaleTimeString("ar-SA", { hour: '2-digit', minute: '2-digit' })} (${r.employeeName || 'الموظف'})</td>
+                  <td>${new Date(r.timestamp || Date.now()).toLocaleTimeString(phLocale(), { hour: '2-digit', minute: '2-digit' })} (${r.employeeName || 'الموظف'})</td>
                   <td>
                     <button class="btn danger" style="padding:4px 8px;font-size:11px;" onclick="deleteWasteRecord(${idx})">حذف</button>
                   </td>
