@@ -659,7 +659,7 @@ function saveTomorrowNow(showStatus) {
   if (st) {
     st.textContent = missing.length
       ? `✅ محفوظ (بدون ${missing.join(" و")} — كمّلهم أول ما تقدر) — ${savedAtText}`
-      : "✅ محفوظ — بيتزامن " + savedAtText;
+      : "✅ محفوظ — جاري المزامنة " + savedAtText;
   }
   if (showStatus) showToast("تم حفظ طلبية الغد بنجاح!");
 }

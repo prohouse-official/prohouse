@@ -641,7 +641,7 @@ async function onRemoveReceivingItem(itemId, itemName) {
     await SupaEngine.saveDay({ date, branch, removedItemIds: removedList }).catch(e => console.warn("Auto sync removed item error:", e));
   })();
 
-  showUndoBar(`🗑️ انشال "${itemName || ''}" من استلام اليوم`, async () => {
+  showUndoBar(`🗑️ تمت إزالة "${itemName || ''}" من استلام اليوم`, async () => {
     await removal;
     if (currentReceivingDate === date && currentReceivingBranch === branch) {
       currentReceivingRemovedIds.delete(itemId);
@@ -838,7 +838,7 @@ function updateSaveBarReceivingStatus() {
 async function saveReceivingReportData() {
   if (isReceivingSaving) return;
   // منحفظ على اليوم والفرع المحمّلين فعلاً — إذا الشاشة لسا عم تحمّل يوم تاني ما منحفظ
-  if (!receivingDataKey) { showToast("⏳ لحظة، الشاشة لسا عم تحمّل"); return; }
+  if (!receivingDataKey) { showToast("⏳ لحظة، الشاشة ما زالت تحمّل"); return; }
   isReceivingSaving = true;
 
   const saveBtn = document.getElementById("receivingSaveBtn");
@@ -879,7 +879,7 @@ async function saveReceivingReportData() {
   if (!(await confirmNoDataLoss("received", payload.date, payload.branch, itemsPayload))) {
     isReceivingSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = "💾 حفظ تقرير الاستلام"; }
-    showToast("تم إلغاء الحفظ — الأرقام المحفوظة ما انمسحت");
+    showToast("تم إلغاء الحفظ — الأرقام المحفوظة لم تُمسح");
     return;
   }
 

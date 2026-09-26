@@ -205,7 +205,7 @@ async function deletePhotoRecord(photoId, photoDate, photoBranch) {
       await SupaEngine.deleteInspectionPhoto(photoId, date, branch);
     } catch (err) {
       console.warn("Supabase photo delete error:", err);
-      showToast("⚠ ما انحذفت من السيرفر: " + (err.message || "تأكد من النت"), true);
+      showToast("⚠ لم تُحذف من السيرفر: " + (err.message || "تأكد من النت"), true);
       return;
     }
   }

@@ -188,8 +188,8 @@ if (typeof document !== "undefined") {
 function autosaveStatusText(state, e) {
   const time = new Date().toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" });
   if (state === "saving") return "⏳ جاري الحفظ…";
-  if (state === "saved") return `✓ انحفظ تلقائياً ${time}`;
-  return "⚠ ما انحفظ، بنعيد المحاولة — " + ((e && e.message) || "");
+  if (state === "saved") return `✓ تم الحفظ تلقائياً ${time}`;
+  return "⚠ لم يتم الحفظ، نعيد المحاولة — " + ((e && e.message) || "");
 }
 
 // ---- شريط "تراجع" بعد شيل صنف ----
@@ -244,7 +244,7 @@ async function confirmNoDataLoss(kind, date, branch, itemsPayload) {
   });
   if (!lost.length) return true;
   const sample = lost.slice(0, 4).join("\n") + (lost.length > 4 ? "\n…" : "");
-  return phConfirm(`⚠️ انتبه: الحفظ بيمسح أرقام محفوظة لـ ${lost.length} صنف:\n${sample}\n\nإذا الشاشة تعرض أصفار بالغلط، اضغط "لا" وحدّث الصفحة.\nمتأكد تبي تحفظ؟`);
+  return phConfirm(`⚠️ انتبه: الحفظ يمسح أرقام محفوظة لـ ${lost.length} صنف:\n${sample}\n\nإذا الشاشة تعرض أصفار بالغلط، اضغط "لا" وحدّث الصفحة.\nمتأكد تبي تحفظ؟`);
 }
 
 function branchList() {
@@ -309,7 +309,7 @@ function phDialog({ title = "", message = "", ok = "تمام", cancel = null, da
   });
 }
 function phConfirm(message, opts = {}) {
-  return phDialog({ message, ok: "إيه", cancel: "لا", ...opts });
+  return phDialog({ message, ok: "نعم", cancel: "لا", ...opts });
 }
 function phAlert(message, opts = {}) {
   return phDialog({ message, ok: "تمام", ...opts });

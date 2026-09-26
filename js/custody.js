@@ -109,7 +109,7 @@ function renderCustodyView(payments) {
       </label>
 
       <div class="cust-field">
-        <span class="cust-label"><b>4</b> مصاريف انصرفت من الكاش</span>
+        <span class="cust-label"><b>4</b> مصاريف صُرفت من الكاش</span>
         <div id="custodyExpenses">
           ${c.expenses.map((e, i) => `
             <div class="cust-expense">
@@ -163,7 +163,7 @@ function renderCustodyView(payments) {
 function custodyOwnerCardHtml(c, payments) {
   if (!payments.length) {
     return `<div class="cust-owner"><div class="cust-owner-title">🔎 المطابقة مع تابسنس (لك بس)</div>
-      <div class="cust-missing">مبيعات تابسنس لهاليوم باقي ما انسحبت — المطابقة بتطلع لحالها بعد السحب.</div></div>`;
+      <div class="cust-missing">مبيعات تابسنس لهذا اليوم لم تُسحب بعد — المطابقة تظهر تلقائياً بعد السحب.</div></div>`;
   }
   const r = custodyReconciliation(c, payments);
   return `
@@ -217,7 +217,7 @@ async function saveCustody(payments) {
     renderCustodyView(payments);
   } catch (e) {
     btn.disabled = false;
-    showToast("⚠ ما انحفظت — " + (e.message || e));
+    showToast("⚠ لم يتم الحفظ — " + (e.message || e));
   }
 }
 
@@ -256,15 +256,15 @@ async function renderCustodyMonth() {
     const { pays, closing } = byDay[d];
     const label = new Date(d + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "short", day: "numeric", month: "numeric" });
     if (!closing || !closing.closed_at) {
-      return `<tr data-date="${d}"><td>${label}</td><td colspan="2"><span class="cust-diff short">ما انقفلت</span></td></tr>`;
+      return `<tr data-date="${d}"><td>${label}</td><td colspan="2"><span class="cust-diff short">لم تُغلق</span></td></tr>`;
     }
     closedCount++;
     const r = custodyReconciliation({ ...closing, expenses: closing.expenses || [] }, pays);
     if (pays.length) { cashTotal += r.cashDiff || 0; cardTotal += r.cardDiff || 0; }
-    return `<tr data-date="${d}"><td>${label}</td><td>${pays.length ? cell(r.cashDiff) : '<span class="cust-diff neutral">بلا مبيعات</span>'}</td><td>${pays.length ? cell(r.cardDiff) : "—"}</td></tr>`;
+    return `<tr data-date="${d}"><td>${label}</td><td>${pays.length ? cell(r.cashDiff) : '<span class="cust-diff neutral">بدون مبيعات</span>'}</td><td>${pays.length ? cell(r.cardDiff) : "—"}</td></tr>`;
   }).join("");
   el.innerHTML = `
-    <div class="cust-owner-title">📅 ملخص الشهر · ${closedCount}/${days.length} يوم انقفلت</div>
+    <div class="cust-owner-title">📅 ملخص الشهر · ${closedCount}/${days.length} يوم مغلق</div>
     <div class="cust-month-sum">
       <span>مجموع فرق الكاش: ${cell(cashTotal)}</span>
       <span>مجموع فرق الشبكة: ${cell(cardTotal)}</span>

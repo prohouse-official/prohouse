@@ -211,7 +211,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     const bar = document.createElement("div");
     bar.className = "demo-banner";
-    bar.innerHTML = '🧪 نسخة معاينة — بيانات وهمية وما تنحفظ في النظام الحقيقي · دخول: <b>1111</b> مالك · <b>2222</b> موظف <button type="button">إعادة البيانات</button>';
+    bar.innerHTML = '🧪 نسخة معاينة — بيانات وهمية ولا تُحفظ في النظام الحقيقي · دخول: <b>1111</b> مالك · <b>2222</b> موظف <button type="button">إعادة البيانات</button>';
     bar.querySelector("button").addEventListener("click", () => window.PH_DEMO_RESET());
     document.body.prepend(bar);
     document.body.classList.add("is-demo");

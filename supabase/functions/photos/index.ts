@@ -33,7 +33,7 @@ function decodeDataUrl(dataUrl: string): { bytes: Uint8Array; type: string; ext:
 
 async function upload(date: string, dataUrl: string) {
   const f = decodeDataUrl(dataUrl);
-  if (!f) throw new Error("صيغة الصورة مش مدعومة");
+  if (!f) throw new Error("صيغة الصورة غير مدعومة");
   const path = `${/^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "undated"}/${crypto.randomUUID()}.${f.ext}`;
   const { error } = await admin.storage.from(BUCKET).upload(path, f.bytes, { contentType: f.type, cacheControl: "31536000", upsert: false });
   if (error) throw new Error("فشل رفع الصورة: " + error.message);

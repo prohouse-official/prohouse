@@ -247,7 +247,7 @@ async function renderDashboard() {
 
 // ==================== تنبيهات الشهر (للمالك) ====================
 // عجز/زيادة الدجاج واللحم والبحري من أول الشهر لكل فرع (المستلم − المباع − الهدر مقارنة بالمتبقي)
-// + فروقات الكاش والأيام اللي ما انقفلت فيها العهدة. الحساب كله بالداتابيس.
+// + فروقات الكاش والأيام اللي لم تُغلق فيها العهدة. الحساب كله بالداتابيس.
 async function renderMonthAlerts(today) {
   const el = document.getElementById("monthAlertsCard");
   if (!el || typeof SupaEngine === "undefined" || !SupaEngine.rpc) return;
@@ -266,12 +266,12 @@ async function renderMonthAlerts(today) {
     if (c.missing_days > 0) lines.push(`<li>📝 ${c.branch} · ${c.category}: ${c.missing_days} يوم بدون جرد متبقي</li>`);
   });
   (data.cash || []).forEach(c => {
-    if (c.open_days > 0) lines.push(`<li>💵 ${c.branch}: ${c.open_days} يوم ما انقفلت العهدة</li>`);
+    if (c.open_days > 0) lines.push(`<li>💵 ${c.branch}: ${c.open_days} يوم لم تُغلق العهدة</li>`);
     if (c.big_diff_days > 0 || Math.abs(c.cash_diff) >= 20) lines.push(`<li class="${c.cash_diff < 0 ? "bad" : ""}">💵 ${c.branch}: فرق الكاش ${c.cash_diff < 0 ? "عجز" : "زيادة"} <b>${Math.abs(c.cash_diff).toFixed(2)} ر.س</b>${c.big_diff_days ? ` · ${c.big_diff_days} يوم فيها فرق كبير` : ""}</li>`);
   });
   el.innerHTML = lines.length
     ? `<div class="month-alerts"><div class="month-alerts-title">⚠ تنبيهات الشهر</div><ul>${lines.join("")}</ul></div>`
-    : `<div class="month-alerts ok">✅ ما في تنبيهات هالشهر</div>`;
+    : `<div class="month-alerts ok">✅ ما فيه تنبيهات هذا الشهر</div>`;
 }
 
 function initDashboardTab() {

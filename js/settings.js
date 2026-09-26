@@ -313,7 +313,7 @@ function clearAllLocalEntries() {
 
 async function doBackup() {
   const status = document.getElementById("backupStatus");
-  if (!API_URL) { status.textContent = "⚠ رابط الباك اند ما انربط للحين (API_URL)"; return; }
+  if (!API_URL) { status.textContent = "⚠ رابط الباك اند غير مربوط بعد (API_URL)"; return; }
   status.textContent = "جاري التصدير…";
   try {
     const qs = new URLSearchParams({ action: "backupAll" }).toString();
@@ -336,8 +336,8 @@ async function doRestore(e) {
   const file = e.target.files[0];
   if (!file) return;
   const status = document.getElementById("backupStatus");
-  if (!API_URL) { status.textContent = "⚠ رابط الباك اند ما انربط للحين (API_URL)"; return; }
-  if (!(await phConfirm("استعادة النسخة الاحتياطية بتستبدل كل البيانات الحالية باللي في الشيت. متأكد؟"))) { e.target.value = ""; return; }
+  if (!API_URL) { status.textContent = "⚠ رابط الباك اند غير مربوط بعد (API_URL)"; return; }
+  if (!(await phConfirm("استعادة النسخة الاحتياطية تستبدل كل البيانات الحالية باللي في الشيت. متأكد؟"))) { e.target.value = ""; return; }
   status.textContent = "جاري الاستعادة…";
   try {
     const text = await file.text();

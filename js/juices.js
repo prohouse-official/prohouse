@@ -294,7 +294,7 @@ function saveJuiceDayNow(showToastMsg) {
 
   const at = new Date().toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" });
   const statusEl = document.getElementById("juiceStatus");
-  if (statusEl) statusEl.textContent = branch ? "✅ محفوظ — بيتزامن " + at : `✅ محفوظ (بدون الفرع — كمّله أول ما تقدر) — ${at}`;
+  if (statusEl) statusEl.textContent = branch ? "✅ محفوظ — جاري المزامنة " + at : `✅ محفوظ (بدون الفرع — كمّله أول ما تقدر) — ${at}`;
   if (showToastMsg) showToast("تم حفظ جرد العصيرات");
 }
 
@@ -368,7 +368,7 @@ async function loadJuiceDay(dateStr) {
   if (statusEl) {
     statusEl.textContent = (data && data.items && data.items.length)
       ? "تم تحميل جرد محفوظ لهذا اليوم لهذا الفرع — عدّل واحفظ لو احتجت"
-      : "ما انحفظ جرد لهذا اليوم لهذا الفرع للحين";
+      : "لم يُحفظ جرد لهذا اليوم لهذا الفرع بعد";
   }
 }
 
