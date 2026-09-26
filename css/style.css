@@ -3226,3 +3226,36 @@ html[dir="ltr"] .sidebar-nav .tab-btn { white-space: normal; }
 #remainingView .category-header { padding: 10px 12px; margin-bottom: 8px; }
 #remainingView .category-header .cat-title { margin: 0; padding: 0; background: none; border: 0; box-shadow: none; font-size: 16px; font-weight: 900; }
 #remainingView .cat-metrics-bar { margin-top: 6px; gap: 6px; }
+
+/* ==================== 💬 المساعد ==================== */
+.assist-wrap { display: flex; flex-direction: column; min-height: calc(100vh - 150px); }
+.assist-title { margin: 4px 0 12px; font-size: 22px; }
+.assist-log { flex: 1; display: flex; flex-direction: column; gap: 10px; padding-bottom: 90px; }
+.assist-msg { max-width: 88%; padding: 12px 14px; border-radius: 18px; font-size: 15px; line-height: 1.7; font-weight: 600; }
+.assist-msg p { margin: 0; }
+.assist-msg.bot { align-self: flex-start; background: var(--card, #fff); border: 1px solid var(--line, #e5e2d8); border-start-start-radius: 6px; }
+.assist-msg.me { align-self: flex-end; background: var(--yellow); color: var(--black); border-start-end-radius: 6px; }
+.assist-msg.typing { opacity: .6; }
+.assist-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.assist-chip { border: 1px solid var(--line-strong, #d8d3c4); background: #FFFBEA; border-radius: 999px; padding: 8px 12px; font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; color: inherit; text-align: start; }
+.assist-open { margin-top: 10px; border: 0; background: var(--black); color: var(--yellow); border-radius: 12px; padding: 9px 14px; font-family: inherit; font-weight: 900; cursor: pointer; }
+.assist-form { position: fixed; bottom: 0; left: 0; right: 0; display: flex; gap: 8px; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid var(--line, #e5e2d8); z-index: 30; }
+@media (min-width: 861px) { html[dir="rtl"] .assist-form { right: 275px; } html[dir="ltr"] .assist-form { left: 275px; } }
+.assist-form input { flex: 1; min-height: 48px; border: 1.5px solid var(--line-strong, #d8d3c4); border-radius: 14px; padding: 0 14px; font-family: inherit; font-size: 16px; }
+.assist-form input:focus { outline: none; border-color: #E6CB3A; box-shadow: var(--ring); }
+.assist-send { min-height: 48px; padding: 0 18px; border: 0; border-radius: 14px; background: var(--black); color: var(--yellow); font-family: inherit; font-weight: 900; font-size: 15px; cursor: pointer; }
+.assist-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.assist-edit-btn { border: 1px solid var(--line-strong, #d8d3c4); background: #fff; border-radius: 12px; padding: 8px 12px; font-family: inherit; font-weight: 800; cursor: pointer; }
+.assist-chip.all { background: var(--black); color: var(--yellow); border-color: var(--black); }
+.assist-editor { background: var(--card, #fff); border: 1px solid var(--line, #e5e2d8); border-radius: 16px; padding: 12px; margin-bottom: 14px; }
+.assist-ed-hint { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--gray); }
+.assist-ed-row { border: 1px solid var(--line, #e5e2d8); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #fff; }
+.assist-ed-row.is-hidden { opacity: .6; }
+.assist-ed-row > summary { font-weight: 800; cursor: pointer; }
+.assist-ed-row label { display: block; font-size: 12px; font-weight: 800; color: var(--gray); margin-top: 8px; }
+.assist-ed-row input[type=text], .assist-ed-row textarea { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; border: 1px solid var(--line-strong, #d8d3c4); border-radius: 10px; padding: 8px 10px; font-family: inherit; font-size: 15px; color: var(--ink, #111); }
+.assist-ed-tr { margin-top: 8px; }
+.assist-ed-tr > summary { font-size: 13px; font-weight: 800; cursor: pointer; }
+.assist-ed-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.assist-ed-hide { display: flex !important; align-items: center; gap: 6px; margin: 0 !important; }
+.assist-ed-bottom { display: flex; gap: 8px; justify-content: space-between; margin-top: 10px; }

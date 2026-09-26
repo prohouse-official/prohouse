@@ -893,6 +893,13 @@ const SupaEngine = (() => {
     if (!res.ok || !out.ok) throw new Error(out.error || `forms [${res.status}]`);
     return out;
   }
+  // 💬 المساعد بالذكاء الاصطناعي (يرجع null إذا ما فيه مفتاح بالسيرفر)
+  async function askAssistant(question, lang, context) {
+    const res = await fetch(SUPABASE_URL + "/functions/v1/assistant", { method: "POST", headers: getHeaders(), body: JSON.stringify({ question, lang, context }) });
+    if (!res.ok) return null;
+    const out = await res.json().catch(() => ({}));
+    return out.answer || null;
+  }
   async function getLastFormSubmission(form, date, branch) {
     const rows = await query(`form_submissions?select=payload,ok,sent_at,sent_by&form=eq.${form}&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&ok=is.true&order=sent_at.desc&limit=1`);
     return (rows && rows[0]) || null;
@@ -993,6 +1000,7 @@ const SupaEngine = (() => {
     getCustodyRange,
     migratePhotosToStorage,
     sendGoogleForm,
+    askAssistant,
     getLastFormSubmission,
     restoreEntryRows,
     saveDay,
