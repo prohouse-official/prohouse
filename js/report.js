@@ -587,7 +587,7 @@ async function exportExcel() {
 }
 
 // ==================== طلبية الغد (للشيف) — نفس "نموذج طلب الاكل" بالضبط ====================
-// ورقة لكل فرع: اليوم / التاريخ / الفرع، وتحتها: الفئة | تسليم | اسم الصنف | حجم السفنديش | العدد | المستلمة | المتبقية | ملاحظات
+// ورقة لكل فرع: اليوم / التاريخ / الفرع، وتحتها: استلام | الفئة | تسليم | اسم الصنف | حجم السفنديش | العدد | المستلمة | المتبقية | ملاحظات
 // نفس عرض الأعمدة وارتفاع الصفوف والخطوط تبع ملف الإكسل، وتطلع Excel أو PDF جاهز للطباعة وينرسل واتساب.
 
 let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
@@ -595,8 +595,8 @@ let lastTomorrowReportDate = "";
 
 // مقاسات ملف الإكسل الأصلي (عرض الأعمدة بوحدة الإكسل، ارتفاع الصفوف بالنقطة)
 const CHEF_SHEET = {
-  cols: [15.2, 15.2, 37.93, 23.68, 22.73, 24.35, 23.95, 70.63],
-  headers: ["الفئة", "تسليم", "اسم الصنف", "حجم السفنديش", "العدد", "الكمية المستلمة", "الكمية المتبقية", "ملاحظات"],
+  cols: [15.2, 15.2, 15.2, 37.93, 23.68, 22.73, 24.35, 23.95, 70.63],
+  headers: ["استلام", "الفئة", "تسليم", "اسم الصنف", "حجم السفنديش", "العدد", "الكمية المستلمة", "الكمية المتبقية", "ملاحظات"],
   titleH: 69.75, headH: 92.25, rowH: 51.75,
   titleFont: 47, bodyFont: 26, boxFont: 42,
   headFill: "BFBFBF", border: "505050"
@@ -683,15 +683,17 @@ function chefSheetHtml(sheet, date) {
   // تجميع الفئات عشان خلية الفئة تندمج عمودياً
   const groups = [];
   sheet.rows.forEach(r => { const g = groups[groups.length - 1]; if (g && g.category === r.category) g.rows.push(r); else groups.push({ category: r.category, rows: [r] }); });
+  const box = () => cell("□", `font-size:${chefPtPx(S.boxFont)}px`);
   const body = groups.map(g => g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
+      ${box()}
       ${i === 0 ? `<td rowspan="${g.rows.length}" style="border:${bd}">${esc(g.category)}</td>` : ""}
-      ${cell("□", `font-size:${chefPtPx(S.boxFont)}px`)}${cell(r.name)}${cell(r.size)}${cell(r.qty)}${cell("")}${cell("")}${cell(r.notes)}
+      ${box()}${cell(r.name)}${cell(r.size)}${cell(r.qty)}${cell("")}${cell("")}${cell(r.notes)}
     </tr>`).join("")).join("");
   return `<div class="chef-sheet" style="width:${totalW}px">
     <table style="width:${totalW}px">
       <colgroup>${colW.map(w => `<col style="width:${w}px">`).join("")}</colgroup>
       <tr class="chef-title" style="height:${chefPtPx(S.titleH)}px">
-        <td colspan="2" style="text-align:left">اليوم:</td><td style="text-align:right">${esc(chefDayName(date))}</td>
+        <td colspan="3" style="text-align:left">اليوم:</td><td style="text-align:right">${esc(chefDayName(date))}</td>
         <td style="text-align:right">التاريخ:</td><td colspan="2" style="text-align:right">${esc(chefDateText(date))}</td>
         <td colspan="2">فرع ${esc(sheet.branch)}</td>
       </tr>
@@ -752,12 +754,12 @@ async function exportTomorrowReportExcel() {
     ws.pageSetup = { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 1,
       margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 } };
     // الصف 1: اليوم / التاريخ / الفرع
-    ws.mergeCells("A1:B1"); ws.mergeCells("E1:F1"); ws.mergeCells("G1:H1");
+    ws.mergeCells("A1:C1"); ws.mergeCells("F1:G1"); ws.mergeCells("H1:I1");
     const [y, m, d] = lastTomorrowReportDate.split("-").map(Number);
-    const title = [["A1", "اليوم:", "left"], ["C1", chefDayName(lastTomorrowReportDate), "right"], ["D1", "التاريخ:", "right"],
-      ["E1", new Date(Date.UTC(y, m - 1, d)), "right"], ["G1", "فرع " + sheetData.branch, "center"]];
+    const title = [["A1", "اليوم:", "left"], ["D1", chefDayName(lastTomorrowReportDate), "right"], ["E1", "التاريخ:", "right"],
+      ["F1", new Date(Date.UTC(y, m - 1, d)), "right"], ["H1", "فرع " + sheetData.branch, "center"]];
     title.forEach(([a, v, h]) => { const c = ws.getCell(a); c.value = v; c.font = font(S.titleFont); c.alignment = { horizontal: h, vertical: "middle" }; });
-    ws.getCell("E1").numFmt = "dd-mm-yyyy";
+    ws.getCell("F1").numFmt = "dd-mm-yyyy";
     ws.getRow(1).height = S.titleH;
     // الصف 2: العناوين
     const head = ws.getRow(2);
@@ -775,16 +777,16 @@ async function exportTomorrowReportExcel() {
       const start = r;
       g.rows.forEach((x, i) => {
         const row = ws.getRow(r);
-        [i === 0 ? g.category : null, "□", x.name, x.size, x.qty, null, null, x.notes || null].forEach((v, ci) => {
+        ["□", i === 0 ? g.category : null, "□", x.name, x.size, x.qty, null, null, x.notes || null].forEach((v, ci) => {
           const c = row.getCell(ci + 1);
           if (v !== null) c.value = v;
-          c.font = font(ci === 1 ? S.boxFont : S.bodyFont); c.alignment = center; c.border = border;
+          c.font = font(ci === 0 || ci === 2 ? S.boxFont : S.bodyFont); c.alignment = center; c.border = border;
         });
-        row.getCell(4).numFmt = "@";
+        row.getCell(5).numFmt = "@";
         row.height = S.rowH;
         r++;
       });
-      if (g.rows.length > 1) ws.mergeCells(start, 1, r - 1, 1);
+      if (g.rows.length > 1) ws.mergeCells(start, 2, r - 1, 2);
     });
   });
   const suffix = lastTomorrowReportSheets.length === 1 ? "_" + lastTomorrowReportSheets[0].branch : "";
