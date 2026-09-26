@@ -184,7 +184,7 @@ async function renderDashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "صباح الخير" : "مساء الخير";
   const name = (Auth.getEmployee() || {}).name || "";
-  const dateLabel = new Date().toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "long", day: "numeric", month: "long" });
+  const dateLabel = new Date().toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long" });
 
   if (Auth.isBranchStaff()) {
     const activeBranch = Branch.get() || branches[0] || "";

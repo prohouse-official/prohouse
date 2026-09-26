@@ -292,7 +292,7 @@ function saveJuiceDayNow(showToastMsg) {
   Sync.enqueue("saveJuiceDay:" + currentJuiceDate + ":" + branch, "saveJuiceDay", payload);
   Sync.cacheSet("juiceday:" + currentJuiceDate + ":" + branch, { date: currentJuiceDate, branch, items, prevCounted: juicePrevCounted, sales: cachedJuiceSalesRows });
 
-  const at = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+  const at = new Date().toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" });
   const statusEl = document.getElementById("juiceStatus");
   if (statusEl) statusEl.textContent = branch ? "✅ محفوظ — بيتزامن " + at : `✅ محفوظ (بدون الفرع — كمّله أول ما تقدر) — ${at}`;
   if (showToastMsg) showToast("تم حفظ جرد العصيرات");

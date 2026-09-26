@@ -558,7 +558,7 @@ async function renderInspectionGalleryView() {
               <div class="timeline-card">
                 <div class="timeline-img-wrap" onclick="viewPhotoFullscreen('${p.id}')" title="اضغط لتكبير الصورة">
                   <img src="${p.url || p.dataUrl}" loading="lazy" alt="${p.checkpointName}" />
-                  <span class="timeline-time">${new Date(p.timestamp).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span class="timeline-time">${new Date(p.timestamp).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" })}</span>
                 </div>
                 <div class="timeline-info" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;">
                   <div>
@@ -603,7 +603,7 @@ function viewPhotoFullscreen(photoId) {
         <img src="${p.url || p.dataUrl}" loading="lazy" alt="${p.checkpointName}" />
         <div class="fullscreen-caption">
           <h3>${p.checkpointName}</h3>
-          <div>الفرع: ${p.branch} | الموظف: ${p.employeeName} | الوقت: ${new Date(p.timestamp).toLocaleString("ar-SA")}</div>
+          <div>الفرع: ${p.branch} | الموظف: ${p.employeeName} | الوقت: ${new Date(p.timestamp).toLocaleString(phLocale())}</div>
           <div style="margin-top:14px;display:flex;gap:10px;justify-content:center;">
             <button class="btn danger" style="font-size:14px;padding:8px 20px;" onclick="deletePhotoRecord('${p.id}', '${p.date || ""}', '${String(p.branch || "").replace(/'/g, "")}')">
               🗑️ حذف الصورة (إذا تم تصويرها بالخطأ)

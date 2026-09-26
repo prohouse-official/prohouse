@@ -81,7 +81,7 @@ function renderCustodyView(payments) {
   const c = currentCustody;
   const view = document.getElementById("custodyView");
   const closed = !!c.closed_at;
-  const closedAt = closed ? new Date(c.closed_at).toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" }) : "";
+  const closedAt = closed ? new Date(c.closed_at).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" }) : "";
   const branches = allowedBranchList();
 
   view.innerHTML = `
@@ -254,7 +254,7 @@ async function renderCustodyMonth() {
   let closedCount = 0, cashTotal = 0, cardTotal = 0;
   const rows = days.map(d => {
     const { pays, closing } = byDay[d];
-    const label = new Date(d + "T12:00:00Z").toLocaleDateString("ar-SA-u-ca-gregory", { weekday: "short", day: "numeric", month: "numeric" });
+    const label = new Date(d + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "short", day: "numeric", month: "numeric" });
     if (!closing || !closing.closed_at) {
       return `<tr data-date="${d}"><td>${label}</td><td colspan="2"><span class="cust-diff short">ما انقفلت</span></td></tr>`;
     }

@@ -654,7 +654,7 @@ function saveTomorrowNow(showStatus) {
 
   const missing = [];
   if (!branch) missing.push("الفرع");
-  const savedAtText = new Date().toLocaleTimeString("ar-SA", { hour: "2-digit", minute: "2-digit" });
+  const savedAtText = new Date().toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" });
   const st = document.getElementById("tomorrowStatus");
   if (st) {
     st.textContent = missing.length
