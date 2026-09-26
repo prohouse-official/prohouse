@@ -1,11 +1,11 @@
 // ==================== طريقة الاستخدام (مختصر ومصوّر) ====================
 // خطوات قليلة وكلام قليل. كل خطوة مربوطة بشاشة وبتظهر بس للي عنده صلاحية عليها.
 const HELP_BASICS = {
-  icon: "✅", title: "قبل ما تبدأ", imgs: [["00-date", 330], ["00-add", 230]],
+  icon: "✅", title: "قبل ما تبدأ",
   lines: [
     "📅 تأكد من التاريخ فوق الشاشة — لازم يكون «اليوم». غلط؟ اضغط «اليوم».",
-    "🏪 تأكد إن الفرع صح.",
-    "➕ وصلك صنف غير موجود بالقائمة؟ انزل لآخر القسم واضغط «➕ إضافة صنف».",
+    ["🏪 تأكد إن الفرع صح.", "00-date", 259],
+    ["➕ وصلك صنف غير موجود بالقائمة؟ انزل لآخر القسم واضغط «➕ إضافة صنف».", "00-add", 86],
     "💾 بالأخير دائماً اضغط «حفظ»."
   ]
 };
@@ -39,8 +39,10 @@ function renderHelpView() {
     ${secs.map((s, i) => `
       <section class="help-sec">
         <h3><span class="help-num">${i + 1}</span><span>${s.icon} ${s.title}</span></h3>
-        ${s.lines.map(t => `<p class="help-line">${t}</p>`).join("")}
-        ${(s.imgs || [[s.img, 780]]).map(([src, h]) => `<img class="help-shot${h < 780 ? " help-shot-wide" : ""}" src="assets/guide/${src}.jpg" alt="" loading="lazy" width="390" height="${h}">`).join("")}
+        ${s.lines.map(l => Array.isArray(l)
+          ? `<p class="help-line">${l[0]}</p><img class="help-shot help-shot-wide" src="assets/guide/${l[1]}.jpg" alt="" loading="lazy" width="390" height="${l[2]}">`
+          : `<p class="help-line">${l}</p>`).join("")}
+        ${s.img ? `<img class="help-shot" src="assets/guide/${s.img}.jpg" alt="" loading="lazy" width="390" height="780">` : ""}
       </section>`).join("")}
     <p class="help-foot">كل شيء يُحفظ تلقائياً. أي مشكلة كلّم المدير.</p>`;
 }
