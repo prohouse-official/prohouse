@@ -35,6 +35,7 @@ function renderHelpView() {
     <div class="help-head">
       <h2>📘 طريقة الاستخدام</h2>
       <p>ضعت؟ الرئيسية تقولك «الخطوة الجاية» — اضغطها.</p>
+      <button type="button" class="home-help-link" onclick="setActiveTab('assistant')">💬 عندك سؤال؟ اسأل المساعد</button>
     </div>
     ${secs.map((s, i) => `
       <section class="help-sec">
