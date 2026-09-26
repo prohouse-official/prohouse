@@ -419,7 +419,7 @@ function chefNextSlotDraft(category, branch) {
   const last = slots[slots.length - 1] || all[all.length - 1];
   const prefix = last ? String(last.name).replace(/\s*\d+\s*$/, "") : `${category} الشيف`;
   const n = Math.max(0, ...all.map(s => Number((String(s.name).match(/(\d+)\s*$/) || [])[1] || 0))) + 1;
-  return { category, name: `${prefix} ${n}`, unit: (last && last.unit) || "جرام", optional: true, hasCustomName: false,
+  return { category, name: `${prefix} ${n}`, unit: (last && last.unit) || "جرام", panSize: (last && last.panSize) || "1/3", optional: true, hasCustomName: false,
            branches: "", sortOrder: Math.max(0, ...all.map(s => Number(s.sortOrder) || 0)) + 1 };
 }
 
