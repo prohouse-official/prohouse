@@ -3048,7 +3048,7 @@ table.order-table tbody tr:nth-child(even){ background:#FBFAF7; }
 .cook-name-row input:focus{ outline:none; border-color:var(--yellow-dark); box-shadow:0 0 0 3px rgba(247,220,78,.35); }
 
 /* ==================== بطاقات الفروع بالرئيسية (سحب لليمين/اليسار) ==================== */
-.home-swiper{ display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; margin:0 -16px; padding:0 16px 4px; scrollbar-width:none; }
+.home-swiper{ display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; margin:0 -12px; padding:0 12px 4px; scrollbar-width:none; }
 .home-swiper::-webkit-scrollbar{ display:none; }
 .home-slide{ flex:0 0 88%; scroll-snap-align:center; }
 .home-slide:only-child{ flex-basis:100%; }
@@ -3181,3 +3181,24 @@ html[dir="ltr"] .app-body { margin-right: 0; margin-left: 275px; }
 /* أسهم التاريخ والتقويم بتنعكس باليسار (السابق ← والتالي →) */
 html[dir="ltr"] .ph-date-arrow, html[dir="ltr"] .ph-cal-nav { transform: scaleX(-1); }
 html[dir="ltr"] .sidebar-nav .tab-btn { white-space: normal; }
+
+/* ==================== طريقة الاستخدام ==================== */
+.help-head h2 { margin: 4px 0 4px; font-size: 22px; }
+.help-head p { margin: 0 0 14px; color: var(--muted, #666); }
+.help-day { background: #111; color: #fff; border-radius: 16px; padding: 14px 16px; display: grid; gap: 8px; margin-bottom: 14px; }
+.help-day-title { color: var(--gold, #F7DC4E); font-weight: 800; font-size: 13px; letter-spacing: .3px; }
+.help-day-row { display: grid; grid-template-columns: 26px 78px 1fr; gap: 8px; align-items: start; font-size: 14px; line-height: 1.5; }
+.help-day-row b { color: var(--gold, #F7DC4E); }
+.help-toc { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.help-toc a { text-decoration: none; color: inherit; font-size: 13px; font-weight: 700; padding: 7px 11px; border-radius: 999px; border: 1.5px solid var(--line, #e5e2d8); background: var(--card, #fff); }
+.help-sec { background: var(--card, #fff); border: 1px solid var(--line, #e5e2d8); border-radius: 18px; padding: 16px; margin-bottom: 14px; scroll-margin-top: 80px; }
+.help-sec h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 17px; text-wrap: balance; }
+.help-num { flex: 0 0 28px; height: 28px; border-radius: 50%; background: var(--gold, #F7DC4E); color: #111; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; }
+.help-body { display: grid; gap: 14px; }
+.help-body ol, .help-tips ul { margin: 0; padding-inline-start: 20px; display: grid; gap: 8px; font-size: 14.5px; line-height: 1.65; }
+.help-shot { display: block; width: 100%; max-width: 300px; height: auto; margin-inline: auto; border-radius: 22px; border: 6px solid #111; box-shadow: 0 8px 24px rgba(0,0,0,.12); background: #f4f2ec; }
+@media (min-width: 760px) {
+  .help-body { grid-template-columns: 1fr 260px; align-items: start; }
+  .help-shot { max-width: 260px; }
+}
+.home-help-link { display: block; text-align: center; margin: 12px 0 0; padding: 12px; border-radius: 14px; border: 1.5px dashed var(--line-strong, #d8d3c4); font-weight: 800; font-size: 14px; color: inherit; text-decoration: none; background: transparent; width: 100%; font-family: inherit; cursor: pointer; }

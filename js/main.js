@@ -2,6 +2,7 @@
 
 const TAB_ROLE_ACCESS = {
   dashboard: ["owner", "manager", "chef", "branch_staff", "employee"],
+  help: ["owner", "manager", "chef", "branch_staff", "employee"],
   branches: ["owner", "manager", "chef"],
   opening: ["owner", "manager", "chef", "branch_staff", "employee"],
   closing: ["owner", "manager", "chef", "branch_staff", "employee"],
@@ -51,7 +52,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "helpView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -89,6 +90,7 @@ function setActiveTab(tab) {
   });
 
   if (tab === "dashboard") { renderDashboard(); }
+  if (tab === "help") { renderHelpView(); window.scrollTo(0, 0); }
   if (tab === "branches") { renderBranchesHubView(); }
   if (tab === "opening") { renderOpeningView(); }
   if (tab === "closing") { renderClosingView(); }

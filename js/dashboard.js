@@ -201,6 +201,7 @@ async function renderDashboard() {
         </button>` : `<div class="home-all-done">✅ خلّصت كل خطوات اليوم. يعطيك العافية!</div>`}
       ${s ? stepsCardHtml(s, false) : ""}
       <div id="pushCardHome" class="push-card-slot"></div>
+      <button type="button" class="home-help-link" data-tab="help">📘 أول مرة؟ شوف طريقة الاستخدام</button>
     `;
   } else {
     let flagged = [];
