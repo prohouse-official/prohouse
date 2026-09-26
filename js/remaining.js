@@ -533,29 +533,17 @@ function renderRemainingView(receivingData, salesData) {
         `}
       </div>
 
-      <div class="rem-quick-actions-bar">
-        ${renderCompactToggleBtnHtml()}
-      </div>
 
+      ${Auth.canSeeSales() ? `
       <div class="rem-filters-scroll">
         <button type="button" class="rem-filter-chip ${remainingActiveFilter === 'all' ? 'active' : ''}" data-filter="all" onclick="setRemainingFilter('all')">
           الكل (${totalItemsCount})
         </button>
-        <button type="button" class="rem-filter-chip ${remainingActiveFilter === 'uncounted' ? 'active' : ''}" data-filter="uncounted" onclick="setRemainingFilter('uncounted')">
-          ⏳ باقي لم يُجرد (${totalItemsCount - countedItemsCount})
-        </button>
-        <button type="button" class="rem-filter-chip ${remainingActiveFilter === 'protein' ? 'active' : ''}" data-filter="protein" onclick="setRemainingFilter('protein')">
-          🍗 الدجاج والبروتين
-        </button>
-        <button type="button" class="rem-filter-chip ${remainingActiveFilter === 'sauce' ? 'active' : ''}" data-filter="sauce" onclick="setRemainingFilter('sauce')">
-          🥣 الصوصات
-        </button>
-        ${Auth.canSeeSales() ? `
         <button type="button" class="rem-filter-chip ${remainingActiveFilter === 'variance' ? 'active' : ''}" data-filter="variance" onclick="setRemainingFilter('variance')">
           ⚠️ تدقيق الانحراف
         </button>
-        ` : ''}
       </div>
+      ` : ''}
     </div>
     ${entryProgressHtml()}
   `;

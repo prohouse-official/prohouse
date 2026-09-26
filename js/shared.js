@@ -89,7 +89,7 @@ const Branch = {
 // أي خانة إدخال رئيسية عليها class="entry-input" بتدخل بالحساب
 function entryProgressHtml() {
   return `<div class="entry-progress">
-    <div class="entry-progress-top"><span class="entry-progress-text"></span><button type="button" class="entry-next-btn">⤵ الصنف الجاي</button></div>
+    <div class="entry-progress-top"><span class="entry-progress-text"></span></div>
     <div class="entry-progress-track"><div class="entry-progress-fill"></div></div>
   </div>`;
 }
@@ -106,11 +106,11 @@ function updateEntryProgress(view) {
   const inputs = entryInputs(view);
   const filled = inputs.filter(i => i.value !== "").length;
   const allDone = inputs.length > 0 && filled >= inputs.length;
-  bar.querySelector(".entry-progress-text").textContent = inputs.length ? `✏️ ${filled} من ${inputs.length}` : "";
   bar.querySelector(".entry-progress-fill").style.width = (inputs.length ? Math.round((filled * 100) / inputs.length) : 0) + "%";
-  const btn = bar.querySelector(".entry-next-btn");
-  btn.textContent = allDone ? "✅ خلصت كلها" : "⤵ الصنف الجاي";
-  btn.disabled = allDone;
+  bar.querySelector(".entry-progress-text").textContent = !inputs.length ? "" : (allDone ? "✅ خلصت كلها" : `✏️ ${filled} من ${inputs.length}`);
+  // زر "الصنف الجاي" فوق شريط الحفظ الثابت تحت — يضل ظاهر وأنت تنزل
+  const next = document.querySelector(`.entry-next-btn[data-view="${view.id}"]`);
+  if (next) next.classList.toggle("hidden", allDone || !inputs.length);
   const topbar = document.querySelector(".app-topbar");
   if (topbar) bar.style.top = topbar.offsetHeight + "px";
 }
@@ -141,9 +141,10 @@ if (typeof document !== "undefined") {
   });
   // أزرار "= المطلوب" و"لم يصل" و"0" بتغيّر القيمة من الكود، فمنعيد الحساب بعد أي كبسة
   document.addEventListener("click", (e) => {
+    const nb = e.target.closest && e.target.closest(".entry-next-btn");
+    if (nb) { jumpToNextEmpty(document.getElementById(nb.dataset.view)); return; }
     const view = e.target.closest && e.target.closest(".view");
     if (!view || !view.querySelector(".entry-progress")) return;
-    if (e.target.closest(".entry-next-btn")) { jumpToNextEmpty(view); return; }
     setTimeout(() => updateEntryProgress(view), 0);
   });
 }
@@ -468,36 +469,9 @@ function chefSlotName(it, cookName) {
   return `${it.name} (${short})`;
 }
 
-// ---- وضع العرض المدمج بسطر واحد لتقليل السكرول للجوال (Compact View Mode) ----
-function isCompactMode() {
-  return localStorage.getItem("prohouse_compact_mode") === "true";
-}
-
-function toggleCompactMode() {
-  const next = !isCompactMode();
-  localStorage.setItem("prohouse_compact_mode", String(next));
-  applyCompactModeUI();
-  showToast(next ? "⚡ تم تفعيل العرض المدمج (سطر واحد)" : "📖 تم العودة للعرض الموسع");
-}
-
+// ---- العرض المدمج دائماً (انشال زر التبديل) ----
 function applyCompactModeUI() {
-  const active = isCompactMode();
-  document.body.classList.toggle("compact-mode", active);
-  document.querySelectorAll(".compact-toggle-btn").forEach(btn => {
-    btn.innerHTML = active 
-      ? "📖 التبديل للعرض الموسع" 
-      : "🗜️ عرض مدمج (تقليل السكرول)";
-    btn.classList.toggle("active", active);
-  });
-}
-
-function renderCompactToggleBtnHtml() {
-  const active = isCompactMode();
-  return `
-    <button type="button" class="btn compact-toggle-btn ${active ? 'active' : ''}" onclick="toggleCompactMode()" title="تبديل كثافة العرض لتقليل السكرول بالجوال">
-      ${active ? '📖 التبديل للعرض الموسع' : '🗜️ عرض مدمج (تقليل السكرول)'}
-    </button>
-  `;
+  document.body.classList.add("compact-mode");
 }
 
 // تطبيق الوضع المحفوظ فوراً عند تحميل الصفحة

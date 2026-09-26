@@ -177,7 +177,6 @@ function renderTomorrowView() {
           ⚡ تطبيق كل المقترحات الذكية
         </button>
       ` : ''}
-      ${renderCompactToggleBtnHtml()}
     </div>
 
     <!-- فلاتر سريعة للتركيز -->
