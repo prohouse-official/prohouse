@@ -225,7 +225,7 @@ function renderTomorrowView() {
     const header = document.createElement("div");
     header.className = "category-header";
     header.innerHTML = `
-      <span class="cat-label">${categoryIconSticker(group.category)} ${group.category}</span>
+      <span class="cat-label-wrap"><span class="cat-label">${categoryIconSticker(group.category)} ${group.category}</span>${tomCatTotalHtml(group.category)}</span>
       <span class="cat-count-badge">
         <span class="cat-count">${filledInCat}/${group.items.length}</span>
         <span class="chevron">▾</span>
@@ -525,6 +525,7 @@ function onTomorrowFieldChange(e) {
   }
 
   currentTomorrowOrder[id][field] = e.target.value;
+  if (field === "qty") updateTomorrowCatTotals();
 
   const card = document.getElementById("tomcard-" + id);
   if (card) {
@@ -836,6 +837,40 @@ const WD_CATS = [["دجاج", "🍗"], ["لحم", "🥩"], ["بحري", "🐟"]]
 const WD_NAMES = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 const wdCache = {};
 const wdAvgByKey = {};
+const wdActualByKey = {}; // متوسط الفعلي (المستلم − المتبقي) لكل تصنيف، وإذا ما فيه جرد: متوسط المبيعات
+
+// ---- إجمالي المطلوب مقابل المتوسط الفعلي على شريط كل تصنيف (دجاج / لحم / بحري) ----
+function tomOrderedGrams(category) {
+  return getAllTomorrowActiveItems().filter(it => it.category === category).reduce((sum, it) => {
+    const q = Number((currentTomorrowOrder[it.id] || {}).qty || 0);
+    const u = String(it.unit || "جرام");
+    if (!q) return sum;
+    if (/كجم|كيلو/.test(u)) return sum + q * 1000;
+    return /جرام|جم/.test(u) ? sum + q : sum;
+  }, 0);
+}
+function tomCatTotalInner(category) {
+  const avg = (wdActualByKey[currentTomorrowDate + "|" + currentTomorrowBranch] || {})[category];
+  const ordered = tomOrderedGrams(category);
+  const fmt = (g) => Math.round(g).toLocaleString("en-US");
+  if (avg == null) return { cls: "", html: `المطلوب: <b>${fmt(ordered)}</b> جم` };
+  const diff = avg.grams ? (ordered - avg.grams) / avg.grams : 0;
+  const cls = !ordered ? "" : Math.abs(diff) <= 0.1 ? "ok" : diff > 0 ? "over" : "under";
+  const sign = !ordered || Math.abs(diff) < 0.005 ? "" : ` · ${diff > 0 ? "أكثر" : "أقل"} ${Math.round(Math.abs(diff) * 100)}%`;
+  return { cls, html: `المطلوب: <b>${fmt(ordered)}</b> · ${avg.actual ? "الفعلي" : "المتوسط"}: <b>${fmt(avg.grams)}</b> جم${sign}` };
+}
+function tomCatTotalHtml(category) {
+  if (!WD_CATS.some(([c]) => c === category)) return "";
+  const t = tomCatTotalInner(category);
+  return `<span class="tom-cat-total ${t.cls}" data-cat="${category}">${t.html}</span>`;
+}
+function updateTomorrowCatTotals() {
+  document.querySelectorAll("#tomorrowView .tom-cat-total").forEach(el => {
+    const t = tomCatTotalInner(el.dataset.cat);
+    el.className = "tom-cat-total " + t.cls;
+    el.innerHTML = t.html;
+  });
+}
 function weekdayAvgGrams(date, branch) { return wdAvgByKey[date + "|" + branch] || null; }
 
 function weekdayAverageDates(date) {
@@ -886,6 +921,8 @@ async function renderWeekdayAverage(el, date, branch) {
     });
     const firstTime = !wdAvgByKey[key];
     wdAvgByKey[key] = Object.fromEntries(rows.map(r => [r.cat, r.grams]));
+    wdActualByKey[key] = Object.fromEntries(rows.filter(r => r.actual != null || r.grams).map(r => [r.cat, r.actual != null ? { grams: r.actual, actual: true } : { grams: r.grams, actual: false }]));
+    updateTomorrowCatTotals();
     if (firstTime && document.querySelector('.tomorrow-item-card[data-slot="1"]')) { renderTomorrowView(); return; }
     const fmt = (g) => g.toLocaleString("en-US");
     const dayList = (list) => list.slice().sort().map(dt => Number(dt.slice(8))).join("، ");

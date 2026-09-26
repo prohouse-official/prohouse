@@ -3259,3 +3259,11 @@ html[dir="ltr"] .sidebar-nav .tab-btn { white-space: normal; }
 .assist-ed-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
 .assist-ed-hide { display: flex !important; align-items: center; gap: 6px; margin: 0 !important; }
 .assist-ed-bottom { display: flex; gap: 8px; justify-content: space-between; margin-top: 10px; }
+
+/* طلبية الغد: إجمالي المطلوب مقابل الفعلي على شريط التصنيف */
+.cat-label-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+.tom-cat-total { font-size: 12px; font-weight: 700; color: #4b5563; background: #fff; border: 1px solid var(--line, #e5e2d8); border-radius: 999px; padding: 3px 10px; }
+.tom-cat-total b { font-weight: 900; color: var(--ink, #111); }
+.tom-cat-total.ok { background: #EEF8F2; border-color: #BfE3CD; color: #137A50; }
+.tom-cat-total.over { background: #FFF4E5; border-color: #F5C98A; color: #9A5B00; }
+.tom-cat-total.under { background: #FFECEC; border-color: #F3B4B4; color: #B42323; }
