@@ -638,9 +638,15 @@ function initTomorrowReportControls() {
   document.getElementById("tomorrowReportGoBtn").addEventListener("click", runTomorrowReport);
   document.getElementById("tomorrowReportExportBtn").addEventListener("click", exportTomorrowReportExcel);
   document.getElementById("tomorrowReportPdfBtn").addEventListener("click", shareTomorrowReportPdf);
+  // تغيير الفرع أو التاريخ يحدّث التقرير مباشرة (بدون ما تضغط «عرض» مرة ثانية)
+  ["tomorrowReportBranch", "tomorrowReportDate"].forEach(id => document.getElementById(id).addEventListener("change", () => {
+    if (document.getElementById("tomorrowReportView").children.length) runTomorrowReport();
+  }));
 }
 
+let tomorrowReportRun = 0;
 async function runTomorrowReport() {
+  const run = ++tomorrowReportRun;
   const view = document.getElementById("tomorrowReportView");
   view.innerHTML = '<div class="loader">جاري تجميع طلبية الغد…</div>';
   await Items.load();
@@ -653,6 +659,7 @@ async function runTomorrowReport() {
   const perBranch = await Promise.all(branches.map(b =>
     Sync.get("getTomorrowOrder", { date, branch: b }, "tomorrow:" + date + ":" + b)
   ));
+  if (run !== tomorrowReportRun) return; // انضغط فرع/تاريخ ثاني وهذا لسه يحمّل
   const order = new Map((Items.current || []).map((it, i) => [it.id, i]));
   lastTomorrowReportSheets = branches.map((branch, i) => {
     const rows = (perBranch[i] || [])

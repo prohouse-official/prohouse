@@ -138,8 +138,9 @@
     const pills = document.createElement("div");
     pills.className = "ph-branch-pills";
     const render = () => {
-      const opts = Array.from(sel.options).filter(o => o.value);
-      pills.innerHTML = opts.map(o => `<button type="button" data-v="${o.value.replace(/"/g, "&quot;")}" class="${o.value === sel.value ? "active" : ""}">🏪 ${o.textContent}</button>`).join("");
+      // خيار "كل الفروع" (قيمته فاضية) يطلع زر برضو، عشان نقدر نرجع له
+      const opts = Array.from(sel.options).filter(o => o.value || /^كل /.test(o.textContent.trim()));
+      pills.innerHTML = opts.map(o => `<button type="button" data-v="${o.value.replace(/"/g, "&quot;")}" class="${o.value === sel.value ? "active" : ""}">${o.value ? "🏪 " : ""}${o.textContent}</button>`).join("");
       pills.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
         if (sel.value === b.dataset.v) return;
         sel.value = b.dataset.v;
@@ -156,7 +157,9 @@
 
   function scan(root) {
     (root.querySelectorAll ? root : document).querySelectorAll(".datebar").forEach(enhanceDateBar);
-    (root.querySelectorAll ? root : document).querySelectorAll("select").forEach(sel => { if (isBranchSelect(sel)) enhanceBranchSelect(sel); });
+    const sels = Array.from((root.querySelectorAll ? root : document).querySelectorAll("select"));
+    if (root.tagName === "SELECT") sels.push(root); // الخيارات انضافت للقائمة نفسها
+    sels.forEach(sel => { if (isBranchSelect(sel)) enhanceBranchSelect(sel); });
   }
 
   function start() {
@@ -168,8 +171,11 @@
     setInterval(() => {
       document.querySelectorAll(".ph-datebar:not(.hidden) input[type=date]").forEach(i => i._phRefresh && i._phRefresh());
       document.querySelectorAll("select[data-ph-branch]").forEach(sel => {
+        // نعيد الرسم بس إذا الزر المفعّل فعلاً غلط — كان يعيد الرسم كل 700ms لما ما فيه زر مفعّل،
+        // فالضغطة تضيع لأن الزر ينمسح وينرسم من جديد وأنت ضاغط (الصفحة "تعلّق")
         const active = sel.nextElementSibling && sel.nextElementSibling.querySelector("button.active");
-        if (sel._phRender && (!active || active.dataset.v !== sel.value)) sel._phRender();
+        const hasOption = !!sel.nextElementSibling && Array.from(sel.nextElementSibling.querySelectorAll("button")).some(b => b.dataset.v === sel.value);
+        if (sel._phRender && hasOption && (!active || active.dataset.v !== sel.value)) sel._phRender();
       });
     }, 700);
   }
