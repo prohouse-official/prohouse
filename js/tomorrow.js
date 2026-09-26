@@ -133,7 +133,7 @@ function renderTomorrowView() {
       if (!isNaN(q) && q > 0) {
         if (isMealCategory(it.category) || (it.unit && (it.unit.includes("جرام") || it.unit.includes("جم")))) {
           totalRequestedWeight += q;
-          totalEstimatedMeals += mealsCount(q);
+          totalEstimatedMeals += q / MEAL_WEIGHT_G;
         }
       }
     }
@@ -161,11 +161,11 @@ function renderTomorrowView() {
         <span class="rem-stat-lbl">أصناف محددة</span>
       </div>
       <div class="rem-stat-pill ok">
-        <span class="rem-stat-num">${Math.round(totalRequestedWeight / 1000)} كجم</span>
+        <span class="rem-stat-num">${(totalRequestedWeight / 1000).toFixed(1).replace(/\.0$/, "")} كجم</span>
         <span class="rem-stat-lbl">إجمالي وزن البروتين</span>
       </div>
       <div class="rem-stat-pill">
-        <span class="rem-stat-num">${totalEstimatedMeals}</span>
+        <span class="rem-stat-num">${Math.round(totalEstimatedMeals)}</span>
         <span class="rem-stat-lbl">إجمالي الوجبات التقديرية</span>
       </div>
     </div>
