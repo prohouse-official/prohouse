@@ -273,10 +273,6 @@ function renderReceivingView() {
           : `<div class="rec-source-badge warn">⚠️ لم تُسجل طلبية سابقة لهذا اليوم. يمكنك تسجيل المستلم يدوياً.</div>`;
       })()}
 
-      <!-- أزرار الإجراء السريع -->
-      <div class="rec-quick-actions-bar">
-        ${renderCompactToggleBtnHtml()}
-      </div>
 
       <!-- فلاتر التركيز السريعة للجوال -->
       <div class="rec-filters-scroll">
@@ -285,9 +281,6 @@ function renderReceivingView() {
         </button>
         <button type="button" class="rec-filter-chip ${receivingActiveFilter === 'unreceived' ? 'active' : ''}" data-filter="unreceived" onclick="setReceivingFilter('unreceived')">
           ⏳ باقي لم يستلم (${unreceivedCount})
-        </button>
-        <button type="button" class="rec-filter-chip ${receivingActiveFilter === 'mismatch' ? 'active' : ''}" data-filter="mismatch" onclick="setReceivingFilter('mismatch')">
-          ⚠️ فيه فرق / نقص (${totalShortageCount + totalSurplusCount})
         </button>
       </div>
     </div>
