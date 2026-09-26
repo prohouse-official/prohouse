@@ -641,12 +641,17 @@ function renderRemainingView(receivingData, salesData) {
                 <span class="rec-meta-chip diff-red" title="انحراف">⚠️ ${itemVarianceText}</span>
               ` : ''}
             </div>
+            <!-- الإجراءات (ملاحظة وحذف) -->
+              <div class="rem-inline-actions">
+                <button type="button" class="rem-waste-btn ${remainingWasteFor(it.id) ? 'has-waste' : ''}" ${isClosed ? 'disabled' : ''} onclick="openRemainingWaste('${it.id}')" title="تسجيل هدر">🗑${remainingWasteFor(it.id) ? ` ${Math.round(remainingWasteFor(it.id))}` : ''}</button>
+                <button type="button" class="rem-mini-note-btn ${remData.notes ? 'has-notes' : ''}" onclick="toggleRemainingNote('${it.id}')" title="ملاحظة">📝</button>
+                <button type="button" class="rec-btn-remove" onclick="onRemoveRemainingItem('${it.id}', '${String(it.name).replace(/'/g, "\\'")}')" title="استبعاد الصنف">✕</button>
+              </div>
 
             <!-- خانات الإدخال المدمجة بصف واحد -->
             <div class="rem-inputs-group">
               <!-- خانة وزن أو عدد المتبقي -->
               <div class="rem-inline-input-group protein">
-                <span class="rem-field-label">${remFieldIconLabel}</span>
                 <div class="rem-mini-input-wrap">
                   <input type="number" step="any" min="0" inputmode="decimal"
                          id="remweight-${it.id}"
@@ -673,12 +678,6 @@ function renderRemainingView(receivingData, salesData) {
                 </button>
               ` : ''}
 
-              <!-- الإجراءات (ملاحظة وحذف) -->
-              <div class="rem-inline-actions">
-                <button type="button" class="rem-waste-btn ${remainingWasteFor(it.id) ? 'has-waste' : ''}" ${isClosed ? 'disabled' : ''} onclick="openRemainingWaste('${it.id}')" title="تسجيل هدر">🗑${remainingWasteFor(it.id) ? ` ${Math.round(remainingWasteFor(it.id))}` : ''}</button>
-                <button type="button" class="rem-mini-note-btn ${remData.notes ? 'has-notes' : ''}" onclick="toggleRemainingNote('${it.id}')" title="ملاحظة">📝</button>
-                <button type="button" class="rec-btn-remove" onclick="onRemoveRemainingItem('${it.id}', '${String(it.name).replace(/'/g, "\\'")}')" title="استبعاد الصنف">✕</button>
-              </div>
             </div>
           </div>
 
