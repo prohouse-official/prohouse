@@ -46,7 +46,6 @@ function applyDashboardPayload(dash) {
 }
 
 async function loadBranchStatus(branch, dash) {
-  const visible = branchVisibleItems(branch);
   const today = todayStr();
   const yesterday = addDaysStr(today, -1);
   const tomorrow = addDaysStr(today, 1);
@@ -110,9 +109,21 @@ async function loadBranchStatus(branch, dash) {
   const checklistComplete = !!(chkStats && chkStats.isComplete);
   const checklistPercent = chkStats ? chkStats.percent : 0;
 
-  const remainingVisible = visible.filter(it => !["كارب", "معدات"].includes(it.category));
   const hasValue = (v) => v !== "" && v !== null && v !== undefined;
   const countedIds = new Set(items.filter(it => hasValue(it.remaining) || hasValue(it.remainingWeight) || hasValue(it.remainingSauce)).map(it => it.itemId));
+  // نفس أصناف شاشة المتبقي: بدون الكارب واللي انشال اليوم، وخانات الشيف بس إذا انستلمت أو انجردت
+  const isCarb = (c) => { c = String(c || ""); return c.includes("كارب") || c.toLowerCase().includes("carb"); };
+  const remIds = Items.current.filter(it => {
+    if (removed.has(it.id) || isCarb(it.category)) return false;
+    const b = itemBranches(it);
+    if (b.length && !b.includes(branch)) return false;
+    if (isOptionalItem(it)) return receivedPositive.has(it.id) || countedIds.has(it.id);
+    return true;
+  }).map(it => it.id);
+  items.forEach(it => {
+    if (!catalog.has(it.itemId) && !removed.has(it.itemId) && !isCarb(it.category) && !remIds.includes(it.itemId)) remIds.push(it.itemId);
+  });
+  const remainingVisible = remIds.map(id => ({ id }));
   let photosCount = 0;
   const meta = dayData && dayData.meta;
   if (meta && typeof meta.photosCount === "number") {
