@@ -52,7 +52,7 @@ function addDaysStr(dateStr, delta) {
 const DEFAULT_BRANCHES_FALLBACK = "الروضة,الشاطئ,عبداللطيف جميل";
 
 // ترتيب افتراضي للتصنيفات
-const DEFAULT_CATEGORY_ORDER_FALLBACK = "دجاج,لحم,بحري,ساندويتشات,كارب,السلطات,الحلويات,فطور,معدات";
+const DEFAULT_CATEGORY_ORDER_FALLBACK = "دجاج,لحم,بحري,ساندويتشات,كارب,أطباق جانبية,السلطات,الحلويات,فطور,معدات";
 function categoryOrderList() {
   const raw = (typeof currentSettings !== "undefined" && currentSettings.categoryOrder) || DEFAULT_CATEGORY_ORDER_FALLBACK;
   return raw.split(",").map(s => s.trim()).filter(Boolean);

@@ -3319,3 +3319,6 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 .insp-round-count.ok { background: #EEF8F2; color: #137A50; }
 .insp-round-missing { font-size: 12.5px; font-weight: 700; color: #9A5B00; background: #FFF4E5; border-radius: 10px; padding: 6px 10px; margin-bottom: 10px; }
 .insp-round-empty { color: var(--gray); font-weight: 700; font-size: 13px; padding: 6px 2px; }
+.tom-pan-select { min-width: 74px; height: 44px; border-radius: 10px; border: 1.5px solid var(--line-strong, #d8d3c4); font-family: inherit; font-weight: 900; font-size: 15px; padding: 0 6px; background: #FFFBEA; }
+/* الاستلام (للمالك): إجمالي المطلوب/المستلم بسطر واحد داخل شريط التصنيف */
+.category-header .rec-cat-total { flex: 1 1 auto; min-width: 0; margin-inline: 8px; font-size: 11.5px; font-weight: 800; color: #6b5a00; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }

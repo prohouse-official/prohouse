@@ -5,7 +5,10 @@ let currentReceivingBranch = "";
 let currentReceivingData = {}; // itemId -> { received, notes, status, cookName }
 let currentReceivingOrdered = {}; // itemId -> orderedQty from yesterday's production order
 let currentReceivingExtraItems = []; // [{ id, name, unit, category, isCustom: true }]
-let currentReceivingAddedIds = new Set(); // خانات الشيف اللي انضافت من شاشة الاستلام
+let currentReceivingAddedIds = new Set();
+let receivingPanMode = false;
+let receivingOrderLabel = {};
+let receivingPanCount = {}; // خانات الشيف اللي انضافت من شاشة الاستلام
 let currentReceivingRemovedIds = new Set(); // set of removed item ids
 let isReceivingSaving = false;
 let receivingActiveFilter = "all"; // 'all', 'unreceived', 'mismatch'
@@ -66,6 +69,18 @@ async function loadReceivingData(date, branch) {
   // 1) جلب كمية الطلب المعتمدة ليوم date من طلبية أمس (T-1)
   const requested = await loadRequestedOrder(currentReceivingDate, currentReceivingBranch);
   currentReceivingOrdered = requested.qty || {};
+  // فرع يطلب بالسفنديشات ويستلم بالجرام: الطلب ينعرض «1/3 × 2» بدون مقارنة زائد/ناقص
+  receivingPanMode = isPanOrderBranch(currentReceivingBranch);
+  receivingOrderLabel = {};
+  receivingPanCount = {};
+  if (receivingPanMode) {
+    Object.keys(currentReceivingOrdered).forEach(id => {
+      const q = currentReceivingOrdered[id];
+      receivingOrderLabel[id] = `${(requested.unit || {})[id] || ""} × ${q}`.trim();
+      receivingPanCount[id] = Number(q) || 0;
+      currentReceivingOrdered[id] = "";
+    });
+  }
   const orderedCookNames = requested.cook || {};
 
   // 2) جلب السجل المحفوظ لهذا اليوم والفرع
@@ -164,6 +179,7 @@ function getAllReceivingActiveItems() {
 function computeReceivingItemStatus(receivedVal, orderedVal) {
   const rec = Number(receivedVal);
   const ord = Number(orderedVal);
+  if (receivingPanMode) return receivedVal !== "" && receivedVal != null && rec > 0 ? "مكتمل" : "لم يصل";
   
   if (receivedVal === "" || receivedVal === null || receivedVal === undefined) return "لم يصل";
   if (isNaN(rec) || rec === 0) return "لم يصل";
@@ -314,6 +330,7 @@ function renderReceivingView() {
       <div class="category-section${receivingCollapsed[cat] ? " collapsed" : ""}" data-cat="${cat}">
         <div class="category-header" onclick="toggleReceivingCategory('${String(cat).replace(/'/g, "\\'")}')">
           <span class="cat-label">${categoryIconSticker(cat)} ${cat}</span>
+          ${recCatTotalHtml(cat)}
           <span class="cat-count-badge">
             <span class="cat-count">${done}/${byCat[cat].length}</span>
             <span class="chevron">▾</span>
@@ -329,7 +346,7 @@ function renderReceivingView() {
       const ordNum = Number(ord || 0);
       const recNum = Number(rec || 0);
       const hasValue = (rec !== "" && rec !== null && rec !== undefined);
-      const diff = hasValue ? (recNum - ordNum) : null;
+      const diff = hasValue && !receivingPanMode ? (recNum - ordNum) : null;
       const status = computeReceivingItemStatus(rec, ord);
 
       let badgeClass = "neutral";
@@ -353,7 +370,7 @@ function renderReceivingView() {
               <span class="rec-item-name">${it.name}</span>
               <span class="rec-item-unit">(${isSandwich ? "ساندويتش" : (isSalad ? "حبة" : (it.unit || "جم"))})</span>
               ${it.isCustom ? '<span class="badge ok rec-custom-badge">إضافي</span>' : ''}
-              <span class="rec-meta-chip rec-req-chip" title="المطلوب من المطبخ">📋 طلب: <strong>${ord !== "" ? ord : "—"}</strong></span>
+              <span class="rec-meta-chip rec-req-chip" title="المطلوب من المطبخ">📋 طلب: <strong>${receivingPanMode ? (receivingOrderLabel[it.id] || "—") : (ord !== "" ? ord : "—")}</strong></span>
               <span class="rec-meta-chip rec-diff-chip ${diff < 0 ? 'diff-red' : (diff > 0 ? 'diff-orange' : (diff === 0 ? 'diff-green' : 'diff-gray'))}" id="recdiff-${it.id}">
                 ${diff === null ? '—' : (diff === 0 ? '✅ مطابق' : (diff < 0 ? `🔻 ${diff}` : `🔺 +${diff}`))}
               </span>
@@ -506,12 +523,33 @@ function onMatchAllReceiving() {
   updateSaveBarReceivingStatus();
 }
 
+// للمالك: إجمالي المطلوب والمستلم على شريط كل تصنيف (بسطر واحد بنفس حجم الشريط)
+function recCatTotalText(cat) {
+  const inCat = getAllReceivingActiveItems().filter(it => (it.category || "عام") === cat);
+  const weight = inCat.length && inCat.every(it => /جرام|جم|كجم/.test(String(it.unit || "")));
+  const fmt = (n) => Math.round(n).toLocaleString("en-US");
+  const rec = inCat.reduce((a, it) => a + (Number((currentReceivingData[it.id] || {}).received) || 0), 0);
+  const unit = weight ? " جم" : "";
+  if (receivingPanMode) {
+    const pans = inCat.reduce((a, it) => a + (receivingPanCount[it.id] || 0), 0);
+    return `طلب ${fmt(pans)} سفنديش · مستلم ${fmt(rec)}${unit}`;
+  }
+  const ord = inCat.reduce((a, it) => a + (Number(currentReceivingOrdered[it.id]) || 0), 0);
+  return `طلب ${fmt(ord)} · مستلم ${fmt(rec)}${unit}`;
+}
+function recCatTotalHtml(cat) {
+  if (!(typeof Auth !== "undefined" && Auth.role && Auth.role() === "owner")) return "";
+  return `<span class="rec-cat-total" data-cat="${String(cat).replace(/"/g, "&quot;")}">${recCatTotalText(cat)}</span>`;
+}
+
 function updateReceivingCategoryCount(itemId) {
   const allItems = getAllReceivingActiveItems();
   const item = allItems.find(it => it.id === itemId);
   if (!item) return;
   const cat = item.category || "عام";
   const section = document.querySelector(`.category-section[data-cat="${cat}"]`);
+  const totalEl = section && section.querySelector(".rec-cat-total");
+  if (totalEl) totalEl.textContent = recCatTotalText(cat);
   const counter = section && section.querySelector(".cat-count");
   if (!counter) return;
 
@@ -560,7 +598,7 @@ function updateReceivingItemCardUI(itemId) {
   const ordNum = Number(ordVal || 0);
   const recNum = Number(recVal || 0);
   const hasValue = (recVal !== "" && recVal !== null && recVal !== undefined);
-  const diff = hasValue ? (recNum - ordNum) : null;
+  const diff = hasValue && !receivingPanMode ? (recNum - ordNum) : null;
   const status = computeReceivingItemStatus(recVal, ordVal);
 
   card.dataset.status = status;

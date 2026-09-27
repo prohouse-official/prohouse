@@ -339,10 +339,17 @@ async function loadRequestedQty(date, branch) {
 // الطلبية المعتمدة لهاليوم: الكميات + اسم الطبخة لخانات الشيف
 async function loadRequestedOrder(date, branch) {
   const data = await Sync.get("getTomorrowOrder", { date, branch }, "tomorrow:" + date + ":" + branch);
-  const qty = {}, cook = {};
-  (data || []).forEach(it => { qty[it.itemId] = it.qty; if (it.cookName) cook[it.itemId] = it.cookName; });
-  return { qty, cook };
+  const qty = {}, cook = {}, unit = {};
+  (data || []).forEach(it => { qty[it.itemId] = it.qty; unit[it.itemId] = it.unit || ""; if (it.cookName) cook[it.itemId] = it.cookName; });
+  return { qty, cook, unit };
 }
+
+// فروع تطلب بعدد السفنديشات (1/3 × 2) وتستلم بالوزن (جرام) — مثل الشاطئ. من الإعدادات: pan_order_branches
+function isPanOrderBranch(branch) {
+  const raw = (typeof currentSettings !== "undefined" && currentSettings.pan_order_branches) || "";
+  return !!branch && raw.split(",").map(s => s.trim()).includes(branch);
+}
+const PAN_SIZES = ["1/1", "1/2", "1/3", "1/4", "1/6", "1/9", "طاسة", "صينية", "حبة"];
 
 // ---- الأصناف الثابتة والاختيارية ----
 // الصنف الاختياري (مثل دجاج الشيف 1/2/3 أو طبخة بتنعمل أحياناً) ما بيطلع إلا باليوم اللي انطلب فيه

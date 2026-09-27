@@ -118,6 +118,8 @@ function renderTomorrowView() {
   const myBranches = allowedBranchList();
   const branchLocked = myBranches.length <= 1;
   const ro = Auth.isViewOnlyTomorrow() ? "disabled" : "";
+  // فرع يطلب بعدد السفنديشات (الشاطئ): العدد + حجم السفنديش، بدون مقترح/مجاميع بالجرام
+  const panMode = isPanOrderBranch(currentTomorrowBranch);
 
   // تجميع الإحصائيات
   const allActiveItems = getAllTomorrowActiveItems();
@@ -160,14 +162,14 @@ function renderTomorrowView() {
         <span class="rem-stat-num">${filledItems}/${totalItems}</span>
         <span class="rem-stat-lbl">أصناف محددة</span>
       </div>
-      <div class="rem-stat-pill ok">
+      ${panMode ? "" : `<div class="rem-stat-pill ok">
         <span class="rem-stat-num">${(totalRequestedWeight / 1000).toFixed(1).replace(/\.0$/, "")} كجم</span>
         <span class="rem-stat-lbl">إجمالي وزن البروتين</span>
       </div>
       <div class="rem-stat-pill">
         <span class="rem-stat-num">${Math.round(totalEstimatedMeals)}</span>
         <span class="rem-stat-lbl">إجمالي الوجبات التقديرية</span>
-      </div>
+      </div>`}
     </div>
 
     <!-- المقترح للمعلومة بس — ما فيه زر يعبّي الكميات تلقائياً (كان يمسح الأوزان المكتوبة) -->
@@ -189,10 +191,12 @@ function renderTomorrowView() {
     </div>
   `;
   view.appendChild(headerCard);
-  const avgCard = document.createElement("div");
-  avgCard.className = "wd-avg";
-  view.appendChild(avgCard);
-  renderWeekdayAverage(avgCard, currentTomorrowDate, currentTomorrowBranch);
+  if (!panMode) {
+    const avgCard = document.createElement("div");
+    avgCard.className = "wd-avg";
+    view.appendChild(avgCard);
+    renderWeekdayAverage(avgCard, currentTomorrowDate, currentTomorrowBranch);
+  }
 
   if (!allActiveItems.length) {
     view.insertAdjacentHTML("beforeend", '<div class="empty-state">لا توجد أصناف مسجلة.</div>');
@@ -218,7 +222,7 @@ function renderTomorrowView() {
     const header = document.createElement("div");
     header.className = "category-header";
     header.innerHTML = `
-      <span class="cat-label-wrap"><span class="cat-label">${categoryIconSticker(group.category)} ${group.category}</span>${tomCatTotalHtml(group.category)}</span>
+      <span class="cat-label-wrap"><span class="cat-label">${categoryIconSticker(group.category)} ${group.category}</span>${panMode ? "" : tomCatTotalHtml(group.category)}</span>
       <span class="cat-count-badge">
         <span class="cat-count">${filledInCat}/${group.items.length}</span>
         <span class="chevron">▾</span>
@@ -306,10 +310,10 @@ function renderTomorrowView() {
             <span class="tom-matrix-val">${todayRem !== undefined && todayRem !== null ? Math.round(Number(todayRem)) : '—'}</span>
             <span class="tom-matrix-lbl">المتبقي الليلة</span>
           </div>
-          <div class="tom-matrix-cell" style="grid-column: span 2; background:#FFFDE7; border-radius:6px; padding:2px 4px;">
+          ${panMode ? "" : `<div class="tom-matrix-cell" style="grid-column: span 2; background:#FFFDE7; border-radius:6px; padding:2px 4px;">
             <span class="tom-matrix-val text-orange">🤖 المقترح: ${smartSuggestedQty || '—'}</span>
             <span class="tom-matrix-lbl">${suggestReason || 'بناءً على الاستهلاك والمتبقي'}</span>
-          </div>
+          </div>`}
         </div>
 
         <!-- سطر إدخال الكمية المطلوبة للجوال -->
@@ -322,7 +326,9 @@ function renderTomorrowView() {
                    placeholder="—"
                    ${ro}
                    class="rec-main-input ${isFilled ? 'border-green' : ''}">
-            <span class="rec-input-unit-label">${item.unit || "جم"}</span>
+            ${panMode ? `<select class="tom-pan-select" ${ro} onchange="onTomorrowPanChange('${item.id}', this.value)" title="حجم السفنديش">
+                ${(() => { const cur = entry.unit || itemPanSize(item) || "1/3"; return [...new Set([cur, ...PAN_SIZES])].map(u => `<option ${u === cur ? "selected" : ""}>${u}</option>`).join(""); })()}
+              </select>` : `<span class="rec-input-unit-label">${item.unit || "جم"}</span>`}
           </div>
 
           <div class="rec-inline-btns">
@@ -502,6 +508,12 @@ function exportTomorrowOrderWhatsApp() {
   window.open(waUrl, "_blank");
 }
 
+function onTomorrowPanChange(id, unit) {
+  if (!currentTomorrowOrder[id]) currentTomorrowOrder[id] = { qty: "", notes: "" };
+  currentTomorrowOrder[id].unit = unit;
+  scheduleTomorrowAutoSave();
+}
+
 function onTomorrowFieldChange(e) {
   const id = e.target.dataset.id;
   const field = e.target.dataset.field;
@@ -592,7 +604,7 @@ function applyTomorrowData(list) {
   if (!list || !list.length) return;
   const map = {};
   list.forEach(it => { 
-    map[it.itemId] = { qty: it.qty, notes: it.notes, cookName: it.cookName || "" };
+    map[it.itemId] = { qty: it.qty, notes: it.notes, cookName: it.cookName || "", unit: it.unit || "" };
     if (!Items.byId(it.itemId) && !currentTomorrowExtraItems.some(x => x.id === it.itemId)) {
       currentTomorrowExtraItems.push({
         id: it.itemId,
@@ -621,7 +633,7 @@ function saveTomorrowNow(showStatus) {
     .map(it => ({ 
       itemId: it.id, 
       itemName: it.name, 
-      unit: it.unit || "جرام", 
+      unit: isPanOrderBranch(branch) ? (currentTomorrowOrder[it.id].unit || itemPanSize(it) || it.unit || "") : (it.unit || "جرام"),
       category: it.category || "عام",
       isCustom: !!it.isCustom,
       qty: currentTomorrowOrder[it.id].qty, 
