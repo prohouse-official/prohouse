@@ -8,7 +8,10 @@ import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
 const ISSUER = "https://token.actions.githubusercontent.com";
 const AUDIENCE = "prohouse-ingest";
 const REPO = "prohouse-official/prohouse";
-const WORKFLOW = `${REPO}/.github/workflows/tabsense-sync.yml@refs/heads/main`;
+const ALLOWED_WORKFLOWS = new Set([
+  `${REPO}/.github/workflows/tabsense-sync.yml@refs/heads/main`,
+  `${REPO}/.github/workflows/foodics-sync.yml@refs/heads/main`
+]);
 const ALLOWED = new Set(["import_sales", "import_product_sales", "import_modifier_sales", "import_payments", "import_juice_sales"]);
 
 const JWKS = createRemoteJWKSet(new URL(`${ISSUER}/.well-known/jwks`));
@@ -19,7 +22,7 @@ Deno.serve(async (req) => {
   const oidc = req.headers.get("x-github-oidc") || "";
   try {
     const { payload } = await jwtVerify(oidc, JWKS, { issuer: ISSUER, audience: AUDIENCE });
-    if (payload.repository !== REPO || payload.ref !== "refs/heads/main" || payload.job_workflow_ref !== WORKFLOW) {
+    if (payload.repository !== REPO || payload.ref !== "refs/heads/main" || !ALLOWED_WORKFLOWS.has(payload.job_workflow_ref as string)) {
       return json({ error: "not allowed" }, 403);
     }
   } catch (e) {
