@@ -345,6 +345,22 @@ async function loadRequestedOrder(date, branch) {
 }
 
 // فروع تطلب بعدد السفنديشات (1/3 × 2) وتستلم بالوزن (جرام) — مثل الشاطئ. من الإعدادات: pan_order_branches
+// أصناف تنعمل حسب الطلب (ستيك، سالمون، فيليه، بلانكو) بفروع فوديكس: ما لها مقترح بطلبية الغد،
+// ومبيعاتها تنشال من متوسط القسم (لأنها ما تنطبخ مسبقاً). تتعدّل من الإعدادات: made_to_order_keywords / made_to_order_branches
+const MADE_TO_ORDER_DEFAULT = "ستيك,سالمون,سلمون,فيليه,بلانكو";
+function madeToOrderApplies(branch) {
+  const raw = (typeof currentSettings !== "undefined" && currentSettings.made_to_order_branches) || "الروضة,الشاطئ";
+  return !!branch && raw.split(",").map(s => s.trim()).includes(branch);
+}
+function isMadeToOrderName(name) {
+  const raw = (typeof currentSettings !== "undefined" && currentSettings.made_to_order_keywords) || MADE_TO_ORDER_DEFAULT;
+  const n = String(name || "").replace(/[إأآ]/g, "ا");
+  return raw.split(",").map(s => s.trim()).filter(Boolean).some(k => n.includes(k.replace(/[إأآ]/g, "ا")));
+}
+function madeToOrderSection(name) {
+  return /ستيك|لحم/.test(String(name || "")) ? "لحم" : "بحري";
+}
+
 // مصدر المبيعات: عبداللطيف جميل على تابسنس، والروضة والشاطئ على فوديكس
 function salesSourceName(branch) {
   return branch === "عبداللطيف جميل" ? "تابسنس" : "فوديكس";

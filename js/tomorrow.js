@@ -191,12 +191,11 @@ function renderTomorrowView() {
     </div>
   `;
   view.appendChild(headerCard);
-  if (!panMode) {
-    const avgCard = document.createElement("div");
-    avgCard.className = "wd-avg";
-    view.appendChild(avgCard);
-    renderWeekdayAverage(avgCard, currentTomorrowDate, currentTomorrowBranch);
-  }
+  // متوسط المبيعات لكل قسم يطلع بكل الفروع (حتى اللي تطلب بالسفنديشات) عشان يساعد بالطلبية
+  const avgCard = document.createElement("div");
+  avgCard.className = "wd-avg";
+  view.appendChild(avgCard);
+  renderWeekdayAverage(avgCard, currentTomorrowDate, currentTomorrowBranch);
 
   if (!allActiveItems.length) {
     view.insertAdjacentHTML("beforeend", '<div class="empty-state">لا توجد أصناف مسجلة.</div>');
@@ -266,6 +265,10 @@ function renderTomorrowView() {
         const slotSug = chefSlotSuggestion(item.category, group.items);
         if (slotSug) { smartSuggestedQty = slotSug.qty; suggestReason = slotSug.reason; }
       }
+
+      // يُعمل حسب الطلب (ستيك/سالمون/فيليه/بلانكو بالروضة والشاطئ): بدون مقترح
+      const madeToOrder = madeToOrderApplies(currentTomorrowBranch) && isMadeToOrderName(item.name);
+      if (madeToOrder) { smartSuggestedQty = ""; suggestReason = "يُعمل حسب الطلب — بدون مقترح"; }
 
       const card = document.createElement("div");
       card.className = "item-card tomorrow-item-card";
@@ -892,11 +895,13 @@ async function renderWeekdayAverage(el, date, branch) {
   try {
     const data = wdCache[key] || (wdCache[key] = await (async () => {
       const sorted = [...dates].sort();
-      const [sales, days] = await Promise.all([
+      const mto = madeToOrderApplies(branch) && SupaEngine.getProductSales;
+      const [sales, days, products] = await Promise.all([
         SupaEngine.getSalesByCategory(sorted[0], sorted[sorted.length - 1], branch),
-        Promise.all(dates.map(dt => SupaEngine.getDay(dt, branch).catch(() => null)))
+        Promise.all(dates.map(dt => SupaEngine.getDay(dt, branch).catch(() => null))),
+        mto ? SupaEngine.getProductSales(sorted[0], sorted[sorted.length - 1], branch).catch(() => []) : Promise.resolve([])
       ]);
-      return { sales, days };
+      return { sales, days, products };
     })());
     const catOf = {};
     (Items.current || []).forEach(it => { catOf[it.id] = it.category; });
@@ -904,7 +909,10 @@ async function renderWeekdayAverage(el, date, branch) {
     const soldDays = dates.filter(dt => data.sales.some(r => r.date === dt && Number(r.qty) > 0));
     const actualDays = [];
     const rows = WD_CATS.map(([cat, icon]) => {
-      const dishes = soldDays.reduce((sum, dt) => sum + data.sales.filter(r => r.date === dt && r.category === cat).reduce((a, r) => a + Number(r.qty || 0), 0), 0);
+      const sold = soldDays.reduce((sum, dt) => sum + data.sales.filter(r => r.date === dt && r.category === cat).reduce((a, r) => a + Number(r.qty || 0), 0), 0);
+      // نشيل مبيعات الأصناف اللي تنعمل حسب الطلب من قسمها
+      const mtoSold = soldDays.reduce((sum, dt) => sum + (data.products || []).filter(p => p.date === dt && isMadeToOrderName(p.product) && madeToOrderSection(p.product) === cat).reduce((a, p) => a + p.qty, 0), 0);
+      const dishes = Math.max(0, sold - mtoSold);
       const avgDishes = soldDays.length ? dishes / soldDays.length : 0;
       // الفعلي: بس الأيام اللي انسجل فيها متبقي لهالتصنيف
       let used = 0, n = 0;
@@ -927,12 +935,12 @@ async function renderWeekdayAverage(el, date, branch) {
     const fmt = (g) => g.toLocaleString("en-US");
     const dayList = (list) => list.slice().sort().map(dt => Number(dt.slice(8))).join("، ");
     if (!soldDays.length) {
-      el.innerHTML = `<div class="wd-avg-title">📊 متوسط استهلاك أيام ${WD_NAMES[wd]}</div><div class="wd-avg-sub">ما فيه مبيعات مسحوبة من تابسنس لأيام ${WD_NAMES[wd]} اللي قبل.</div>`;
+      el.innerHTML = `<div class="wd-avg-title">📊 متوسط استهلاك أيام ${WD_NAMES[wd]}</div><div class="wd-avg-sub">ما فيه مبيعات مسحوبة من ${salesSourceName(branch)} لأيام ${WD_NAMES[wd]} اللي قبل.</div>`;
       return;
     }
     el.innerHTML = `
       <div class="wd-avg-title">📊 متوسط استهلاك أيام ${WD_NAMES[wd]}</div>
-      <div class="wd-avg-sub">من مبيعات تابسنس لأيام: ${dayList(soldDays)} · الطبق = ${MEAL_WEIGHT_G} جم</div>
+      <div class="wd-avg-sub">من مبيعات ${salesSourceName(branch)} لأيام: ${dayList(soldDays)} · الطبق = ${MEAL_WEIGHT_G} جم (والإضافة 50 جم = ثلث طبق)${madeToOrderApplies(branch) ? " · بدون أصناف «حسب الطلب» (ستيك، سالمون، فيليه، بلانكو)" : ""}</div>
       <div class="wd-avg-grid">
         ${rows.map(r => `
           <div class="wd-avg-cell">
@@ -957,6 +965,7 @@ function chefSlotSuggestion(category, groupItems) {
   groupItems.forEach(it => {
     const def = Items.byId(it.id) || it;
     if (isChefSlot(def)) { slotCount++; return; }
+    if (madeToOrderApplies(currentTomorrowBranch) && isMadeToOrderName(def.name)) return;
     const o = currentTomorrowOrder[it.id];
     if (o && o.qty !== "" && o.qty != null) fixedPlanned += Number(o.qty) || 0;
     else {

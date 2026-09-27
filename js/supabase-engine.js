@@ -660,6 +660,12 @@ const SupaEngine = (() => {
     }));
   }
 
+  // مبيعات المنتجات لفرع وفترة (عشان نشيل الأصناف اللي تنعمل حسب الطلب من المتوسط)
+  async function getProductSales(start, end, branch) {
+    const res = await queryAll(`tabsense_product_sales?select=date,product,qty&date=gte.${start}&date=lte.${end}&branch=eq.${encodeURIComponent(branch)}`, "date,product");
+    return (res || []).map(r => ({ date: r.date, product: r.product, qty: Number(r.qty || 0) }));
+  }
+
   // تفاصيل تابسنس للفترة: مبيعات كل منتج + الإضافات + طرق الدفع (طرق الدفع بترجع للمالك بس)
   async function getTabsenseDetails(start, end) {
     const range = `date=gte.${start}&date=lte.${end}`;
@@ -1035,6 +1041,7 @@ const SupaEngine = (() => {
     getEmployees,
     getSalesByCategory,
     getTabsenseDetails,
+    getProductSales,
     getReport,
     getFlaggedItems,
     getDashboard,
