@@ -561,36 +561,72 @@ async function renderInspectionGalleryView() {
         </div>
       </div>
 
-      <div class="inspection-timeline-wrap">
-        <h3>⏱️ التسلسل الزمني للفحص البصري (Timeline)</h3>
-        ${photos.length === 0 ? `
-          <div class="empty-state">لا توجد صور معاينة ملتقطة لليوم لهذا الفرع بعد.</div>
-        ` : `
-          <div class="timeline-grid">
-            ${photos.map(p => `
-              <div class="timeline-card">
-                <div class="timeline-img-wrap" onclick="viewPhotoFullscreen('${p.id}')" title="اضغط لتكبير الصورة">
-                  <img src="${p.url || p.dataUrl}" loading="lazy" alt="${p.checkpointName}" />
-                  <span class="timeline-time">${new Date(p.timestamp).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" })}</span>
-                </div>
-                <div class="timeline-info" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;">
-                  <div>
-                    <strong style="display:block;margin-bottom:3px;">${p.checkpointName}</strong>
-                    <div class="timeline-emp">👤 ${p.employeeName}</div>
-                  </div>
-                  <button class="btn danger" style="padding:5px 12px;font-size:12px;" onclick="deletePhotoRecord('${p.id}', '${p.date || ""}', '${String(p.branch || "").replace(/'/g, "")}')" title="حذف هذه الصورة إذا تم تصويرها بالخطأ">
-                    🗑️ حذف
-                  </button>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-        `}
-      </div>
+      ${inspectionRoundsHtml(photos, branch)}
     </div>
   `;
 
   view.innerHTML = html;
+}
+
+// ---- الصور مرتبة حسب الجولات (الافتتاح / الغداء / الإغلاق) مع فرز ----
+let inspectionRoundFilter = "all";
+function photoRoundId(p) {
+  const m = /-(MORNING|LUNCH|CLOSING)$/.exec(String(p.sessionId || ""));
+  return m ? m[1].toLowerCase() : "other";
+}
+function inspectionCardHtml(p) {
+  return `
+    <div class="timeline-card">
+      <div class="timeline-img-wrap" onclick="viewPhotoFullscreen('${p.id}')" title="اضغط لتكبير الصورة">
+        <img src="${p.url || p.dataUrl}" loading="lazy" alt="${p.checkpointName}" />
+        <span class="timeline-time">${new Date(p.timestamp).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" })}</span>
+      </div>
+      <div class="timeline-info" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;">
+        <div>
+          <strong style="display:block;margin-bottom:3px;">${p.checkpointName}</strong>
+          <div class="timeline-emp">👤 ${p.employeeName}</div>
+        </div>
+        <button class="btn danger" style="padding:5px 12px;font-size:12px;" onclick="deletePhotoRecord('${p.id}', '${p.date || ""}', '${String(p.branch || "").replace(/'/g, "")}')" title="حذف هذه الصورة إذا تم تصويرها بالخطأ">
+          🗑️ حذف
+        </button>
+      </div>
+    </div>`;
+}
+function inspectionRoundsHtml(photos, branch) {
+  const cps = getCheckpointsForBranch(branch);
+  const order = new Map(cps.map((cp, i) => [cp.id, i]));
+  const stages = (typeof INSPECTION_STAGES !== "undefined" ? INSPECTION_STAGES : []).concat([{ id: "other", name: "صور بدون جولة", icon: "📷" }]);
+  const rounds = stages.map(st => {
+    const list = photos.filter(p => photoRoundId(p) === st.id)
+      .sort((a, b) => (order.get(a.checkpointId) ?? 99) - (order.get(b.checkpointId) ?? 99) || new Date(a.timestamp) - new Date(b.timestamp));
+    const done = cps.filter(cp => list.some(p => p.checkpointId === cp.id));
+    const missing = st.id === "other" ? [] : cps.filter(cp => !done.includes(cp)).map(cp => cp.name);
+    return { ...st, list, done: done.length, total: cps.length, missing };
+  }).filter(r => r.id !== "other" || r.list.length);
+  const f = rounds.some(r => r.id === inspectionRoundFilter) ? inspectionRoundFilter : "all";
+  const chip = (id, label) => `<button type="button" class="${f === id ? "active" : ""}" onclick="setInspectionRound('${id}')">${label}</button>`;
+  const shown = f === "all" ? rounds : rounds.filter(r => r.id === f);
+  return `
+    <div class="inspection-timeline-wrap">
+      <div class="ph-branch-pills insp-round-pills">
+        ${chip("all", `الكل (${photos.length})`)}
+        ${rounds.map(r => chip(r.id, `${r.icon} ${r.id === "other" ? "بدون جولة" : "الجولة " + (stages.indexOf(stages.find(s => s.id === r.id)) + 1)} ${r.id === "other" ? `(${r.list.length})` : `${r.done}/${r.total}`}`)).join("")}
+      </div>
+      ${shown.map(r => `
+        <section class="insp-round">
+          <div class="insp-round-head">
+            <b>${r.icon} ${r.name}</b>
+            ${r.id === "other" ? "" : `<span class="insp-round-count ${r.done >= r.total && r.total ? "ok" : r.done ? "part" : ""}">${r.done}/${r.total}</span>`}
+          </div>
+          ${r.missing.length && r.done ? `<div class="insp-round-missing">ناقص: ${r.missing.join("، ")}</div>` : ""}
+          ${r.list.length ? `<div class="timeline-grid">${r.list.map(inspectionCardHtml).join("")}</div>`
+                          : `<div class="insp-round-empty">ما فيه صور لهذي الجولة للحين.</div>`}
+        </section>`).join("")}
+    </div>`;
+}
+function setInspectionRound(id) {
+  inspectionRoundFilter = id;
+  renderInspectionGalleryView();
 }
 
 function onInspectionBranchChange(branch) {
