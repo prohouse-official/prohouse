@@ -661,24 +661,48 @@ async function runTomorrowReport() {
   const branches = branchFilter ? [branchFilter] : branchList();
   lastTomorrowReportDate = date;
 
-  const perBranch = await Promise.all(branches.map(b =>
-    Sync.get("getTomorrowOrder", { date, branch: b }, "tomorrow:" + date + ":" + b)
-  ));
+  const [perBranch, perDay] = await Promise.all([
+    Promise.all(branches.map(b => Sync.get("getTomorrowOrder", { date, branch: b }, "tomorrow:" + date + ":" + b))),
+    Promise.all(branches.map(b => Sync.get("getDay", { date, branch: b }, "day:" + date + ":" + b).catch(() => null)))
+  ]);
   if (run !== tomorrowReportRun) return; // انضغط فرع/تاريخ ثاني وهذا لسه يحمّل
   const order = new Map((Items.current || []).map((it, i) => [it.id, i]));
+  const blank = (v) => v === "" || v === null || v === undefined;
   lastTomorrowReportSheets = branches.map((branch, i) => {
-    const rows = (perBranch[i] || [])
-      .filter(e => e.qty !== "" && e.qty != null && Number(e.qty) > 0)
-      .map(e => {
-        const it = Items.byId(e.itemId) || { name: e.itemName, category: "-", unit: e.unit, sortOrder: 999 };
-        return {
-          category: it.category || "-", name: chefReportName(it, e.cookName),
-          // فرع يطلب بالسفنديشات: الحجم من الطلبية نفسها والعدد عدد سفنديشات
-          size: isPanOrderBranch(branch) ? (e.unit || itemPanSize(it)) : itemPanSize({ ...it, unit: it.unit || e.unit }),
-          qty: isPanOrderBranch(branch) ? Number(e.qty) : chefQtyText(Number(e.qty), it.unit || e.unit), notes: e.notes || "",
-          rank: categoryRank(it.category), sort: order.has(e.itemId) ? order.get(e.itemId) : 9999
-        };
-      })
+    // إذا اليوم انستلم: نعبّي الكمية المستلمة والمتبقية، والصنف اللي انطلب وما انعمل ينشال
+    // ومكانه الأصناف اللي الشيف عملها بداله (انستلمت بدون ما تنطلب)
+    const dayItems = ((perDay[i] && perDay[i].items) || []);
+    const dayById = new Map(dayItems.map(d => [d.itemId, d]));
+    const received = (d) => d && !blank(d.received) && Number(d.received) > 0;
+    const hasReceiving = dayItems.some(received);
+    const actual = (d, unit) => {
+      if (!received(d)) return { rec: "", rem: "", sauce: false };
+      const u = unit || d.unit;
+      const leftRaw = !blank(d.remainingWeight) ? d.remainingWeight : !blank(d.remainingSauce) ? d.remainingSauce : d.remaining;
+      const sauce = blank(d.remainingWeight) && !blank(d.remainingSauce) && Number(d.remainingSauce) > 0;
+      return { rec: chefQtyText(Number(d.received), u), rem: blank(leftRaw) ? "" : chefQtyText(Number(leftRaw), u), sauce };
+    };
+    const rowFor = (it, e, d) => {
+      const a = actual(d, it.unit || (e && e.unit));
+      const notes = [e && e.notes, a.sauce ? "متبقي صوص" : ""].filter(Boolean).join(" · ");
+      return {
+        category: it.category || "-", name: chefReportName(it, (d && d.cookName) || (e && e.cookName)),
+        // فرع يطلب بالسفنديشات: الحجم من الطلبية نفسها والعدد عدد سفنديشات
+        size: e && isPanOrderBranch(branch) ? (e.unit || itemPanSize(it)) : itemPanSize({ ...it, unit: it.unit || (e && e.unit) }),
+        qty: !e ? "—" : isPanOrderBranch(branch) ? Number(e.qty) : chefQtyText(Number(e.qty), it.unit || e.unit),
+        rec: a.rec, rem: a.rem, notes,
+        rank: categoryRank(it.category), sort: order.has(it.id) ? order.get(it.id) : 9999
+      };
+    };
+    const ordered = (perBranch[i] || []).filter(e => e.qty !== "" && e.qty != null && Number(e.qty) > 0);
+    const orderedIds = new Set(ordered.map(e => e.itemId));
+    const rows = ordered
+      .filter(e => !hasReceiving || received(dayById.get(e.itemId)))
+      .map(e => rowFor(Items.byId(e.itemId) || { id: e.itemId, name: e.itemName, category: "-", unit: e.unit }, e, dayById.get(e.itemId)))
+      .concat(hasReceiving ? dayItems.filter(d => received(d) && !orderedIds.has(d.itemId)).map(d => {
+        const it = Items.byId(d.itemId) || { id: d.itemId, name: d.itemName, category: "-", unit: d.unit };
+        return rowFor(it, null, d);
+      }) : [])
       .sort((a, b) => a.rank - b.rank || a.sort - b.sort);
     return { branch, rows };
   }).filter(s => s.rows.length);
@@ -701,7 +725,7 @@ function chefSheetHtml(sheet, date) {
   const body = groups.map(g => g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
       ${box()}
       ${i === 0 ? `<td rowspan="${g.rows.length}" style="border:${bd}">${esc(g.category)}</td>` : ""}
-      ${box()}${cell(r.name)}${cell(r.size)}${cell(r.qty)}${cell("")}${cell("")}${cell(r.notes)}
+      ${box()}${cell(r.name)}${cell(r.size)}${cell(r.qty)}${cell(r.rec || "")}${cell(r.rem || "")}${cell(r.notes)}
     </tr>`).join("")).join("");
   return `<div class="chef-sheet" style="width:${totalW}px">
     <table style="width:${totalW}px">
@@ -791,7 +815,7 @@ async function exportTomorrowReportExcel() {
       const start = r;
       g.rows.forEach((x, i) => {
         const row = ws.getRow(r);
-        ["□", i === 0 ? g.category : null, "□", x.name, x.size, x.qty, null, null, x.notes || null].forEach((v, ci) => {
+        ["□", i === 0 ? g.category : null, "□", x.name, x.size, x.qty, x.rec || null, x.rem || null, x.notes || null].forEach((v, ci) => {
           const c = row.getCell(ci + 1);
           if (v !== null) c.value = v;
           c.font = font(ci === 0 || ci === 2 ? S.boxFont : S.bodyFont); c.alignment = center; c.border = border;
