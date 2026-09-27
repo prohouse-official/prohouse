@@ -22,7 +22,7 @@ concurrency:
 jobs:
   foodics-sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 90 # سحب أيام قديمة (شهرين) ياخذ وقت أطول
     # id-token: هوية التشغيل الموقّعة من GitHub — الموقع بيقبل المبيعات بس منها (بدل مفتاح سري بالكود)
     permissions:
       contents: read
