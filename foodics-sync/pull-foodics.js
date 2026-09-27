@@ -414,7 +414,18 @@ function branchMatches(cell, branch) {
   return !!c && c.includes(b);
 }
 
+// نجرّب مرتين: صفحات فوديكس أحياناً تتأخر بالتحميل فيختفي زر التجميع أو الجدول
 async function readGroupedReport(page, path, iso, nameLabel) {
+  let res = await readGroupedReportOnce(page, path, iso, nameLabel);
+  if (!res.ok) {
+    await page.waitForTimeout(3000);
+    res = await readGroupedReportOnce(page, path, iso, nameLabel);
+    if (!res.ok) console.warn(`⚠️ ${path}: ${res.reason}`);
+  }
+  return res;
+}
+
+async function readGroupedReportOnce(page, path, iso, nameLabel) {
   const url = `https://console.foodics.com${path}?date=${iso}+-+${iso}`;
   await page.goto(url, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
   await page.waitForSelector("table", { timeout: 15000 }).catch(() => {});
@@ -423,6 +434,7 @@ async function readGroupedReport(page, path, iso, nameLabel) {
 
   // «تجميع بـ» ← «الفرع»
   const groupBtn = page.locator('button:has-text("تجميع")').first();
+  await groupBtn.waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
   if (!(await groupBtn.isVisible().catch(() => false))) return { ok: false, reason: "ما لقينا زر التجميع", rows: [] };
   await groupBtn.click().catch(() => {});
   await page.waitForTimeout(1000);
