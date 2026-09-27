@@ -40,6 +40,7 @@ async function runDailyReport() {
   }
   if (run !== dailyReportRun) return;
   view.innerHTML = cards.map(c => dailyBranchHtml(c, date)).join("");
+  refreshTabsenseSyncInfo();
 }
 
 async function loadDailyBranch(date, branch) {
@@ -86,6 +87,61 @@ async function loadDailyBranch(date, branch) {
     hasWaste: wasteItems.length > 0,
     custody, pays: pays || []
   };
+}
+
+// ---- 🔄 سحب مبيعات تابسنس من داخل التطبيق ----
+let drSyncPoll = null;
+
+function drWhen(ts) {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleString(phLocale(), { weekday: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Riyadh" });
+}
+
+function drSyncInfo(out, note) {
+  const el = document.getElementById("drSyncInfo");
+  if (!el) return;
+  const last = out && out.lastImport;
+  el.textContent = note || (last ? `آخر مبيعات وصلت: ${drWhen(last.imported_at)} (يوم ${last.date})` : "مبيعات تابسنس");
+}
+
+async function refreshTabsenseSyncInfo() {
+  if (!(Auth.role && Auth.role() === "owner") || typeof SupaEngine === "undefined" || !SupaEngine.tabsensePull) return;
+  try { drSyncInfo(await SupaEngine.tabsensePull("status")); } catch (e) { /* يكفي الزر */ }
+}
+
+async function startTabsensePull() {
+  const btn = document.getElementById("drSyncBtn");
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  let out;
+  try { out = await SupaEngine.tabsensePull("start"); }
+  catch (e) { btn.disabled = false; showToast("⚠ ما قدرنا نبدأ السحب — " + (e.message || e)); return; }
+  if (out.error === "not_configured") {
+    btn.disabled = false;
+    drSyncInfo(out);
+    showToast("⚠ زر السحب يحتاج تفعيل من السيرفر (مفتاح GitHub) — السحب التلقائي شغّال بدونه");
+    return;
+  }
+  const before = out.lastImport && out.lastImport.imported_at;
+  drSyncInfo(out, out.started ? "⏳ جاري السحب من تابسنس… ياخذ دقيقتين تقريباً" : "⏳ فيه سحب شغّال الحين… ننتظره يخلص");
+  clearInterval(drSyncPoll);
+  let tries = 0, sawRunning = false;
+  drSyncPoll = setInterval(async () => {
+    tries++;
+    let st;
+    try { st = await SupaEngine.tabsensePull("status"); } catch (e) { return; }
+    if (st.busy) sawRunning = true;
+    const done = (sawRunning || tries >= 4) && !st.busy;
+    if (!done && tries < 30) return;
+    clearInterval(drSyncPoll);
+    btn.disabled = false;
+    const now = st.lastImport && st.lastImport.imported_at;
+    const failed = st.run && st.run.conclusion && st.run.conclusion !== "success";
+    drSyncInfo(st);
+    if (failed) showToast("⚠ السحب ما نجح — جرّب مرة ثانية بعد شوي");
+    else if (now && now !== before) { showToast("✅ وصلت مبيعات تابسنس الجديدة"); runDailyReport(); }
+    else showToast("ℹ️ خلص السحب — ما فيه مبيعات جديدة بتابسنس للحين");
+  }, 10000);
 }
 
 function drNum(n, digits = 1) {
