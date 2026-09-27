@@ -10,7 +10,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 const BUCKET = "photos";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-session-token",
+  "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, x-session-token, prefer, accept-profile, content-profile",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>

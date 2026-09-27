@@ -35,6 +35,13 @@ const SupaEngine = (() => {
     };
   }
 
+  // دوال السيرفر (Edge Functions): بدون "Prefer" — هالهيدر خاص بقاعدة البيانات، والمتصفح كان يوقف الطلب بسببه
+  function fnHeaders() {
+    const h = getHeaders();
+    delete h.Prefer;
+    return h;
+  }
+
   async function query(endpoint, options = {}) {
     const url = SUPABASE_URL + "/rest/v1/" + endpoint;
     const controller = new AbortController();
@@ -868,7 +875,7 @@ const SupaEngine = (() => {
     try {
       const res = await fetch(SUPABASE_URL + "/functions/v1/photos", {
         method: "POST", signal: controller.signal,
-        headers: getHeaders(), body: JSON.stringify(body)
+        headers: fnHeaders(), body: JSON.stringify(body)
       });
       const out = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(out.error || `photos [${res.status}]`);
@@ -890,14 +897,14 @@ const SupaEngine = (() => {
 
   // نماذج قوقل اللي الموقع بيبعتها لحاله (نموذج الصوص)
   async function sendGoogleForm(body) {
-    const res = await fetch(SUPABASE_URL + "/functions/v1/forms", { method: "POST", headers: getHeaders(), body: JSON.stringify(body) });
+    const res = await fetch(SUPABASE_URL + "/functions/v1/forms", { method: "POST", headers: fnHeaders(), body: JSON.stringify(body) });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || !out.ok) throw new Error(out.error || `forms [${res.status}]`);
     return out;
   }
   // 💬 المساعد بالذكاء الاصطناعي (يرجع null إذا ما فيه مفتاح بالسيرفر)
   async function askAssistant(question, lang, context) {
-    const res = await fetch(SUPABASE_URL + "/functions/v1/assistant", { method: "POST", headers: getHeaders(), body: JSON.stringify({ question, lang, context }) });
+    const res = await fetch(SUPABASE_URL + "/functions/v1/assistant", { method: "POST", headers: fnHeaders(), body: JSON.stringify({ question, lang, context }) });
     if (!res.ok) return null;
     const out = await res.json().catch(() => ({}));
     return out.answer || null;

@@ -170,14 +170,7 @@ function renderTomorrowView() {
       </div>
     </div>
 
-    <!-- أزرار الإجراءات الفائقة السرعة للمالك -->
-    <div class="tom-quick-actions-bar">
-      ${!Auth.isViewOnlyTomorrow() ? `
-        <button type="button" class="tom-ai-btn" onclick="applyAllAiRecommendations()">
-          ⚡ تطبيق كل المقترحات الذكية
-        </button>
-      ` : ''}
-    </div>
+    <!-- المقترح للمعلومة بس — ما فيه زر يعبّي الكميات تلقائياً (كان يمسح الأوزان المكتوبة) -->
 
     <!-- فلاتر سريعة للتركيز -->
     <div class="rec-filters-scroll">
@@ -333,11 +326,6 @@ function renderTomorrowView() {
           </div>
 
           <div class="rec-inline-btns">
-            ${smartSuggestedQty ? `
-              <button type="button" class="rec-btn-quick match" ${ro} onclick="onQuickSetTomorrowSuggested('${item.id}', ${smartSuggestedQty})">
-                = المقترح
-              </button>
-            ` : ''}
             <button type="button" class="rec-btn-quick zero" ${ro} onclick="onQuickSetTomorrowZero('${item.id}')">
               0 (لا يلزم)
             </button>
