@@ -676,7 +676,7 @@ async function runTomorrowReport() {
     const received = (d) => d && !blank(d.received) && Number(d.received) > 0;
     const hasReceiving = dayItems.some(received);
     const actual = (d, unit) => {
-      if (!received(d)) return { rec: "", rem: "", sauce: false };
+      if (!received(d)) return hasReceiving ? { rec: chefQtyText(0, unit), rem: "", sauce: false, notMade: true } : { rec: "", rem: "", sauce: false };
       const u = unit || d.unit;
       const leftRaw = !blank(d.remainingWeight) ? d.remainingWeight : !blank(d.remainingSauce) ? d.remainingSauce : d.remaining;
       const sauce = blank(d.remainingWeight) && !blank(d.remainingSauce) && Number(d.remainingSauce) > 0;
@@ -684,7 +684,7 @@ async function runTomorrowReport() {
     };
     const rowFor = (it, e, d) => {
       const a = actual(d, it.unit || (e && e.unit));
-      const notes = [e && e.notes, a.sauce ? "متبقي صوص" : ""].filter(Boolean).join(" · ");
+      const notes = [e && e.notes, a.sauce ? "متبقي صوص" : "", a.notMade ? "ما انعمل" : ""].filter(Boolean).join(" · ");
       return {
         category: it.category || "-", name: chefReportName(it, (d && d.cookName) || (e && e.cookName)),
         // فرع يطلب بالسفنديشات: الحجم من الطلبية نفسها والعدد عدد سفنديشات
@@ -697,7 +697,8 @@ async function runTomorrowReport() {
     const ordered = (perBranch[i] || []).filter(e => e.qty !== "" && e.qty != null && Number(e.qty) > 0);
     const orderedIds = new Set(ordered.map(e => e.itemId));
     const rows = ordered
-      .filter(e => !hasReceiving || received(dayById.get(e.itemId)))
+      // الطلب يضل ظاهر حتى لو ما انعمل (مستلم 0)، إلا خانات الشيف الفاضية — مكانها الطبخات اللي انعملت فعلاً
+      .filter(e => { const it = Items.byId(e.itemId); return !hasReceiving || received(dayById.get(e.itemId)) || !(it && isChefItem(it)); })
       .map(e => rowFor(Items.byId(e.itemId) || { id: e.itemId, name: e.itemName, category: "-", unit: e.unit }, e, dayById.get(e.itemId)))
       .concat(hasReceiving ? dayItems.filter(d => received(d) && !orderedIds.has(d.itemId)).map(d => {
         const it = Items.byId(d.itemId) || { id: d.itemId, name: d.itemName, category: "-", unit: d.unit };
