@@ -10,6 +10,10 @@ on:
         description: "Pull this many past days (e.g. 14). Empty = yesterday + today"
         required: false
         default: ""
+      explore:
+        description: "1 = only log the Foodics page layout (report links, table columns) without sending anything"
+        required: false
+        default: ""
 
 concurrency:
   group: foodics-sync
@@ -60,15 +64,10 @@ jobs:
         working-directory: ./foodics-sync
         env:
           BACKFILL_DAYS: ${{ github.event.inputs.backfill_days }}
+          FOODICS_EXPLORE: ${{ github.event.inputs.explore }}
+          # أسماء الفروع هون (UTF-8 مضمون) — أسرار GitHub تخرّب العربي أحياناً لـ ????
+          FOODICS_BRANCHES: "الروضة,الشاطئ"
         run: |
           node pull-foodics.js
 
-      # لما يفشل: صورة الشاشة (مثلاً الكابتشا أو صفحة تغيّرت) تنحفظ 3 أيام عشان نعرف السبب
-      - name: Upload error screenshot
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: foodics-error
-          path: foodics-sync/downloads/*.png
-          retention-days: 3
-          if-no-files-found: ignore
+      # ملاحظة: المستودع عام، فما نرفع صور شاشة فوديكس ولا نطبع أرقام مبيعات بالسجل
