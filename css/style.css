@@ -3278,3 +3278,33 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 .chef-sheet td { text-align: center; vertical-align: middle; padding: 0 8px; overflow: hidden; line-height: 1.15; white-space: nowrap; }
 .chef-sheet .chef-title td { font-size: 63px; border: 0 !important; white-space: nowrap; }
 .chef-sheet .chef-head td { white-space: normal; line-height: 1.2; }
+
+/* ==================== 📅 تقرير اليوم لكل فرع ==================== */
+.dr-card { background: var(--card, #fff); border: 1px solid var(--line, #e5e2d8); border-radius: 18px; padding: 14px; margin-bottom: 14px; }
+.dr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.dr-head b { font-size: 18px; }
+.dr-head span { font-size: 13px; font-weight: 700; color: var(--gray); }
+.dr-checks { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.dr-check { font-size: 12px; font-weight: 800; border-radius: 999px; padding: 4px 10px; border: 1px solid; }
+.dr-check.ok { background: #EEF8F2; border-color: #BFE3CD; color: #137A50; }
+.dr-check.no { background: #FFF4E5; border-color: #F5C98A; color: #9A5B00; }
+.dr-table-wrap { overflow-x: auto; }
+.dr-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.dr-table th { font-size: 11.5px; color: var(--gray); font-weight: 800; padding: 6px 4px; border-bottom: 1px solid var(--line, #e5e2d8); text-align: center; }
+.dr-table td { padding: 8px 4px; border-bottom: 1px solid var(--line, #eee); text-align: center; font-weight: 800; vertical-align: middle; }
+.dr-table td small { display: block; font-size: 10.5px; font-weight: 600; color: var(--gray); }
+.dr-table td.dr-cat { text-align: start; font-size: 12.5px; }
+.dr-table th { font-size: 10.5px !important; white-space: nowrap; padding: 6px 1px !important; }
+.dr-table td small { white-space: nowrap; font-size: 10px !important; }
+.dr-gap { display: block; border-radius: 10px; padding: 4px 3px; font-size: 11px; line-height: 1.25; }
+.dr-gap b { display: block; font-size: 14px; }
+.dr-gap small { color: inherit !important; opacity: .8; }
+.dr-gap.ok { background: #EEF8F2; color: #137A50; }
+.dr-gap.warn { background: #FFF6CC; color: #8A6A00; }
+.dr-gap.bad { background: #FFECEC; color: #B42323; }
+.dr-gap.missing { background: #F2F2F2; color: #6b7280; font-weight: 700; }
+.dr-note { font-size: 11px; color: var(--gray); margin: 8px 0 4px; font-weight: 600; }
+.dr-cash { font-size: 14px; font-weight: 800; margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dr-cash.no { color: #9A5B00; }
+.dr-cash-sub { font-size: 12px; color: var(--gray); font-weight: 700; }
+.dr-empty { color: var(--gray); font-weight: 700; padding: 10px 0; }
