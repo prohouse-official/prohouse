@@ -530,11 +530,13 @@ function recCatTotalText(cat) {
   const fmt = (n) => Math.round(n).toLocaleString("en-US");
   const rec = inCat.reduce((a, it) => a + (Number((currentReceivingData[it.id] || {}).received) || 0), 0);
   const unit = weight ? " جم" : "";
+  // المطلوب = كل طلبية التصنيف، حتى الأصناف اللي انشالت من شاشة الاستلام أو ما وصلت
+  const catOf = (id) => ((typeof Items !== "undefined" && Items.byId(id)) || {}).category || "عام";
   if (receivingPanMode) {
-    const pans = inCat.reduce((a, it) => a + (receivingPanCount[it.id] || 0), 0);
+    const pans = Object.keys(receivingPanCount).filter(id => catOf(id) === cat).reduce((a, id) => a + (receivingPanCount[id] || 0), 0);
     return `طلب ${fmt(pans)} سفنديش · مستلم ${fmt(rec)}${unit}`;
   }
-  const ord = inCat.reduce((a, it) => a + (Number(currentReceivingOrdered[it.id]) || 0), 0);
+  const ord = Object.keys(currentReceivingOrdered).filter(id => catOf(id) === cat).reduce((a, id) => a + (Number(currentReceivingOrdered[id]) || 0), 0);
   return `طلب ${fmt(ord)} · مستلم ${fmt(rec)}${unit}`;
 }
 function recCatTotalHtml(cat) {
