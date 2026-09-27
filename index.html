@@ -12,7 +12,7 @@
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-<link rel="stylesheet" href="css/style.css?v=5.40.0">
+<link rel="stylesheet" href="css/style.css?v=5.41.0">
 <script>
 // الشغل بدون نت انلغى: منشيل الـ Service Worker القديم (sw.js) ومنمسح ملفاته لحتى الجهاز يجيب أحدث نسخة دايماً.
 // عامل الإشعارات (push-sw.js) ما بيخزّن شي، فمنخليه.
@@ -311,12 +311,13 @@ if ('caches' in window) {
       <div id="checklistView" class="view hidden"></div>
       <div id="wasteView" class="view hidden"></div>
       <div id="reportContainer" class="view hidden">
-        <div class="toolbar">
-          <select id="reportType">
-            <option value="daily" selected>📅 تقرير اليوم لكل فرع</option>
-            <option value="entries">تقرير الاستلام/الإرجاع ومقارنة المبيعات</option>
-            <option value="tabsense">📈 تقرير مبيعات تابسنس (مباشر)</option>
-            <option value="tomorrow">طلبية الغد (للشيف)</option>
+        <div class="report-head">
+          <h2 class="report-head-title">📊 التقارير</h2>
+          <select id="reportType" class="ph-pills">
+            <option value="daily" selected data-short="📅 تقرير اليوم">📅 تقرير اليوم لكل فرع</option>
+            <option value="tomorrow" data-short="👨‍🍳 تقرير الشيف">طلبية الغد (للشيف)</option>
+            <option value="entries" data-short="📦 الاستلام والمبيعات">تقرير الاستلام/الإرجاع ومقارنة المبيعات</option>
+            <option value="tabsense" data-short="📈 مبيعات تابسنس">📈 تقرير مبيعات تابسنس (مباشر)</option>
           </select>
         </div>
 
@@ -339,17 +340,27 @@ if ('caches' in window) {
         </div>
 
         <div id="entriesReportControls" class="hidden">
-          <div class="toolbar">
-            <select id="reportMode">
-              <option value="day">يوم</option>
-              <option value="month" selected>شهر</option>
-              <option value="range">فترة</option>
-            </select>
-            <input type="date" id="reportDayInput" class="hidden">
+          <select id="reportMode" class="ph-pills">
+            <option value="day">يوم</option>
+            <option value="month" selected>شهر</option>
+            <option value="range">فترة</option>
+          </select>
+          <div class="datebar hidden" id="reportDayBar">
+            <input type="date" id="reportDayInput">
+            <div class="day-jump">
+              <button type="button" data-day="prev" title="اليوم السابق" aria-label="اليوم السابق">→</button>
+              <button type="button" data-day="yesterday">أمس</button>
+              <button type="button" data-day="today">اليوم</button>
+              <button type="button" data-day="next" title="اليوم التالي" aria-label="اليوم التالي">←</button>
+            </div>
+          </div>
+          <div class="report-period">
             <input type="month" id="reportMonthInput">
             <input type="date" id="reportStartInput" class="hidden">
             <span class="hidden" id="reportRangeSep">←</span>
             <input type="date" id="reportEndInput" class="hidden">
+          </div>
+          <div class="report-actions">
             <button class="btn primary" id="reportGoBtn">عرض</button>
             <button class="btn gold" id="exportExcelBtn">⬇ تصدير Excel</button>
           </div>
@@ -366,12 +377,20 @@ if ('caches' in window) {
         </div>
 
         <div id="tomorrowReportControls" class="hidden">
-          <div class="toolbar">
+          <div class="datebar" id="tomorrowReportDateBar" data-future="1">
             <input type="date" id="tomorrowReportDate">
-            <select id="tomorrowReportBranch"><option value="">كل الفروع</option></select>
-            <button class="btn primary" id="tomorrowReportGoBtn">عرض</button>
-            <button class="btn gold" id="tomorrowReportExportBtn">⬇ تصدير Excel</button>
+            <div class="day-jump">
+              <button type="button" data-day="prev" title="اليوم السابق" aria-label="اليوم السابق">→</button>
+              <button type="button" data-day="today">اليوم</button>
+              <button type="button" data-day="tomorrow">بكرة</button>
+              <button type="button" data-day="next" title="اليوم التالي" aria-label="اليوم التالي">←</button>
+            </div>
+          </div>
+          <div class="toolbar"><select id="tomorrowReportBranch"><option value="">كل الفروع</option></select></div>
+          <div class="report-actions">
             <button class="btn primary" id="tomorrowReportPdfBtn">📄 PDF للشيف (واتساب)</button>
+            <button class="btn gold" id="tomorrowReportExportBtn">⬇ Excel</button>
+            <button class="btn secondary" id="tomorrowReportGoBtn">🔄 تحديث</button>
           </div>
           <div id="tomorrowReportView"></div>
         </div>
@@ -415,36 +434,36 @@ if ('caches' in window) {
 
 <div class="toast" id="toast"></div>
 
-<script src="js/demo.js?v=5.40.0"></script>
-<script src="js/config.js?v=5.40.0"></script>
-<script src="js/i18n.js?v=5.40.0"></script>
-<script src="js/supabase-engine.js?v=5.40.0"></script>
-<script src="js/shared.js?v=5.40.0"></script>
-<script src="js/pickers.js?v=5.40.0"></script>
-<script src="js/auth.js?v=5.40.0"></script>
-<script src="js/sync.js?v=5.40.0"></script>
-<script src="js/items.js?v=5.40.0"></script>
-<script src="js/camera.js?v=5.40.0"></script>
-<script src="js/branches.js?v=5.40.0"></script>
-<script src="js/receiving.js?v=5.40.0"></script>
-<script src="js/remaining.js?v=5.40.0"></script>
-<script src="js/custody.js?v=5.40.0"></script>
-<script src="js/push.js?v=5.40.0"></script>
-<script src="js/ptr.js?v=5.40.0"></script>
-<script src="js/waste.js?v=5.40.0"></script>
-<script src="js/users.js?v=5.40.0"></script>
-<script src="js/audit.js?v=5.40.0"></script>
-<script src="js/forecast.js?v=5.40.0"></script>
-<script src="js/tomorrow.js?v=5.40.0"></script>
-<script src="js/juices.js?v=5.40.0"></script>
-<script src="js/checklist.js?v=5.40.0"></script>
-<script src="js/report.js?v=5.40.0"></script>
-<script src="js/daily-report.js?v=5.40.0"></script>
-<script src="js/settings.js?v=5.40.0"></script>
-<script src="js/help.js?v=5.40.0"></script>
-<script src="js/assistant.js?v=5.40.0"></script>
-<script src="js/dashboard.js?v=5.40.0"></script>
-<script src="js/main.js?v=5.40.0"></script>
+<script src="js/demo.js?v=5.41.0"></script>
+<script src="js/config.js?v=5.41.0"></script>
+<script src="js/i18n.js?v=5.41.0"></script>
+<script src="js/supabase-engine.js?v=5.41.0"></script>
+<script src="js/shared.js?v=5.41.0"></script>
+<script src="js/pickers.js?v=5.41.0"></script>
+<script src="js/auth.js?v=5.41.0"></script>
+<script src="js/sync.js?v=5.41.0"></script>
+<script src="js/items.js?v=5.41.0"></script>
+<script src="js/camera.js?v=5.41.0"></script>
+<script src="js/branches.js?v=5.41.0"></script>
+<script src="js/receiving.js?v=5.41.0"></script>
+<script src="js/remaining.js?v=5.41.0"></script>
+<script src="js/custody.js?v=5.41.0"></script>
+<script src="js/push.js?v=5.41.0"></script>
+<script src="js/ptr.js?v=5.41.0"></script>
+<script src="js/waste.js?v=5.41.0"></script>
+<script src="js/users.js?v=5.41.0"></script>
+<script src="js/audit.js?v=5.41.0"></script>
+<script src="js/forecast.js?v=5.41.0"></script>
+<script src="js/tomorrow.js?v=5.41.0"></script>
+<script src="js/juices.js?v=5.41.0"></script>
+<script src="js/checklist.js?v=5.41.0"></script>
+<script src="js/report.js?v=5.41.0"></script>
+<script src="js/daily-report.js?v=5.41.0"></script>
+<script src="js/settings.js?v=5.41.0"></script>
+<script src="js/help.js?v=5.41.0"></script>
+<script src="js/assistant.js?v=5.41.0"></script>
+<script src="js/dashboard.js?v=5.41.0"></script>
+<script src="js/main.js?v=5.41.0"></script>
 <script>
   // أزرار اللغة (عربي / English / বাংলা)
   ["loginLangSlot", "menuLangSlot"].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = phLangSwitcherHtml(); });

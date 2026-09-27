@@ -55,7 +55,7 @@ function initReportTab() {
 
   function syncBars() {
     const mode = modeSel.value;
-    dayInput.classList.toggle("hidden", mode !== "day");
+    document.getElementById("reportDayBar").classList.toggle("hidden", mode !== "day");
     monthInput.classList.toggle("hidden", mode !== "month");
     startInput.classList.toggle("hidden", mode !== "range");
     endInput.classList.toggle("hidden", mode !== "range");

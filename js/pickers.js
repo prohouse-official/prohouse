@@ -20,7 +20,7 @@
     bar.dataset.phDate = "1";
     bar.classList.add("ph-datebar");
     const q = (d) => bar.querySelector(`.day-jump [data-day="${d}"]`);
-    const prev = q("prev"), next = q("next"), yest = q("yesterday"), today = q("today");
+    const prev = q("prev"), next = q("next"), yest = q("yesterday"), today = q("today"), tmrw = q("tomorrow");
 
     const row = document.createElement("div");
     row.className = "ph-date-row";
@@ -29,7 +29,7 @@
     card.className = "ph-date-card";
     card.innerHTML = `<span class="ph-date-icon">📅</span><span class="ph-date-text"><b class="ph-date-day"></b><span class="ph-date-full"></span></span><span class="ph-date-rel"></span>`;
     input.classList.add("ph-hidden-select"); // الحقل الأصلي مخفي — التقويم تبعنا بيعبّيه
-    const allowFuture = bar.id === "tomorrowDateBar";
+    const allowFuture = bar.id === "tomorrowDateBar" || !!bar.dataset.future;
     card.addEventListener("click", () => openPhCalendar(input, allowFuture));
     if (prev) { prev.classList.add("ph-date-arrow"); row.appendChild(prev); }
     row.appendChild(card);
@@ -39,7 +39,7 @@
     const chips = bar.querySelector(".day-jump");
     if (chips) {
       chips.classList.add("ph-date-chips");
-      [yest, today].forEach(b => b && chips.appendChild(b));
+      [yest, today, tmrw].forEach(b => b && chips.appendChild(b));
       if (!chips.children.length) chips.remove();
     }
     const refresh = () => {
@@ -52,8 +52,9 @@
       const relEl = card.querySelector(".ph-date-rel");
       relEl.textContent = rel;
       relEl.hidden = !rel;
-      if (next) next.disabled = v >= todayStr() && bar.id !== "tomorrowDateBar";
+      if (next) next.disabled = v >= todayStr() && !allowFuture;
       if (today) today.classList.toggle("active", v === todayStr());
+      if (tmrw) tmrw.classList.toggle("active", v === addDaysStr(todayStr(), 1));
       if (yest) yest.classList.toggle("active", v === addDaysStr(todayStr(), -1));
     };
     input.addEventListener("change", refresh);
@@ -155,8 +156,31 @@
     render();
   }
 
+  // ---- قوائم الاختيار القصيرة (نوع التقرير، يوم/شهر/فترة) ← أزرار أسود/أصفر تنسحب يمين ويسار ----
+  function enhancePillSelect(sel) {
+    if (sel.dataset.phPills) return;
+    sel.dataset.phPills = "1";
+    const pills = document.createElement("div");
+    pills.className = "ph-branch-pills ph-tab-pills";
+    const render = () => {
+      pills.innerHTML = Array.from(sel.options).map(o => `<button type="button" data-v="${o.value.replace(/"/g, "&quot;")}" class="${o.value === sel.value ? "active" : ""}">${o.dataset.short || o.textContent}</button>`).join("");
+      pills.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+        if (sel.value === b.dataset.v) return;
+        sel.value = b.dataset.v;
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+        render();
+        b.scrollIntoView && pills.querySelector("button.active") && pills.querySelector("button.active").scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+      }));
+    };
+    sel.classList.add("ph-hidden-select");
+    sel.insertAdjacentElement("afterend", pills);
+    sel.addEventListener("change", render);
+    render();
+  }
+
   function scan(root) {
     (root.querySelectorAll ? root : document).querySelectorAll(".datebar").forEach(enhanceDateBar);
+    (root.querySelectorAll ? root : document).querySelectorAll("select.ph-pills").forEach(enhancePillSelect);
     const sels = Array.from((root.querySelectorAll ? root : document).querySelectorAll("select"));
     if (root.tagName === "SELECT") sels.push(root); // الخيارات انضافت للقائمة نفسها
     sels.forEach(sel => { if (isBranchSelect(sel)) enhanceBranchSelect(sel); });

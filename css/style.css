@@ -3327,3 +3327,20 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 .dr-sync span { font-size: 12.5px; font-weight: 800; color: #6b5a00; }
 .dr-sync .btn { padding: 8px 12px; font-size: 13px; }
 .dr-sync .btn:disabled { opacity: .55; }
+/* 📊 رأس التقارير: أزرار نوع التقرير + التاريخ بهوية برو هاوس */
+.report-head { margin-bottom: 12px; }
+.report-head-title { margin: 0 0 10px; font-size: 22px; font-weight: 900; }
+.ph-tab-pills { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+.ph-tab-pills::-webkit-scrollbar { display: none; }
+.ph-tab-pills button { flex: 0 0 auto; white-space: nowrap; }
+#reportContainer .ph-datebar { margin: 0 0 10px; }
+#reportContainer .ph-tab-pills + .datebar, #entriesReportControls > .ph-tab-pills { margin-bottom: 10px; }
+.report-period { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.report-period input { flex: 1 1 140px; min-height: 46px; border: 1.5px solid var(--line-strong); border-radius: 14px; background: #fff; font-family: inherit; font-size: 15px; font-weight: 800; padding: 0 12px; }
+.report-period input.hidden, .report-period span.hidden { display: none; }
+.report-period input:focus { outline: none; border-color: #E6CB3A; box-shadow: 0 0 0 3px rgba(245,215,66,.35); }
+.report-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.report-actions .btn { flex: 1 1 0; min-height: 46px; border-radius: 14px; font-weight: 900; white-space: nowrap; }
+#entriesReportControls .toolbar select, #entriesReportControls .toolbar label { min-height: 44px; border-radius: 14px; }
+.report-actions .btn.secondary { flex: 0 0 auto; padding: 0 14px; }
+.report-actions #tomorrowReportPdfBtn { flex: 1.6 1 0; }
