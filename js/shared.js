@@ -345,6 +345,12 @@ async function loadRequestedOrder(date, branch) {
 }
 
 // فروع تطلب بعدد السفنديشات (1/3 × 2) وتستلم بالوزن (جرام) — مثل الشاطئ. من الإعدادات: pan_order_branches
+// فروع لسا ما تحددت لها مناطق التصوير — تنشال منها صور التوثيق (إعداد photo_off_branches)
+function isPhotoOffBranch(branch) {
+  const raw = (typeof currentSettings !== "undefined" && currentSettings.photo_off_branches) || "";
+  return !!branch && raw.split(",").map(s => s.trim()).includes(branch);
+}
+
 function isPanOrderBranch(branch) {
   const raw = (typeof currentSettings !== "undefined" && currentSettings.pan_order_branches) || "";
   return !!branch && raw.split(",").map(s => s.trim()).includes(branch);

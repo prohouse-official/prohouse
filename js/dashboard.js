@@ -166,7 +166,7 @@ function dayStepsFor(s) {
   const state = (done, total) => (total > 0 && done >= total ? "done" : done > 0 ? "partial" : "todo");
 
   steps.push({ tab: "receiving", icon: "📦", title: "استلام الصبح", state: state(s.touched, s.total), note: fraction(s.touched, s.total) });
-  if (tabAllowed("opening")) {
+  if (tabAllowed("opening") && !(typeof isPhotoOffBranch === "function" && isPhotoOffBranch(s.branch))) {
     const r = s.photoRound;
     if (r) {
       steps.push({ tab: "opening", icon: "📷", title: `صور التوثيق — الجولة ${r.n}${r.missed && r.missed.length ? ` (الجولة ${r.missed.join(" و")} ناقصة)` : ""}`,
