@@ -902,6 +902,13 @@ const SupaEngine = (() => {
     if (!res.ok || !out.ok) throw new Error(out.error || `forms [${res.status}]`);
     return out;
   }
+  // 🔄 سحب مبيعات تابسنس الحين (يشغّل سحب GitHub) — action: "start" أو "status"
+  async function tabsensePull(action) {
+    const res = await fetch(SUPABASE_URL + "/functions/v1/tabsense-pull", { method: "POST", headers: fnHeaders(), body: JSON.stringify({ action }) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok && out.error !== "not_configured") throw new Error(out.error || `tabsense-pull [${res.status}]`);
+    return out;
+  }
   // 💬 المساعد بالذكاء الاصطناعي (يرجع null إذا ما فيه مفتاح بالسيرفر)
   async function askAssistant(question, lang, context) {
     const res = await fetch(SUPABASE_URL + "/functions/v1/assistant", { method: "POST", headers: fnHeaders(), body: JSON.stringify({ question, lang, context }) });
@@ -1010,6 +1017,7 @@ const SupaEngine = (() => {
     migratePhotosToStorage,
     sendGoogleForm,
     askAssistant,
+    tabsensePull,
     getLastFormSubmission,
     restoreEntryRows,
     saveDay,
