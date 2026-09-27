@@ -134,8 +134,10 @@ async function loadBranchStatus(branch, dash) {
       const doneIn = (stg) => cps.filter(cp => (dayPhotos || []).some(p => p.sessionId === prefix + stg.id.toUpperCase() && p.checkpointId === cp.id)).length;
       const autoIdx = Math.max(0, INSPECTION_STAGES.findIndex(st => st.id === getAutoInspectionStage()));
       const due = INSPECTION_STAGES.slice(0, autoIdx + 1).map((st, i) => ({ n: i + 1, done: doneIn(st), total: cps.length }));
-      const open = due.find(r => r.total > 0 && r.done < r.total);
-      photoRound = open ? { ...open, complete: false } : { ...due[due.length - 1], complete: true };
+      // الجولة اللي جا وقتها الحين (حسب الساعة)، ونذكر إذا جولة قبلها ناقصة
+      const cur = due[due.length - 1];
+      const missed = due.slice(0, -1).filter(r => r.total > 0 && r.done < r.total).map(r => r.n);
+      photoRound = { ...cur, complete: cur.total > 0 && cur.done >= cur.total, missed };
     } catch (e) { photoRound = null; }
   }
   const custody = typeof Custody !== "undefined" ? await Custody.statusFor(today, branch) : null;
@@ -167,7 +169,7 @@ function dayStepsFor(s) {
   if (tabAllowed("opening")) {
     const r = s.photoRound;
     if (r) {
-      steps.push({ tab: "opening", icon: "📷", title: `صور التوثيق — الجولة ${r.n}`,
+      steps.push({ tab: "opening", icon: "📷", title: `صور التوثيق — الجولة ${r.n}${r.missed && r.missed.length ? ` (الجولة ${r.missed.join(" و")} ناقصة)` : ""}`,
         state: r.complete ? "done" : r.done > 0 ? "partial" : "todo", note: `${r.done}/${r.total}` });
     } else {
       steps.push({ tab: "opening", icon: "📷", title: "صور التوثيق", state: s.photosCount > 0 ? "done" : "todo", note: s.photosCount > 0 ? `${s.photosCount} صورة` : "باقي" });
