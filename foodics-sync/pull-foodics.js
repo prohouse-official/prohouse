@@ -371,37 +371,51 @@ async function exploreFoodics(page) {
     }).catch(e => ({ error: e.message }));
     console.log(`EXPLORE[${label}] ` + JSON.stringify(info));
   };
-  await describe("dashboard");
-  // قائمة تقارير المبيعات: نجمع روابطها ونزور كل تقرير "sales-by" / "by" بتاريخ اليوم
   const today = riyadhDateObj(0).iso;
+  const txt = (el) => (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ");
+  // 1) أسماء كروت التقارير بصفحة تقارير المبيعات (نصوص بس)
   await page.goto("https://console.foodics.com/reports/sales-report", { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
   await page.waitForTimeout(4000);
-  await dismissFoodicsModals(page);
-  await describe("/reports/sales-report");
-  const hrefs = await page.evaluate(() => Array.from(new Set(Array.from(document.querySelectorAll("a[href]"))
-    .map(a => a.getAttribute("href")).filter(h => /^\/reports\/[a-z-]+$/.test(h))))).catch(() => []);
-  console.log("EXPLORE_LINKS " + JSON.stringify(hrefs));
-  const wanted = hrefs.filter(h => /categor|product|item|modifier|payment/i.test(h)).slice(0, 8);
-  for (const h of wanted) {
+  const cards = await page.evaluate(() => (document.querySelector("main") || document.body).innerText.replace(/\s+/g, " ").slice(0, 1500)).catch(() => "");
+  console.log("EXPLORE_SALES_REPORT_TEXT " + cards);
+  // 2) عناوين محتملة لتقارير التصنيف والمنتج
+  for (const h of ["/reports/sales-by-category", "/reports/sales-by-product", "/reports/sales-by-product-category", "/reports/sales-by-modifier", "/reports/sales-by-order-type"]) {
     await page.goto(`https://console.foodics.com${h}?date=${today}+-+${today}`, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
-    await page.waitForTimeout(4000);
+    await page.waitForTimeout(3500);
     await dismissFoodicsModals(page);
     await describe(h);
   }
-  // لوحة التصفية (عشان نعرف كيف نختار الفرع): نضغط «تصفية» ونطبع أسماء الحقول
+  // 3) قائمة «تجميع بـ» بتقرير المبيعات حسب الفرع
+  await page.goto(`https://console.foodics.com/reports/sales-by-branch?date=${today}+-+${today}`, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+  await page.waitForTimeout(3500);
+  await dismissFoodicsModals(page);
+  const groupBtn = page.locator('button:has-text("تجميع")').first();
+  if (await groupBtn.isVisible().catch(() => false)) {
+    await groupBtn.click().catch(() => {});
+    await page.waitForTimeout(1500);
+    const opts = await page.evaluate(() => Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], li, .dropdown-item'))
+      .map(e => (e.innerText || "").trim().replace(/\s+/g, " ")).filter(t => t && t.length < 40).slice(0, 40)).catch(() => []);
+    console.log("EXPLORE_GROUPBY " + JSON.stringify(opts));
+    await page.keyboard.press("Escape").catch(() => {});
+  }
+  // 4) لوحة التصفية: حقل الفروع وخياراته
   const filterBtn = page.locator('button:has-text("تصفية")').first();
   if (await filterBtn.isVisible().catch(() => false)) {
     await filterBtn.click().catch(() => {});
     await page.waitForTimeout(2000);
-    const fields = await page.evaluate(() => {
-      const txt = (el) => (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 50);
-      return {
-        labels: Array.from(document.querySelectorAll("label")).map(txt).filter(Boolean).slice(0, 30),
-        inputs: Array.from(document.querySelectorAll("input, select")).map(i => (i.name || i.id || i.placeholder || i.type)).slice(0, 30),
-        url: location.href
-      };
-    }).catch(e => ({ error: e.message }));
-    console.log("EXPLORE_FILTER " + JSON.stringify(fields));
+    const branchField = page.locator('label:has-text("الفروع")').first();
+    if (await branchField.isVisible().catch(() => false)) {
+      const box = page.locator('label:has-text("الفروع") ~ *, label:has-text("الفروع") + *').first();
+      await (await box.isVisible().catch(() => false) ? box : branchField).click().catch(() => {});
+      await page.waitForTimeout(1500);
+    }
+    const panel = await page.evaluate(() => ({
+      options: Array.from(document.querySelectorAll('[role="option"], [role="menuitem"], li, .multiselect__option, .vs__dropdown-option'))
+        .map(e => (e.innerText || "").trim().replace(/\s+/g, " ")).filter(t => t && t.length < 40).slice(0, 40),
+      buttons: Array.from(document.querySelectorAll("button")).map(b => (b.innerText || "").trim()).filter(t => t && t.length < 30).slice(-12),
+      html: (document.querySelector('label') && document.querySelector('label').parentElement ? document.querySelector('label').parentElement.outerHTML : "").replace(/\s+/g, " ").slice(0, 900)
+    })).catch(e => ({ error: e.message }));
+    console.log("EXPLORE_FILTER_BRANCHES " + JSON.stringify(panel));
   }
 }
 
