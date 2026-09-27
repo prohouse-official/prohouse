@@ -446,6 +446,8 @@ function renderRemainingView(receivingData, salesData) {
   let grandTotalActualRemainingWeight = 0;
   let grandTotalActualSauce = 0;
   let grandTotalWasteGrams = 0;
+  let grandTotalReceivedMeals = 0; // المستلم بالوجبات مثل المبيعات: البروتين ÷ 150 جم + الساندويتشات والسلطات بالعدد
+  let grandTotalShortMeals = 0;    // مجموع العجز بالوجبات (يتعبّى تحت مع حساب كل تصنيف)
   let highVarianceCount = 0;
 
   const byCat = {};
@@ -471,6 +473,8 @@ function renderRemainingView(receivingData, salesData) {
       const recEntry = receivingMap[it.id] || {};
       const recQty = Number(recEntry.received || 0);
       grandTotalReceivedWeight += recQty;
+      if (isWeightMealCategory(cat)) grandTotalReceivedMeals += recQty / MEAL_WEIGHT_G;
+      else if (isMealCat) grandTotalReceivedMeals += recQty;
 
       const remData = currentRemainingData[it.id] || { remainingWeight: "", remainingSauce: "" };
       const actualWeight = Number(remData.remainingWeight || remData.remaining || 0);
@@ -513,18 +517,15 @@ function renderRemainingView(receivingData, salesData) {
           <span class="rem-stat-lbl">أصناف تم جردها</span>
         </div>
         <div class="rem-stat-pill ok">
-          <span class="rem-stat-num">${Math.round(grandTotalReceivedWeight)}g</span>
-          <span class="rem-stat-lbl">المستلم صباحاً</span>
+          <span class="rem-stat-num">${Math.round(grandTotalReceivedMeals)}</span>
+          <span class="rem-stat-lbl">وجبات مستلمة صباحاً</span>
         </div>
         ${Auth.canSeeSales() ? `
         <div class="rem-stat-pill">
           <span class="rem-stat-num">${Math.round(grandTotalSoldMeals)}</span>
           <span class="rem-stat-lbl">وجبات مباعة (تابسنس)</span>
         </div>
-        <div class="rem-stat-pill ${grandTotalWasteGrams > 0 ? 'warn' : 'ok'}">
-          <span class="rem-stat-num">${Math.round(grandTotalWasteGrams)}g</span>
-          <span class="rem-stat-lbl">إجمالي الفاقد/الهدر</span>
-        </div>
+        %%REM_SHORT_PILL%%
         ` : `
         <div class="rem-stat-pill">
           <span class="rem-stat-num">${Math.round(grandTotalActualRemainingWeight)}g${grandTotalActualSauce > 0 ? ` | 🥣 ${grandTotalActualSauce}` : ''}</span>
@@ -713,6 +714,7 @@ function renderRemainingView(receivingData, salesData) {
       const catBadge = getVarianceBadge(catVariancePct);
 
       if (catVarianceGrams < 0) grandTotalWasteGrams += Math.abs(catVarianceGrams);
+      if (hasRemainingRecorded && catVarianceGrams < -50) grandTotalShortMeals += Math.abs(catVarianceGrams) / MEAL_WEIGHT_G;
       if (catBadge.level === "critical") highVarianceCount++;
 
       const recMeals = (catReceivedSum / MEAL_WEIGHT_G).toFixed(1).replace(/\.0$/, "");
@@ -738,6 +740,7 @@ function renderRemainingView(receivingData, salesData) {
       const soldCount = categorySoldMeals;
       const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
       const catVariance = Math.round(catActualChickenSum) - expectedRem;
+      if (hasRemainingRecorded && catVariance < 0) grandTotalShortMeals += Math.abs(catVariance);
 
       recDisplay = `${recCount} ساندويتش`;
       soldDisplay = `${soldCount || 0} ساندويتش`;
@@ -757,6 +760,7 @@ function renderRemainingView(receivingData, salesData) {
       const soldCount = categorySoldMeals;
       const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
       const catVariance = Math.round(catActualChickenSum) - expectedRem;
+      if (hasRemainingRecorded && catVariance < 0) grandTotalShortMeals += Math.abs(catVariance);
 
       recDisplay = `${recCount} حبة`;
       soldDisplay = `${soldCount || 0} حبة`;
@@ -835,6 +839,11 @@ function renderRemainingView(receivingData, salesData) {
     `;
   });
 
+  const shortMeals = Math.round(grandTotalShortMeals * 10) / 10;
+  html = html.replace("%%REM_SHORT_PILL%%", `<div class="rem-stat-pill ${shortMeals > 0 ? 'warn' : 'ok'}">
+          <span class="rem-stat-num">${shortMeals}</span>
+          <span class="rem-stat-lbl">إجمالي العجز (وجبات)</span>
+        </div>`);
   view.innerHTML = html;
   filterRemainingCardsUI();
   updateEntryProgress(view);
