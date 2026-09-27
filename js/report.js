@@ -673,7 +673,9 @@ async function runTomorrowReport() {
         const it = Items.byId(e.itemId) || { name: e.itemName, category: "-", unit: e.unit, sortOrder: 999 };
         return {
           category: it.category || "-", name: chefReportName(it, e.cookName),
-          size: itemPanSize({ ...it, unit: it.unit || e.unit }), qty: chefQtyText(Number(e.qty), it.unit || e.unit), notes: e.notes || "",
+          // فرع يطلب بالسفنديشات: الحجم من الطلبية نفسها والعدد عدد سفنديشات
+          size: isPanOrderBranch(branch) ? (e.unit || itemPanSize(it)) : itemPanSize({ ...it, unit: it.unit || e.unit }),
+          qty: isPanOrderBranch(branch) ? Number(e.qty) : chefQtyText(Number(e.qty), it.unit || e.unit), notes: e.notes || "",
           rank: categoryRank(it.category), sort: order.has(e.itemId) ? order.get(e.itemId) : 9999
         };
       })
