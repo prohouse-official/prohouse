@@ -325,11 +325,13 @@ function initDayJumpButtons() {
       if (!input) return;
       const today = todayStr();
       const current = input.value || today;
+      const future = !!btn.closest(".datebar").dataset.future; // تقرير الشيف: يقدر يروح لبكرة وبعده
       let next = current;
       if (btn.dataset.day === "today") next = today;
       else if (btn.dataset.day === "yesterday") next = addDaysStr(today, -1);
+      else if (btn.dataset.day === "tomorrow") next = addDaysStr(today, 1);
       else if (btn.dataset.day === "prev") next = addDaysStr(current, -1);
-      else if (btn.dataset.day === "next") next = current < today ? addDaysStr(current, 1) : today;
+      else if (btn.dataset.day === "next") next = future || current < today ? addDaysStr(current, 1) : today;
       if (next === input.value) return;
       input.value = next;
       input.dispatchEvent(new Event("change", { bubbles: true }));
