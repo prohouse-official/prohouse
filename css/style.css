@@ -3308,3 +3308,14 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 .dr-cash.no { color: #9A5B00; }
 .dr-cash-sub { font-size: 12px; color: var(--gray); font-weight: 700; }
 .dr-empty { color: var(--gray); font-weight: 700; padding: 10px 0; }
+
+/* معرض صور التوثيق مرتب حسب الجولات */
+.insp-round-pills { margin: 6px 0 14px; flex-wrap: wrap; }
+.insp-round { background: var(--card, #fff); border: 1px solid var(--line, #e5e2d8); border-radius: 18px; padding: 12px; margin-bottom: 14px; }
+.insp-round-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.insp-round-head b { font-size: 16px; }
+.insp-round-count { font-weight: 900; font-size: 13px; border-radius: 999px; padding: 3px 10px; background: #F2F2F2; color: #555; }
+.insp-round-count.part { background: #FFF6CC; color: #8A6A00; }
+.insp-round-count.ok { background: #EEF8F2; color: #137A50; }
+.insp-round-missing { font-size: 12.5px; font-weight: 700; color: #9A5B00; background: #FFF4E5; border-radius: 10px; padding: 6px 10px; margin-bottom: 10px; }
+.insp-round-empty { color: var(--gray); font-weight: 700; font-size: 13px; padding: 6px 2px; }
