@@ -372,17 +372,36 @@ async function exploreFoodics(page) {
     console.log(`EXPLORE[${label}] ` + JSON.stringify(info));
   };
   await describe("dashboard");
-  for (const url of [
-    "https://console.foodics.com/reports",
-    "https://console.foodics.com/reports/sales",
-    "https://console.foodics.com/reports/sales-by-branch",
-    "https://console.foodics.com/reports/categories",
-    "https://console.foodics.com/reports/products"
-  ]) {
-    await page.goto(url, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+  // قائمة تقارير المبيعات: نجمع روابطها ونزور كل تقرير "sales-by" / "by" بتاريخ اليوم
+  const today = riyadhDateObj(0).iso;
+  await page.goto("https://console.foodics.com/reports/sales-report", { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+  await page.waitForTimeout(4000);
+  await dismissFoodicsModals(page);
+  await describe("/reports/sales-report");
+  const hrefs = await page.evaluate(() => Array.from(new Set(Array.from(document.querySelectorAll("a[href]"))
+    .map(a => a.getAttribute("href")).filter(h => /^\/reports\/[a-z-]+$/.test(h))))).catch(() => []);
+  console.log("EXPLORE_LINKS " + JSON.stringify(hrefs));
+  const wanted = hrefs.filter(h => /categor|product|item|modifier|payment/i.test(h)).slice(0, 8);
+  for (const h of wanted) {
+    await page.goto(`https://console.foodics.com${h}?date=${today}+-+${today}`, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
     await page.waitForTimeout(4000);
     await dismissFoodicsModals(page);
-    await describe(url.replace("https://console.foodics.com", ""));
+    await describe(h);
+  }
+  // لوحة التصفية (عشان نعرف كيف نختار الفرع): نضغط «تصفية» ونطبع أسماء الحقول
+  const filterBtn = page.locator('button:has-text("تصفية")').first();
+  if (await filterBtn.isVisible().catch(() => false)) {
+    await filterBtn.click().catch(() => {});
+    await page.waitForTimeout(2000);
+    const fields = await page.evaluate(() => {
+      const txt = (el) => (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 50);
+      return {
+        labels: Array.from(document.querySelectorAll("label")).map(txt).filter(Boolean).slice(0, 30),
+        inputs: Array.from(document.querySelectorAll("input, select")).map(i => (i.name || i.id || i.placeholder || i.type)).slice(0, 30),
+        url: location.href
+      };
+    }).catch(e => ({ error: e.message }));
+    console.log("EXPLORE_FILTER " + JSON.stringify(fields));
   }
 }
 
