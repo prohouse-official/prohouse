@@ -62,7 +62,8 @@ async function loadDailyBranch(date, branch) {
     const received = mine.reduce((a, x) => a + Number(x.received || 0), 0);
     const counted = mine.some(x => x.remaining != null || x.remainingWeight != null || x.remainingSauce != null);
     const remaining = mine.reduce((a, x) => {
-      if (s.weight) return a + Number(x.remainingWeight != null ? x.remainingWeight : (x.remainingSauce == null ? (x.remaining || 0) : 0));
+      // الصوص الباقي بالصحن من وزن الاستلام، فيحسب من المتبقي
+      if (s.weight) return a + Number(x.remainingWeight != null ? x.remainingWeight : (x.remainingSauce != null ? x.remainingSauce : (x.remaining || 0)));
       return a + Number(x.remaining != null ? x.remaining : (x.remainingWeight || 0));
     }, 0);
     const wasted = wasteItems.filter(w => catOf(w.itemId) === s.cat).reduce((a, w) => a + Number(w.qty || 0), 0);
