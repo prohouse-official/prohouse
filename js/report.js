@@ -684,7 +684,7 @@ async function runTomorrowReport() {
     };
     const rowFor = (it, e, d) => {
       const a = actual(d, it.unit || (e && e.unit));
-      const notes = [e && e.notes, a.sauce ? "متبقي صوص" : "", a.notMade ? "ما انعمل" : ""].filter(Boolean).join(" · ");
+      const notes = [e && e.notes, a.sauce ? "متبقي صوص" : "", a.notMade ? "لم يُحضَّر" : ""].filter(Boolean).join(" · ");
       return {
         category: it.category || "-", name: chefReportName(it, (d && d.cookName) || (e && e.cookName)),
         // فرع يطلب بالسفنديشات: الحجم من الطلبية نفسها والعدد عدد سفنديشات
@@ -697,7 +697,7 @@ async function runTomorrowReport() {
     const ordered = (perBranch[i] || []).filter(e => e.qty !== "" && e.qty != null && Number(e.qty) > 0);
     const orderedIds = new Set(ordered.map(e => e.itemId));
     const rows = ordered
-      // الطلب يضل ظاهر حتى لو ما انعمل (مستلم 0)، إلا خانات الشيف الفاضية — مكانها الطبخات اللي انعملت فعلاً
+      // الطلب يضل ظاهر حتى لو ما انعمل (مستلم 0 ولم يُحضَّر)، إلا خانات الشيف الفاضية — مكانها الطبخات اللي انعملت فعلاً
       .filter(e => { const it = Items.byId(e.itemId); return !hasReceiving || received(dayById.get(e.itemId)) || !(it && isChefItem(it)); })
       .map(e => rowFor(Items.byId(e.itemId) || { id: e.itemId, name: e.itemName, category: "-", unit: e.unit }, e, dayById.get(e.itemId)))
       .concat(hasReceiving ? dayItems.filter(d => received(d) && !orderedIds.has(d.itemId)).map(d => {
