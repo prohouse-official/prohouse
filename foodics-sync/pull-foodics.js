@@ -372,50 +372,57 @@ async function exploreFoodics(page) {
     console.log(`EXPLORE[${label}] ` + JSON.stringify(info));
   };
   const today = riyadhDateObj(0).iso;
-  const txt = (el) => (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ");
-  // 1) أسماء كروت التقارير بصفحة تقارير المبيعات (نصوص بس)
-  await page.goto("https://console.foodics.com/reports/sales-report", { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
-  await page.waitForTimeout(4000);
-  const cards = await page.evaluate(() => (document.querySelector("main") || document.body).innerText.replace(/\s+/g, " ").slice(0, 1500)).catch(() => "");
-  console.log("EXPLORE_SALES_REPORT_TEXT " + cards);
-  // 2) عناوين محتملة لتقارير التصنيف والمنتج
-  for (const h of ["/reports/sales-by-category", "/reports/sales-by-product", "/reports/sales-by-product-category", "/reports/sales-by-modifier", "/reports/sales-by-order-type"]) {
-    await page.goto(`https://console.foodics.com${h}?date=${today}+-+${today}`, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
-    await page.waitForTimeout(3500);
-    await dismissFoodicsModals(page);
-    await describe(h);
-  }
-  // 3) قائمة «تجميع بـ» بتقرير المبيعات حسب الفرع
-  await page.goto(`https://console.foodics.com/reports/sales-by-branch?date=${today}+-+${today}`, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+  // نصوص العناصر الظاهرة — نقارن قبل/بعد الضغط عشان نعرف وش انفتح (قائمة، خيارات)
+  const visibleTexts = () => page.evaluate(() => Array.from(document.querySelectorAll("body *"))
+    .filter(e => e.children.length === 0 && e.offsetParent !== null)
+    .map(e => (e.innerText || "").trim().replace(/\s+/g, " ")).filter(t => t && t.length < 50)).catch(() => []);
+  const diff = (a, b) => Array.from(new Set(b.filter(x => !a.includes(x)))).slice(0, 40);
+  // طلبات الشبكة (العنوان بس، بدون الردود) — نعرف أسماء باراميترات الفرع والتجميع
+  const reqs = [];
+  page.on("request", r => { const u = r.url(); if (/api|report/i.test(u) && !/\.(js|css|png|svg|woff)/.test(u)) reqs.push(r.method() + " " + u.replace(/^https?:\/\/[^/]+/, "")
+    // السجل عام: نخفي أي قيمة شكلها توكن/مفتاح (طويلة أو باسم token/key/sig)
+    .replace(/([?&][^=&]*(token|key|sig|auth)[^=&]*=)[^&]*/gi, "$1…")
+    .replace(/=([^&]{40,})/g, "=…")); });
+
+  const url = `https://console.foodics.com/reports/sales-by-category?date=${today}+-+${today}`;
+  await page.goto(url, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
   await page.waitForTimeout(3500);
   await dismissFoodicsModals(page);
-  const groupBtn = page.locator('button:has-text("تجميع")').first();
-  if (await groupBtn.isVisible().catch(() => false)) {
-    await groupBtn.click().catch(() => {});
-    await page.waitForTimeout(1500);
-    const opts = await page.evaluate(() => Array.from(document.querySelectorAll('[role="menuitem"], [role="option"], li, .dropdown-item'))
-      .map(e => (e.innerText || "").trim().replace(/\s+/g, " ")).filter(t => t && t.length < 40).slice(0, 40)).catch(() => []);
-    console.log("EXPLORE_GROUPBY " + JSON.stringify(opts));
-    await page.keyboard.press("Escape").catch(() => {});
-  }
-  // 4) لوحة التصفية: حقل الفروع وخياراته
-  const filterBtn = page.locator('button:has-text("تصفية")').first();
-  if (await filterBtn.isVisible().catch(() => false)) {
-    await filterBtn.click().catch(() => {});
-    await page.waitForTimeout(2000);
-    const branchField = page.locator('label:has-text("الفروع")').first();
-    if (await branchField.isVisible().catch(() => false)) {
-      const box = page.locator('label:has-text("الفروع") ~ *, label:has-text("الفروع") + *').first();
-      await (await box.isVisible().catch(() => false) ? box : branchField).click().catch(() => {});
-      await page.waitForTimeout(1500);
-    }
-    const panel = await page.evaluate(() => ({
-      options: Array.from(document.querySelectorAll('[role="option"], [role="menuitem"], li, .multiselect__option, .vs__dropdown-option'))
-        .map(e => (e.innerText || "").trim().replace(/\s+/g, " ")).filter(t => t && t.length < 40).slice(0, 40),
-      buttons: Array.from(document.querySelectorAll("button")).map(b => (b.innerText || "").trim()).filter(t => t && t.length < 30).slice(-12),
-      html: (document.querySelector('label') && document.querySelector('label').parentElement ? document.querySelector('label').parentElement.outerHTML : "").replace(/\s+/g, " ").slice(0, 900)
-    })).catch(e => ({ error: e.message }));
-    console.log("EXPLORE_FILTER_BRANCHES " + JSON.stringify(panel));
+  console.log("EXPLORE_REQS_LOAD " + JSON.stringify(reqs.splice(0).slice(-8)));
+
+  // 1) «تجميع بـ»
+  let before = await visibleTexts();
+  await page.locator('button:has-text("تجميع")').first().click().catch(() => {});
+  await page.waitForTimeout(1500);
+  console.log("EXPLORE_GROUPBY_NEW " + JSON.stringify(diff(before, await visibleTexts())));
+  await page.keyboard.press("Escape").catch(() => {});
+  await page.waitForTimeout(800);
+
+  // 2) التصفية ← حقل الفروع
+  await page.locator('button:has-text("تصفية")').first().click().catch(() => {});
+  await page.waitForTimeout(1500);
+  before = await visibleTexts();
+  const field = page.locator('[id="form_field_الفروع"], label[for="form_field_الفروع"]').first();
+  await field.click().catch(() => {});
+  await page.waitForTimeout(1500);
+  const opened = diff(before, await visibleTexts());
+  console.log("EXPLORE_BRANCH_OPTIONS " + JSON.stringify(opened));
+  const tag = await page.evaluate(() => { const el = document.getElementById("form_field_الفروع"); return el ? el.outerHTML.replace(/\s+/g, " ").slice(0, 500) : "none"; }).catch(() => "err");
+  console.log("EXPLORE_BRANCH_FIELD " + tag);
+
+  // 3) نختار الروضة ونطبّق، ونشوف وش تغيّر بالرابط والطلبات
+  const opt = page.getByText("الروضة", { exact: false }).last();
+  if (await opt.isVisible().catch(() => false)) {
+    await opt.click().catch(() => {});
+    await page.waitForTimeout(800);
+    await page.locator('button:has-text("تطبيق")').last().click().catch(() => {});
+    await page.waitForTimeout(3500);
+    console.log("EXPLORE_AFTER_BRANCH_URL " + page.url());
+    console.log("EXPLORE_REQS_BRANCH " + JSON.stringify(reqs.splice(0).slice(-8)));
+    const rows = await page.evaluate(() => { const t = document.querySelector("table"); return t ? t.querySelectorAll("tbody tr").length : -1; }).catch(() => -2);
+    console.log("EXPLORE_ROWS_AFTER_BRANCH " + rows);
+  } else {
+    console.log("EXPLORE_NO_RAWDAH_OPTION");
   }
 }
 
