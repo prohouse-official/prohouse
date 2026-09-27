@@ -388,6 +388,25 @@ async function exploreFoodics(page) {
   }
 }
 
+// ---- الإضافات (+50 جم دجاج/لحم/بحري) ← أجزاء وجبة: الوجبة 150 جم، فـ +50 جم = ثلث وجبة ----
+const MEAL_WEIGHT_G = 150;
+function addOnCategory(name) {
+  const t = normalizeArabic(name).toLowerCase();
+  if (/دجاج|chicken/.test(t)) return "دجاج";
+  if (/لحم|meat|beef|steak/.test(t)) return "لحم";
+  if (/سمك|جمبري|روبيان|سالمون|سلمون|بحري|fish|shrimp|salmon/.test(t)) return "بحري";
+  return null;
+}
+// كم جرام زيادة بالإضافة: "+50 دجاج" أو "إضافة دجاج 50 جرام" = 50، و"دجاج 200 جم" = 200 − 150 = 50
+function addOnExtraGrams(name) {
+  const t = String(name || "");
+  const m = t.match(/(\d+(?:\.\d+)?)/);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  if (/^\s*\+/.test(t) || /[اإأ]ضاف|زياد|extra|add/i.test(t)) return n <= MEAL_WEIGHT_G ? n : n - MEAL_WEIGHT_G;
+  return n > MEAL_WEIGHT_G ? n - MEAL_WEIGHT_G : 0;
+}
+
 // ---- قراءة تقرير فوديكس «مجمّع حسب الفرع» ----
 const toNum = (t) => parseFloat(String(t || "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[,٬\s]/g, "").replace("٫", ".")) || 0;
 function branchMatches(cell, branch) {
@@ -517,6 +536,7 @@ async function run() {
       console.log(`\n📅 ${iso}`);
       const cats = await readGroupedReport(page, "/reports/sales-by-category", iso, "التصنيف");
       const prods = await readGroupedReport(page, "/reports/sales-by-product", iso, "المنتج");
+      const mods = await readGroupedReport(page, "/reports/sales-by-modifier-option", iso, "خيار الإضافة");
       if (cats.ok) structureOk = true;
       if (!cats.ok) { console.warn(`⚠️ ما قدرنا نقرأ تقرير التصنيفات حسب الفرع (${cats.reason}) — ما انرسل شي لهاليوم`); continue; }
 
@@ -530,6 +550,17 @@ async function run() {
         });
         const ummAli = prodRows.filter(p => normalizeArabic(p.name).includes("ام علي")).reduce((t, p) => t + p.qty, 0);
         if (ummAli > 0) mapped[UMM_ALI_TARGET_CATEGORY] = (mapped[UMM_ALI_TARGET_CATEGORY] || 0) + ummAli / 2;
+        // الإضافات: جراماتها ÷ 150 = أجزاء وجبة تنضاف لقسمها
+        const modRows = mods.ok ? mine(mods.rows) : [];
+        const addOnNames = [], noGrams = [];
+        modRows.forEach(r => {
+          const cat = addOnCategory(r.name), g = addOnExtraGrams(r.name);
+          if (cat && g && r.qty > 0) { mapped[cat] = (mapped[cat] || 0) + (g * r.qty) / MEAL_WEIGHT_G; addOnNames.push(`${r.name}→${cat} ${g}جم`); }
+          else if (cat && r.qty > 0) noGrams.push(r.name);
+        });
+        if (noGrams.length) console.log(`ℹ️ ${branch}: إضافات بروتين بدون وزن بالاسم (ما انحسبت): ${Array.from(new Set(noGrams)).join("، ")}`);
+        // أسماء الإضافات اللي انحسبت وجرامها للحبة (بدون الكميات) عشان نتأكد من القراءة
+        if (addOnNames.length) console.log(`➕ ${branch}: إضافات محسوبة: ${Array.from(new Set(addOnNames)).join("، ")}`);
         const mappedRows = Object.keys(mapped).map(c => ({ category: c, qty: Math.round(mapped[c] * 100) / 100 }));
         // أسماء التصنيفات اللي ما عرفناها (أسماء بس، بدون أرقام) عشان نضيفها للخريطة
         if (unknown.size) console.log(`ℹ️ ${branch}: تصنيفات ما لها مقابل: ${Array.from(unknown).join("، ")}`);
@@ -538,6 +569,10 @@ async function run() {
         if (mappedRows.length) {
           try { await sendToSupabase("import_sales", iso, branch, mappedRows); sentAny = true; console.log(`☁️ ${branch}: انحفظت مبيعات ${mappedRows.length} قسم`); }
           catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ مبيعات الأقسام:`, e.message); }
+        }
+        if (modRows.length) {
+          try { await sendToSupabase("import_modifier_sales", iso, branch, modRows.filter(r => r.qty > 0).map(r => ({ modifier: "", option: r.name, qty: r.qty, net: null }))); }
+          catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ الإضافات:`, e.message); }
         }
         const productRows = prodRows.filter(p => p.name && p.qty > 0).map(p => ({ name: p.name, category: "", qty: p.qty }));
         if (productRows.length) {
