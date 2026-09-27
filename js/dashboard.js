@@ -75,9 +75,28 @@ async function loadBranchStatus(branch, dash) {
   const confirmedIds = new Set(items.filter(it => it.confirmed === true || it.confirmed === "TRUE").map(it => it.itemId));
   const touchedIds = new Set(items.filter(it => it.received !== "" && it.received != null).map(it => it.itemId));
 
-  const total = visible.length;
-  const confirmed = visible.filter(it => confirmedIds.has(it.id)).length;
-  const touched = visible.filter(it => touchedIds.has(it.id)).length;
+  // نفس أصناف شاشة الاستلام بالضبط: الثابتة ناقص اللي انشال اليوم، + الاختيارية (خانات الشيف)
+  // اللي انطلبت لهاليوم أو انستلمت، + الأصناف الإضافية اللي انضافت يدوي
+  const removed = new Set((dayData && (dayData.removedItemIds || (dayData.meta && dayData.meta.removedItemIds))) || []);
+  const orderedToday = new Set();
+  try {
+    const ord = await Sync.get("getTomorrowOrder", { date: today, branch }, "tomorrow:" + today + ":" + branch);
+    (ord || []).forEach(o => orderedToday.add(o.itemId));
+  } catch (e) { /* بدون طلبية: نعدّ الثابت بس */ }
+  const receivedPositive = new Set(items.filter(it => it.received !== "" && it.received != null && Number(it.received) > 0).map(it => it.itemId));
+  const recIds = Items.current.filter(it => {
+    if (removed.has(it.id)) return false;
+    const b = itemBranches(it);
+    if (b.length && !b.includes(branch)) return false;
+    if (isOptionalItem(it)) return receivedPositive.has(it.id) || orderedToday.has(it.id);
+    return true;
+  }).map(it => it.id);
+  const catalog = new Set(Items.current.map(it => it.id));
+  items.forEach(it => { if (!catalog.has(it.itemId) && !removed.has(it.itemId) && !recIds.includes(it.itemId)) recIds.push(it.itemId); });
+
+  const total = recIds.length;
+  const confirmed = recIds.filter(id => confirmedIds.has(id)).length;
+  const touched = recIds.filter(id => touchedIds.has(id)).length;
 
   let status = "none";
   if (touched > 0 && confirmed >= total && total > 0) status = "done";
@@ -105,13 +124,27 @@ async function loadBranchStatus(branch, dash) {
       photosCount = Array.isArray(photos) ? photos.length : 0;
     } catch (e) { photosCount = 0; }
   }
+  // صور التوثيق: الجولة الحالية (حسب الوقت) — أول جولة لسه ناقصة من الجولات اللي جا وقتها
+  let photoRound = null;
+  if (typeof INSPECTION_STAGES !== "undefined" && typeof SupaEngine !== "undefined" && SupaEngine.getInspectionPhotos) {
+    try {
+      const dayPhotos = await SupaEngine.getInspectionPhotos(today, branch);
+      const cps = typeof getCheckpointsForBranch === "function" ? getCheckpointsForBranch(branch) : [];
+      const prefix = "INSP-" + branch.replace(/\s+/g, "_") + "-" + today.replace(/-/g, "") + "-";
+      const doneIn = (stg) => cps.filter(cp => (dayPhotos || []).some(p => p.sessionId === prefix + stg.id.toUpperCase() && p.checkpointId === cp.id)).length;
+      const autoIdx = Math.max(0, INSPECTION_STAGES.findIndex(st => st.id === getAutoInspectionStage()));
+      const due = INSPECTION_STAGES.slice(0, autoIdx + 1).map((st, i) => ({ n: i + 1, done: doneIn(st), total: cps.length }));
+      const open = due.find(r => r.total > 0 && r.done < r.total);
+      photoRound = open ? { ...open, complete: false } : { ...due[due.length - 1], complete: true };
+    } catch (e) { photoRound = null; }
+  }
   const custody = typeof Custody !== "undefined" ? await Custody.statusFor(today, branch) : null;
 
   return {
     branch, total, confirmed, touched, status,
     remainingTotal: remainingVisible.length,
     remainingCounted: remainingVisible.filter(it => countedIds.has(it.id)).length,
-    photosCount,
+    photosCount, photoRound,
     custodyClosed: !!(custody && custody.closed),
     mealsToday: mealsFromDayItems(items),
     mealsYesterday: mealsFromDayItems((yesterdayData && yesterdayData.items) || []),
@@ -132,7 +165,13 @@ function dayStepsFor(s) {
 
   steps.push({ tab: "receiving", icon: "📦", title: "استلام الصبح", state: state(s.touched, s.total), note: fraction(s.touched, s.total) });
   if (tabAllowed("opening")) {
-    steps.push({ tab: "opening", icon: "📷", title: "صور التوثيق", state: s.photosCount > 0 ? "done" : "todo", note: s.photosCount > 0 ? `${s.photosCount} صورة` : "باقي" });
+    const r = s.photoRound;
+    if (r) {
+      steps.push({ tab: "opening", icon: "📷", title: `صور التوثيق — الجولة ${r.n}`,
+        state: r.complete ? "done" : r.done > 0 ? "partial" : "todo", note: `${r.done}/${r.total}` });
+    } else {
+      steps.push({ tab: "opening", icon: "📷", title: "صور التوثيق", state: s.photosCount > 0 ? "done" : "todo", note: s.photosCount > 0 ? `${s.photosCount} صورة` : "باقي" });
+    }
   }
   steps.push({ tab: "remaining", icon: "📊", title: "جرد المتبقي", state: state(s.remainingCounted, s.remainingTotal), note: fraction(s.remainingCounted, s.remainingTotal) });
   if (tabAllowed("custody")) {
