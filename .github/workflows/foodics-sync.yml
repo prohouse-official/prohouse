@@ -1,0 +1,74 @@
+name: Foodics 30-Min Sync
+
+on:
+  schedule:
+    # كل 30 دقيقة — بفرق ربع ساعة عن سحب تابسنس عشان ما يشتغلوا بنفس الوقت
+    - cron: '15,45 * * * *'
+  workflow_dispatch: # زر التشغيل اليدوي على GitHub
+    inputs:
+      backfill_days:
+        description: "Pull this many past days (e.g. 14). Empty = yesterday + today"
+        required: false
+        default: ""
+
+concurrency:
+  group: foodics-sync
+  cancel-in-progress: false
+
+jobs:
+  foodics-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # id-token: هوية التشغيل الموقّعة من GitHub — الموقع بيقبل المبيعات بس منها (بدل مفتاح سري بالكود)
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        working-directory: ./foodics-sync
+        run: |
+          npm ci || npm install
+
+      - name: Install Playwright Browsers
+        working-directory: ./foodics-sync
+        run: |
+          npx playwright install --with-deps chromium
+
+      - name: Create config.json from GitHub Secret
+        working-directory: ./foodics-sync
+        env:
+          FOODICS_CONFIG: ${{ secrets.FOODICS_CONFIG_JSON }}
+        run: |
+          if [ -n "$FOODICS_CONFIG" ]; then
+            echo "$FOODICS_CONFIG" > config.json
+          else
+            echo "Error: FOODICS_CONFIG_JSON secret is not set!"
+            exit 1
+          fi
+
+      - name: Run Foodics Sync Script
+        if: github.ref_name == 'main'
+        working-directory: ./foodics-sync
+        env:
+          BACKFILL_DAYS: ${{ github.event.inputs.backfill_days }}
+        run: |
+          node pull-foodics.js
+
+      # لما يفشل: صورة الشاشة (مثلاً الكابتشا أو صفحة تغيّرت) تنحفظ 3 أيام عشان نعرف السبب
+      - name: Upload error screenshot
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: foodics-error
+          path: foodics-sync/downloads/*.png
+          retention-days: 3
+          if-no-files-found: ignore

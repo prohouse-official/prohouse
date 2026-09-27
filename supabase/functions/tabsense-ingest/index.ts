@@ -1,6 +1,6 @@
-// استقبال مبيعات تابسنس من GitHub Actions بدون أي مفتاح سري بالكود.
+// استقبال مبيعات تابسنس وفوديكس من GitHub Actions بدون أي مفتاح سري بالكود.
 // GitHub بيعطي كل تشغيل للـ workflow هوية موقّعة (OIDC). منتأكد إنها من مستودعنا،
-// من فرع main، ومن ملف tabsense-sync.yml — وبعدين منادي دالة الاستيراد بمفتاح التكامل
+// من فرع main، ومن ملف tabsense-sync.yml أو foodics-sync.yml — وبعدين منادي دالة الاستيراد بمفتاح التكامل
 // اللي محفوظ جوّا الداتابيس وما بيطلع برا أبداً.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
