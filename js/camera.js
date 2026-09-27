@@ -307,8 +307,9 @@ async function getAllPhotos(branchFilter, dateFilter) {
 
 let isSyncingLocalPhotos = false;
 async function syncPendingLocalPhotos(localList) {
-  if (isSyncingLocalPhotos) return;
-  if (typeof SupaEngine === "undefined" || !SupaEngine.saveInspectionPhoto) return;
+  const result = { uploaded: 0, failed: 0, pending: 0 };
+  if (isSyncingLocalPhotos) return result;
+  if (typeof SupaEngine === "undefined" || !SupaEngine.saveInspectionPhoto) return result;
   isSyncingLocalPhotos = true;
   try {
     let list = localList;
@@ -327,7 +328,8 @@ async function syncPendingLocalPhotos(localList) {
     }
 
     list = (list || []).filter(p => !p.uploaded && !isStaleLocalPhoto(p));
-    if (list.length === 0) return;
+    result.pending = list.length;
+    if (list.length === 0) return result;
 
     // تجميع حسب الفرع والتاريخ
     const groups = {};
@@ -345,25 +347,36 @@ async function syncPendingLocalPhotos(localList) {
       const remoteIds = new Set((remote || []).map(rp => rp.id));
 
       for (const lp of g.photos) {
-        if (!remoteIds.has(lp.id)) {
-          console.log("رفع صورة محلية سابقة إلى السحابة:", lp.id, lp.checkpointName);
-          await SupaEngine.saveInspectionPhoto(lp);
-          remoteIds.add(lp.id);
+        // كل صورة لحالها: لو وحدة فشلت نكمّل الباقي ونعرف كم فشل
+        try {
+          if (!remoteIds.has(lp.id)) {
+            await SupaEngine.saveInspectionPhoto(lp);
+            remoteIds.add(lp.id);
+            result.uploaded++;
+          }
+          await markPhotoUploaded(lp.id);
+        } catch (e) {
+          result.failed++;
+          console.warn("photo upload failed:", lp.id, e);
         }
-        await markPhotoUploaded(lp.id);
       }
     }
   } catch (e) {
     console.warn("syncPendingLocalPhotos error:", e);
+    result.failed = Math.max(result.failed, result.pending - result.uploaded, 1);
   } finally {
     isSyncingLocalPhotos = false;
   }
+  return result;
 }
 
 async function manualSyncLocalPhotos() {
   showToast("⏳ جاري فحص ومزامنة صور هذا الجهاز مع السحابة…");
-  await syncPendingLocalPhotos();
-  showToast("✅ تمت مزامنة جميع صور الجهاز مع السحابة بنجاح!");
+  const r = await syncPendingLocalPhotos();
+  // الرسالة تقول الحقيقة: كم ارتفع وكم فشل (قبل كانت تقول «تمت» حتى لو ما ارتفع شيء)
+  if (!r || r.failed) showToast(`⚠ ما ارتفعت ${r ? r.failed : ""} صورة — تأكد من النت وجرّب مرة ثانية`);
+  else if (r.uploaded) showToast(`✅ ارتفعت ${r.uploaded} صورة للسحابة`);
+  else showToast("✅ كل صور هذا الجهاز موجودة بالسحابة");
   if (typeof renderOpeningView === "function" && document.getElementById("openingView") && !document.getElementById("openingView").classList.contains("hidden")) {
     renderOpeningView();
   }
