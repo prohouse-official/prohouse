@@ -1,0 +1,14 @@
+{
+  "name": "prohouse-foodics-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "سحب دوري تلقائي لتقرير مبيعات فروع الروضة والشاطئ من فوديكس وإرساله لموقع Pro House",
+  "main": "pull-foodics.js",
+  "scripts": {
+    "start": "node pull-foodics.js",
+    "install-browser": "playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}
