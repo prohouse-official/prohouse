@@ -426,6 +426,72 @@ async function exploreFoodics(page) {
   }
 }
 
+// ---- قراءة تقرير فوديكس «مجمّع حسب الفرع» ----
+const toNum = (t) => parseFloat(String(t || "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[,٬\s]/g, "").replace("٫", ".")) || 0;
+function branchMatches(cell, branch) {
+  const c = normalizeArabic(cell || ""), b = normalizeArabic(branch);
+  return !!c && c.includes(b);
+}
+
+async function readGroupedReport(page, path, iso, nameLabel) {
+  const url = `https://console.foodics.com${path}?date=${iso}+-+${iso}`;
+  await page.goto(url, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+  await page.waitForSelector("table", { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(1500);
+  await dismissFoodicsModals(page);
+
+  // «تجميع بـ» ← «الفرع»
+  const groupBtn = page.locator('button:has-text("تجميع")').first();
+  if (!(await groupBtn.isVisible().catch(() => false))) return { ok: false, reason: "ما لقينا زر التجميع", rows: [] };
+  await groupBtn.click().catch(() => {});
+  await page.waitForTimeout(1000);
+  const opt = page.getByText("الفرع", { exact: true }).last();
+  if (!(await opt.isVisible().catch(() => false))) return { ok: false, reason: "ما لقينا خيار الفرع", rows: [] };
+  await opt.click().catch(() => {});
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForTimeout(2500);
+
+  const all = [];
+  for (let pageNo = 0; pageNo < 20; pageNo++) {
+    const part = await page.evaluate((nameLabel) => {
+      const first = (el) => (el.innerText || "").split("\n")[0].trim();
+      const table = document.querySelector("table");
+      if (!table) return { error: "ما فيه جدول" };
+      const headers = Array.from(table.querySelectorAll("thead th, thead td")).map(first);
+      const idx = (re) => headers.findIndex(h => re.test(h));
+      const nameIdx = idx(new RegExp("^" + nameLabel));
+      const branchIdx = idx(/^الفرع/);
+      const qtyIdx = idx(/^صافي الكمية/);
+      const rows = [];
+      let groupBranch = "";
+      Array.from(table.querySelectorAll("tbody tr")).forEach(tr => {
+        const tds = Array.from(tr.querySelectorAll("td"));
+        const texts = tds.map(td => (td.innerText || "").trim());
+        // صف عنوان مجموعة (خلية ممتدة) = اسم الفرع
+        if (tds.length && (tds.length < headers.length / 2 || tds.some(td => td.colSpan > 1)) && texts[0]) { groupBranch = texts[0]; return; }
+        const name = nameIdx >= 0 ? texts[nameIdx] : "";
+        if (!name || /لا يوجد|no data|الإجمالي|المجموع|total/i.test(name)) return;
+        rows.push({ branch: branchIdx >= 0 ? texts[branchIdx] : groupBranch, name, qty: qtyIdx >= 0 ? texts[qtyIdx] : "" });
+      });
+      return { headers: headers.map(h => h.slice(0, 20)), nameIdx, branchIdx, qtyIdx, rows };
+    }, nameLabel).catch(e => ({ error: e.message }));
+    if (part.error) return { ok: false, reason: part.error, rows: [] };
+    if (pageNo === 0) {
+      const branchesSeen = Array.from(new Set(part.rows.map(r => r.branch).filter(Boolean)));
+      console.log(`🔎 ${path}: أعمدة ${JSON.stringify(part.headers.slice(0, 4))} · اسم=${part.nameIdx} فرع=${part.branchIdx} كمية=${part.qtyIdx} · فروع: ${branchesSeen.join("، ")}`);
+      if (part.nameIdx < 0 || part.qtyIdx < 0) return { ok: false, reason: "أعمدة الاسم/الكمية مو موجودة", rows: [] };
+      if (part.rows.length && !branchesSeen.length) return { ok: false, reason: "ما بان اسم الفرع بالصفوف", rows: [] };
+    }
+    part.rows.forEach(r => all.push({ branch: r.branch, name: r.name, qty: toNum(r.qty) }));
+    // الصفحة الجاية إذا فيه
+    const next = page.locator('button[aria-label*="next" i], button[aria-label*="التالي"], a[rel="next"], li.next:not(.disabled) a').first();
+    if (!(await next.isVisible().catch(() => false)) || !(await next.isEnabled().catch(() => false))) break;
+    await next.click().catch(() => {});
+    await page.waitForTimeout(2000);
+  }
+  return { ok: true, rows: all };
+}
+
 async function run() {
   fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true });
@@ -482,95 +548,50 @@ async function run() {
       return;
     }
 
-    for (const branch of branches) {
-      console.log(`\n==================================================`);
-      console.log(`🏢 بدء سحب مبيعات فوديكس لفرع: [${branch}]`);
-      console.log(`==================================================`);
+    // التقرير يعرض كل الفروع مع بعض، فمنجمّعه «حسب الفرع» ومنقسّم الصفوف على الفروع
+    let sentAny = false, structureOk = false;
+    for (const targetDate of targetDates) {
+      const { iso } = targetDate;
+      console.log(`\n📅 ${iso}`);
+      const cats = await readGroupedReport(page, "/reports/sales-by-category", iso, "التصنيف");
+      const prods = await readGroupedReport(page, "/reports/sales-by-product", iso, "المنتج");
+      if (cats.ok) structureOk = true;
+      if (!cats.ok) { console.warn(`⚠️ ما قدرنا نقرأ تقرير التصنيفات حسب الفرع (${cats.reason}) — ما انرسل شي لهاليوم`); continue; }
 
-      for (const targetDate of targetDates) {
-        const { display, iso } = targetDate;
-        console.log(`\n--------------------------------------------------`);
-        console.log(`📅 معالجة تاريخ: ${display} (${iso}) لفرع: ${branch}...`);
-
-        // ---- 1) فتح صفحة تقرير المبيعات المباشرة بالتاريخ المحدد ----
-        const reportUrl = `https://console.foodics.com/reports/sales-by-branch?date=${iso}+-+${iso}`;
-        console.log(`🌐 فتح تقرير المبيعات: ${reportUrl}`);
-        await page.goto(reportUrl, { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
-        await page.waitForTimeout(3000);
-        await dismissFoodicsModals(page);
-
-        // ضبط الفرع
-        await selectFoodicsBranch(page, branch);
-        await page.waitForTimeout(2000);
-
-        // سحب التصنيفات
-        const categoryRows = await extractCategoryTable(page);
-        console.log(`📊 صفوف جدول التصنيفات: ${categoryRows.length}`); // المستودع عام — لا نطبع أرقام المبيعات بالسجل
-
-        const mappedRows = [];
-        categoryRows.forEach(r => {
-          const targetCat = CATEGORY_MAP[r.category];
-          if (targetCat) {
-            const existing = mappedRows.find(m => m.category === targetCat);
-            if (existing) existing.qty += r.qty;
-            else mappedRows.push({ category: targetCat, qty: r.qty });
-          }
+      for (const branch of branches) {
+        const mine = (rows) => rows.filter(r => branchMatches(r.branch, branch));
+        const catRows = mine(cats.rows), prodRows = prods.ok ? mine(prods.rows) : [];
+        const mapped = {}, unknown = new Set();
+        catRows.forEach(r => {
+          const target = CATEGORY_MAP[r.name] || categorizeProduct(r.name, "");
+          if (target) mapped[target] = (mapped[target] || 0) + r.qty; else unknown.add(r.name);
         });
+        const ummAli = prodRows.filter(p => normalizeArabic(p.name).includes("ام علي")).reduce((t, p) => t + p.qty, 0);
+        if (ummAli > 0) mapped[UMM_ALI_TARGET_CATEGORY] = (mapped[UMM_ALI_TARGET_CATEGORY] || 0) + ummAli / 2;
+        const mappedRows = Object.keys(mapped).map(c => ({ category: c, qty: Math.round(mapped[c] * 100) / 100 }));
+        // أسماء التصنيفات اللي ما عرفناها (أسماء بس، بدون أرقام) عشان نضيفها للخريطة
+        if (unknown.size) console.log(`ℹ️ ${branch}: تصنيفات ما لها مقابل: ${Array.from(unknown).join("، ")}`);
+        console.log(`🏢 ${branch}: ${catRows.length} تصنيف · ${prodRows.length} منتج`);
 
-        // ---- 2) سحب المنتجات (أم علي + العصيرات) ----
-        console.log(`🍩 جاري سحب تقرير المنتجات لفرع ${branch}...`);
-        const products = await extractProductTable(page);
-        const ummAliQty = findProductQty(products, UMM_ALI_PRODUCT_NAME);
-        console.log(`أم علي ليوم ${display}: ${ummAliQty > 0 ? "موجود" : "ما فيه"}`);
-        
-        const sandwichesFromUmmAli = ummAliQty / 2;
-        if (sandwichesFromUmmAli > 0) {
-          console.log("تم إضافة أم علي للساندويتشات.");
-          const existing = mappedRows.find(r => r.category === UMM_ALI_TARGET_CATEGORY);
-          if (existing) existing.qty += sandwichesFromUmmAli;
-          else mappedRows.push({ category: UMM_ALI_TARGET_CATEGORY, qty: sandwichesFromUmmAli });
-        }
-
-        // مطابقة المنتجات مع التصنيفات الرئيسية مع إعطاء الأولوية للسلطات
-        if (products && products.length) {
-          products.forEach(p => {
-            const targetCat = categorizeProduct(p.category || "", p.name || "");
-            if (targetCat && p.qty > 0) {
-              const hasFromCategoryTable = categoryRows.some(r => CATEGORY_MAP[r.category] === targetCat);
-              if (!hasFromCategoryTable) {
-                const existing = mappedRows.find(m => m.category === targetCat);
-                if (existing) existing.qty += p.qty;
-                else mappedRows.push({ category: targetCat, qty: p.qty });
-              }
-            }
-          });
-        }
-
-        // ---- 3) إرسال مبيعات التصنيفات إلى Supabase ----
         if (mappedRows.length) {
-          try {
-            await sendToSupabase("import_sales", iso, branch, mappedRows);
-            console.log(`☁️ تم تحديث مبيعات التصنيفات على Supabase لفرع ${branch} (${mappedRows.length} تصنيف).`);
-          } catch (supaErr) {
-            console.warn(`⚠ تعذر تحديث Supabase (مبيعات التصنيفات لفرع ${branch}):`, supaErr.message);
-          }
-        } else {
-          console.warn(`⚠️ لم يتم العثور على مبيعات تصنيفات في فوديكس لفرع ${branch} في تاريخ ${iso}.`);
+          try { await sendToSupabase("import_sales", iso, branch, mappedRows); sentAny = true; console.log(`☁️ ${branch}: انحفظت مبيعات ${mappedRows.length} قسم`); }
+          catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ مبيعات الأقسام:`, e.message); }
         }
-
-        // ---- 4) مبيعات العصيرات ----
-        const juiceRows = pickJuiceRows(products, config.juiceCategories || DEFAULT_JUICE_CATEGORIES);
+        const productRows = prodRows.filter(p => p.name && p.qty > 0).map(p => ({ name: p.name, category: "", qty: p.qty }));
+        if (productRows.length) {
+          try { await sendToSupabase("import_product_sales", iso, branch, productRows); console.log(`🧾 ${branch}: انحفظت مبيعات ${productRows.length} منتج`); }
+          catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ مبيعات المنتجات:`, e.message); }
+        }
+        const juiceRows = pickJuiceRows(prodRows, config.juiceCategories || DEFAULT_JUICE_CATEGORIES);
         if (juiceRows.length) {
-          console.log(`🥤 جاري إرسال مبيعات ${juiceRows.length} عصير لفرع ${branch}...`);
-          try {
-            await sendToSupabase("import_juice_sales", iso, branch, juiceRows);
-            console.log(`☁️ تم تحديث مبيعات ${juiceRows.length} عصير على Supabase لفرع ${branch}.`);
-          } catch (supaErr) {
-            console.warn(`⚠ تعذر تحديث Supabase (مبيعات العصيرات لفرع ${branch}):`, supaErr.message);
-          }
+          try { await sendToSupabase("import_juice_sales", iso, branch, juiceRows); console.log(`🥤 ${branch}: انحفظت مبيعات ${juiceRows.length} عصير`); }
+          catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ العصيرات:`, e.message); }
         }
       }
     }
+    // إذا ولا مرة قدرنا نقرأ التقرير (صفحة فوديكس تغيّرت) نطلع بخطأ عشان يبان أحمر
+    if (!structureOk) throw new Error("ما قدرنا نقرأ تقرير فوديكس حسب الفرع — غالباً شكل الصفحة تغيّر");
+    if (!sentAny) console.log("ℹ️ ما فيه مبيعات جديدة للإرسال.");
 
   } catch (err) {
     console.error("❌ خطأ أثناء السحب:", err.message);
