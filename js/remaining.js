@@ -594,7 +594,7 @@ function renderRemainingView(receivingData, salesData) {
       if (recQty > 0 && Auth.canSeeSales()) {
         if (isWeightMeal) {
           const itemExpected = Math.max(0, recQty - categoryConsumedGrams - remainingWasteFor(it.id));
-          const diff = actualChicken - itemExpected;
+          const diff = numVal - itemExpected; // بروتين أو صوص — الاثنين من وزن الاستلام
           if (Math.abs(diff) > 50) {
             hasVariance = true;
             itemVarianceText = diff < 0 ? `🔻 عجز تقريبي: ${Math.round(diff)} جم` : `🔺 زيادة: +${Math.round(diff)} جم`;
@@ -708,7 +708,7 @@ function renderRemainingView(receivingData, salesData) {
 
     if (isWeightMeal) {
       const expectedRemainingGrams = Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste);
-      const catVarianceGrams = catActualChickenSum - expectedRemainingGrams;
+      const catVarianceGrams = catActualChickenSum + catActualSauceSum - expectedRemainingGrams; // الصوص الباقي بالصحن كان من وزن الاستلام — ينخصم من العجز
       const catVariancePct = catReceivedSum > 0 ? (catVarianceGrams / catReceivedSum) * 100 : 0;
       const catBadge = getVarianceBadge(catVariancePct);
 
@@ -794,7 +794,7 @@ function renderRemainingView(receivingData, salesData) {
           <div class="cat-header-main">
             <div class="cat-label">
               <span class="cat-title">${categoryIconSticker(cat)} ${cat}</span>
-              ${isWeightMeal && Auth.canSeeSales() ? `<span class="badge ${getVarianceBadge((catActualChickenSum - Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste)) / (catReceivedSum || 1) * 100).class}" style="font-size:11px;margin-right:6px;">${getVarianceBadge((catActualChickenSum - Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste)) / (catReceivedSum || 1) * 100).label}</span>` : ''}
+              ${isWeightMeal && Auth.canSeeSales() ? `<span class="badge ${getVarianceBadge((catActualChickenSum + catActualSauceSum - Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste)) / (catReceivedSum || 1) * 100).class}" style="font-size:11px;margin-right:6px;">${getVarianceBadge((catActualChickenSum + catActualSauceSum - Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste)) / (catReceivedSum || 1) * 100).label}</span>` : ''}
             </div>
 
             <!-- شريط مؤشرات التصنيف: المستلم، المباع، المتبقي، العجز -->
@@ -908,7 +908,7 @@ function updateCategoryHeaderMetrics(itemId) {
       if (isWeightMeal) {
         const categoryConsumedGrams = categorySoldMeals * MEAL_WEIGHT_G;
         const expectedRemainingGrams = Math.max(0, catReceivedSum - categoryConsumedGrams - catWaste);
-        const catVarianceGrams = catActualChickenSum - expectedRemainingGrams;
+        const catVarianceGrams = catActualChickenSum + catActualSauceSum - expectedRemainingGrams; // الصوص الباقي بالصحن كان من وزن الاستلام — ينخصم من العجز
         const varMeals = (catVarianceGrams / MEAL_WEIGHT_G).toFixed(1).replace(/\.0$/, "");
 
         if (hasRemainingRecorded) {
