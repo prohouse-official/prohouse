@@ -283,7 +283,7 @@ async function run() {
       console.log(`📊 جاري سحب تقرير المبيعات حسب التصنيف ليوم ${display}...`);
       await prepareReportPageAndSetDate(page, CATEGORY_REPORT_URL, display);
       const categoryRows = await extractCategoryTable(page);
-      console.log("جدول التصنيفات المستخرج:", categoryRows);
+      console.log(`📊 صفوف جدول التصنيفات: ${categoryRows.length}`); // المستودع عام — لا نطبع أرقام المبيعات بالسجل
 
       const mappedRows = [];
       categoryRows.forEach(r => {
@@ -313,11 +313,11 @@ async function run() {
         }
       }
       const ummAliQty = findProductQty(products, UMM_ALI_PRODUCT_NAME);
-      console.log(`كمية منتج أم علي المباعة ليوم ${display}: ${ummAliQty}`);
+      console.log(`أم علي ليوم ${display}: ${ummAliQty > 0 ? "موجود" : "ما فيه"}`);
       
       const sandwichesFromUmmAli = ummAliQty / 2;
       if (sandwichesFromUmmAli > 0) {
-        console.log(`تم إضافة ${sandwichesFromUmmAli} ساندويتش من مبيعات أم علي (${ummAliQty} حبة).`);
+        console.log("تم إضافة أم علي للساندويتشات.");
         const existing = mappedRows.find(r => r.category === UMM_ALI_TARGET_CATEGORY);
         if (existing) existing.qty += sandwichesFromUmmAli;
         else mappedRows.push({ category: UMM_ALI_TARGET_CATEGORY, qty: sandwichesFromUmmAli });
@@ -364,7 +364,7 @@ async function run() {
             const existing = mappedRows.find(r => r.category === cat);
             if (existing) existing.qty += meals;
             else mappedRows.push({ category: cat, qty: meals });
-            console.log(`➕ إضافات ${cat}: ${g} جم = ${meals} وجبة`);
+            console.log(`➕ إضافات ${cat}: تم الحساب`);
           });
         }
       } catch (modErr) {
@@ -406,7 +406,7 @@ async function run() {
       try {
         await prepareReportPageAndSetDate(page, PAYMENT_REPORT_URL, display);
         const paymentRows = await extractPaymentRows(page);
-        console.log(`💳 طرق الدفع ليوم ${iso}:`, paymentRows);
+        console.log(`💳 طرق الدفع ليوم ${iso}: ${paymentRows.length} صف`);
         if (paymentRows.length) {
           await sendToSupabase("import_payments", iso, BRANCH, paymentRows);
           console.log(`☁️ تم تحديث مبيعات طرق الدفع على Supabase لفرع ${BRANCH}.`);
@@ -431,7 +431,7 @@ async function run() {
           });
           const juiceJson = await juiceRes.json();
           if (!juiceJson.ok) console.warn("⚠ فشل إرسال مبيعات العصيرات:", juiceJson.error);
-          else console.log("🥤 تم إرسال مبيعات العصيرات:", juiceRows);
+          else console.log(`🥤 تم إرسال مبيعات ${juiceRows.length} عصير.`);
         } catch (jErr) {
           console.warn("⚠ خطأ شبكة أثناء إرسال مبيعات العصيرات:", jErr.message);
         }
@@ -446,7 +446,7 @@ async function run() {
       }
 
       if (mappedRows.length || juiceRows.length) {
-        console.log(`🎉 تم سحب وإرسال بيانات ${iso} لفرع ${BRANCH} بنجاح!`, mappedRows);
+        console.log(`🎉 تم سحب وإرسال بيانات ${iso} لفرع ${BRANCH} بنجاح (${mappedRows.length} تصنيف).`);
 
         // ---- 5) إشعارات الواتساب السحابية من GitHub Actions ----
         if ((config.whatsappPhone || config.adminPhone) && (config.whatsappApiKey || config.whatsappToken)) {

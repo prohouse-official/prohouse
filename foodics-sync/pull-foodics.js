@@ -162,7 +162,9 @@ async function dismissFoodicsModals(page) {
 
 // تبديل الفرع في لوحة تحكم فوديكس
 async function selectFoodicsBranch(page, targetBranchName) {
-  const searchName = (config.branchFoodicsNames && config.branchFoodicsNames[targetBranchName]) || (targetBranchName.includes("فرع") ? targetBranchName : `فرع ${targetBranchName}`);
+  // أسرار GitHub تخرّب العربي أحياناً (تصير ????) — نتجاهل أي قيمة فيها علامة استفهام
+  const fromConfig = config.branchFoodicsNames && config.branchFoodicsNames[targetBranchName];
+  const searchName = (fromConfig && !String(fromConfig).includes("?")) ? fromConfig : targetBranchName;
   console.log("🏢 جاري اختيار فرع (" + searchName + ") في فوديكس...");
 
   try {
@@ -349,6 +351,41 @@ function categorizeProduct(pCat, pName) {
   return null;
 }
 
+// ---- وضع الاستكشاف (FOODICS_EXPLORE=1): نعرف شكل صفحات فوديكس الحقيقية ----
+// يطبع روابط التقارير وأسماء أعمدة الجداول وعدد الصفوف بس — بدون أي أرقام مبيعات (السجل عام)
+async function exploreFoodics(page) {
+  const describe = async (label) => {
+    const info = await page.evaluate(() => {
+      const txt = (el) => (el.innerText || el.textContent || "").trim().replace(/\s+/g, " ").slice(0, 60);
+      const links = Array.from(document.querySelectorAll("a[href]"))
+        .filter(a => /report/i.test(a.getAttribute("href")))
+        .map(a => txt(a) + " -> " + a.getAttribute("href"));
+      const tables = Array.from(document.querySelectorAll("table")).map(t => ({
+        headers: Array.from(t.querySelectorAll("thead th, thead td")).map(txt),
+        rows: t.querySelectorAll("tbody tr").length
+      }));
+      const gridRows = document.querySelectorAll('[role="row"]').length;
+      const buttons = Array.from(document.querySelectorAll("button, [role='button'], select"))
+        .map(txt).filter(t => t && t.length < 40).slice(0, 40);
+      return { url: location.href, title: document.title, links: Array.from(new Set(links)).slice(0, 80), tables, gridRows, buttons };
+    }).catch(e => ({ error: e.message }));
+    console.log(`EXPLORE[${label}] ` + JSON.stringify(info));
+  };
+  await describe("dashboard");
+  for (const url of [
+    "https://console.foodics.com/reports",
+    "https://console.foodics.com/reports/sales",
+    "https://console.foodics.com/reports/sales-by-branch",
+    "https://console.foodics.com/reports/categories",
+    "https://console.foodics.com/reports/products"
+  ]) {
+    await page.goto(url, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+    await page.waitForTimeout(4000);
+    await dismissFoodicsModals(page);
+    await describe(url.replace("https://console.foodics.com", ""));
+  }
+}
+
 async function run() {
   fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
   const browser = await chromium.launch({ headless: true });
@@ -368,7 +405,7 @@ async function run() {
         const accInput = page.locator('#business_ref, input[name="business"]').first();
         if (await accInput.isVisible({ timeout: 5000 }).catch(() => false)) {
           await accInput.fill(String(config.accountNumber));
-          console.log(`✓ تم إدخال رقم الحساب: ${config.accountNumber}`);
+          console.log("✓ تم إدخال رقم الحساب");
         }
       }
 
@@ -400,6 +437,11 @@ async function run() {
     // إغلاق أي نافذة منبثقة أو رسالة تجديد
     await dismissFoodicsModals(page);
 
+    if (process.env.FOODICS_EXPLORE === "1") {
+      await exploreFoodics(page);
+      return;
+    }
+
     for (const branch of branches) {
       console.log(`\n==================================================`);
       console.log(`🏢 بدء سحب مبيعات فوديكس لفرع: [${branch}]`);
@@ -423,7 +465,7 @@ async function run() {
 
         // سحب التصنيفات
         const categoryRows = await extractCategoryTable(page);
-        console.log("جدول التصنيفات المستخرج:", categoryRows);
+        console.log(`📊 صفوف جدول التصنيفات: ${categoryRows.length}`); // المستودع عام — لا نطبع أرقام المبيعات بالسجل
 
         const mappedRows = [];
         categoryRows.forEach(r => {
@@ -439,11 +481,11 @@ async function run() {
         console.log(`🍩 جاري سحب تقرير المنتجات لفرع ${branch}...`);
         const products = await extractProductTable(page);
         const ummAliQty = findProductQty(products, UMM_ALI_PRODUCT_NAME);
-        console.log(`كمية منتج أم علي المباعة ليوم ${display}: ${ummAliQty}`);
+        console.log(`أم علي ليوم ${display}: ${ummAliQty > 0 ? "موجود" : "ما فيه"}`);
         
         const sandwichesFromUmmAli = ummAliQty / 2;
         if (sandwichesFromUmmAli > 0) {
-          console.log(`تم إضافة ${sandwichesFromUmmAli} ساندويتش من مبيعات أم علي (${ummAliQty} حبة).`);
+          console.log("تم إضافة أم علي للساندويتشات.");
           const existing = mappedRows.find(r => r.category === UMM_ALI_TARGET_CATEGORY);
           if (existing) existing.qty += sandwichesFromUmmAli;
           else mappedRows.push({ category: UMM_ALI_TARGET_CATEGORY, qty: sandwichesFromUmmAli });
@@ -468,7 +510,7 @@ async function run() {
         if (mappedRows.length) {
           try {
             await sendToSupabase("import_sales", iso, branch, mappedRows);
-            console.log(`☁️ تم تحديث مبيعات التصنيفات على Supabase لفرع ${branch} بنجاح.`, mappedRows);
+            console.log(`☁️ تم تحديث مبيعات التصنيفات على Supabase لفرع ${branch} (${mappedRows.length} تصنيف).`);
           } catch (supaErr) {
             console.warn(`⚠ تعذر تحديث Supabase (مبيعات التصنيفات لفرع ${branch}):`, supaErr.message);
           }
@@ -482,7 +524,7 @@ async function run() {
           console.log(`🥤 جاري إرسال مبيعات ${juiceRows.length} عصير لفرع ${branch}...`);
           try {
             await sendToSupabase("import_juice_sales", iso, branch, juiceRows);
-            console.log(`☁️ تم تحديث مبيعات العصيرات على Supabase لفرع ${branch} بنجاح.`, juiceRows);
+            console.log(`☁️ تم تحديث مبيعات ${juiceRows.length} عصير على Supabase لفرع ${branch}.`);
           } catch (supaErr) {
             console.warn(`⚠ تعذر تحديث Supabase (مبيعات العصيرات لفرع ${branch}):`, supaErr.message);
           }
