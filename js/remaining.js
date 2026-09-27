@@ -523,7 +523,7 @@ function renderRemainingView(receivingData, salesData) {
         ${Auth.canSeeSales() ? `
         <div class="rem-stat-pill">
           <span class="rem-stat-num">${Math.round(grandTotalSoldMeals)}</span>
-          <span class="rem-stat-lbl">وجبات مباعة (تابسنس)</span>
+          <span class="rem-stat-lbl">وجبات مباعة (${salesSourceName(currentRemainingBranch)})</span>
         </div>
         %%REM_SHORT_PILL%%
         ` : `
@@ -807,7 +807,7 @@ function renderRemainingView(receivingData, salesData) {
                 📥 مستلم: <b>${recDisplay}</b>
               </span>
               ${Auth.canSeeSales() ? `
-                <span class="cat-pill pill-sold" title="إجمالي المبيعات المسحوبة من تابسنس">
+                <span class="cat-pill pill-sold" title="إجمالي المبيعات المسحوبة من ${salesSourceName(currentRemainingBranch)}">
                   💳 مباع: <b>${soldDisplay}</b>
                 </span>
               ` : ''}
