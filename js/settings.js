@@ -4,10 +4,16 @@ let currentSettings = {};
 let categoryOrderState = [];
 
 async function loadSettings() {
-  const data = await Sync.get("getSettings", {}, "settings", (val) => { currentSettings = val || {}; applyBrandingFromSettings(); });
+  const data = await Sync.get("getSettings", {}, "settings", (val) => { currentSettings = val || {}; applyBrandingFromSettings(); settingsGatingRefresh(); });
   currentSettings = data || currentSettings;
   applyBrandingFromSettings();
+  settingsGatingRefresh();
   return currentSettings;
+}
+
+// بعض الإعدادات تغيّر وش يطلع للموظف (مثل فروع بدون صور توثيق) — نعيد إظهار/إخفاء الشاشات
+function settingsGatingRefresh() {
+  if (typeof applyRoleUiGating === "function" && typeof Auth !== "undefined" && Auth.role && Auth.role()) applyRoleUiGating();
 }
 
 function applyBrandingFromSettings() {

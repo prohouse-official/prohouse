@@ -25,7 +25,13 @@ const TAB_ROLE_ACCESS = {
 
 function tabAllowed(tab) {
   const role = Auth.role();
-  return !!(role && TAB_ROLE_ACCESS[tab] && TAB_ROLE_ACCESS[tab].includes(role));
+  if (!(role && TAB_ROLE_ACCESS[tab] && TAB_ROLE_ACCESS[tab].includes(role))) return false;
+  // صور التوثيق تنشال عن الموظف إذا كل فروعه لسا ما تحددت لها مناطق تصوير
+  if (tab === "opening" && role !== "owner" && typeof isPhotoOffBranch === "function") {
+    const mine = (Auth.branches && Auth.branches()) || [];
+    if (mine.length && mine.every(isPhotoOffBranch)) return false;
+  }
+  return true;
 }
 
 function openMobileSidebar() {
