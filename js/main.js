@@ -120,6 +120,8 @@ function setActiveTab(tab) {
   if (tab === "audit") { renderAuditView(); }
   if (tab === "checklist") { renderChecklistView(); }
   if (tab === "report") {
+    const rt = document.getElementById("reportType");
+    if (rt && rt.value === "daily") runDailyReport();
     loadReportLibs().then(() => {
       if (!document.getElementById("reportContainer").classList.contains("hidden")) redrawTrendChartIfReady();
     });

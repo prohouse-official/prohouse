@@ -34,12 +34,17 @@ function loadReportLibs() {
 
 function initReportTab() {
   document.getElementById("reportType").addEventListener("change", (e) => {
-    const isTomorrow = e.target.value === "tomorrow";
-    document.getElementById("entriesReportControls").classList.toggle("hidden", isTomorrow);
+    const type = e.target.value;
+    const isTomorrow = type === "tomorrow";
+    document.getElementById("dailyReportControls").classList.toggle("hidden", type !== "daily");
+    document.getElementById("entriesReportControls").classList.toggle("hidden", type === "daily" || isTomorrow);
     document.getElementById("tomorrowReportControls").classList.toggle("hidden", !isTomorrow);
     if (isTomorrow) runTomorrowReport();
+    if (type === "daily") runDailyReport();
+    if (type === "entries") runReport();
   });
   initTomorrowReportControls();
+  initDailyReportControls();
 
   const modeSel = document.getElementById("reportMode");
   const dayInput = document.getElementById("reportDayInput");
@@ -73,7 +78,7 @@ function initReportTab() {
   document.getElementById("reportEndInput").value = r.end;
 
   populateReportFilterOptions();
-  runReport();
+  // التقرير الافتراضي «تقرير اليوم» ينعرض لما تنفتح شاشة التقارير (بدل ما يحمّل تقرير الشهر عند كل فتح للتطبيق)
 }
 
 async function populateReportFilterOptions() {
