@@ -756,8 +756,8 @@ function confirmAddReceivingItem(category) {
   }
 
   // الصنف موجود أصلاً بهالقسم (حتى لو انشال اليوم أو اختياري)؟ نرجّعه هو بدل ما ننشئ نسخة ثانية بنفس الاسم
-  const norm = (s) => String(s || "").replace(/[إأآ]/g, "ا").replace(/ة$/, "ه").replace(/\s+/g, " ").trim();
-  const existing = (Items.current || []).find(it => (it.category || "عام") === category && norm(it.name) === norm(name) &&
+  const norm = (s) => String(s || "").replace(/[إأآ]/g, "ا").replace(/ة$/, "ه").replace(/\s+/g, "").trim();
+  const existing = (Items.current || []).find(it => norm(it.name) === norm(name) &&
     (!itemBranches(it).length || itemBranches(it).includes(currentReceivingBranch)));
   if (existing) {
     currentReceivingRemovedIds.delete(existing.id);

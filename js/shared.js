@@ -361,6 +361,13 @@ function madeToOrderSection(name) {
   return /ستيك|لحم/.test(String(name || "")) ? "لحم" : "بحري";
 }
 
+// الكارب ما ينجرد بعبداللطيف جميل، بس بالفروع اللي تطلب بالسفنديشات (الشاطئ والروضة) الرز والبطاطس تنوزن آخر اليوم
+function remainingHidesCategory(category, branch) {
+  const c = String(category || "");
+  const isCarb = c.includes("كارب") || c.toLowerCase().includes("carb");
+  return isCarb && !isPanOrderBranch(branch);
+}
+
 // مصدر المبيعات: عبداللطيف جميل على تابسنس، والروضة والشاطئ على فوديكس
 function salesSourceName(branch) {
   return branch === "عبداللطيف جميل" ? "تابسنس" : "فوديكس";

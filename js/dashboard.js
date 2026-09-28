@@ -112,7 +112,7 @@ async function loadBranchStatus(branch, dash) {
   const hasValue = (v) => v !== "" && v !== null && v !== undefined;
   const countedIds = new Set(items.filter(it => hasValue(it.remaining) || hasValue(it.remainingWeight) || hasValue(it.remainingSauce)).map(it => it.itemId));
   // نفس أصناف شاشة المتبقي: بدون الكارب واللي انشال اليوم، وخانات الشيف بس إذا انستلمت أو انجردت
-  const isCarb = (c) => { c = String(c || ""); return c.includes("كارب") || c.toLowerCase().includes("carb"); };
+  const isCarb = (c) => remainingHidesCategory(c, branch);
   const remIds = Items.current.filter(it => {
     if (removed.has(it.id) || isCarb(it.category)) return false;
     const b = itemBranches(it);
