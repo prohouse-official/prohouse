@@ -1249,8 +1249,10 @@ async function saveRemainingReportData() {
 
 // ==================== نموذج الصوص المتبقي (قوقل فورم) ====================
 // بعد حفظ المتبقي: الموقع بيجمع الصوص حسب النوع وبيبعت النموذج لحاله.
-// إذا الأرقام نفسها اللي انبعتت قبل ما منعيد؛ إذا تعدّلت منبعت نسخة جديدة (الشيت بيعتمد آخر رد).
-const SAUCE_FORM_BRANCHES = ["الروضة", "الشاطئ", "عبداللطيف جميل"];
+// ينرسل مرة وحدة باليوم لكل فرع (كل إرسال = سطر جديد عند المحاسب).
+// عبداللطيف جميل ما ينرسل من الجوال: السيرفر يرسله الساعة 9 الليل بآخر الأرقام (pg_cron → forms)، عشان أي تعديل قبلها ينحسب.
+const SAUCE_FORM_BRANCHES = ["الروضة", "الشاطئ"];
+const SAUCE_FORM_SCHEDULED = { "عبداللطيف جميل": "9 الليل" };
 function sauceBucketOf(it) {
   const n = it.name || it.itemName || "", c = it.category || "";
   if (/سالمون/.test(n)) return "salmon";
@@ -1271,6 +1273,11 @@ function sauceTotals(items) {
   return t;
 }
 async function sendSauceFormIfChanged(date, branch, items) {
+  if (SAUCE_FORM_SCHEDULED[branch]) {
+    const st = document.getElementById("remainingSaveStatus");
+    if (st) st.textContent += ` · نموذج الصوص ينرسل تلقائياً الساعة ${SAUCE_FORM_SCHEDULED[branch]} بآخر الأرقام`;
+    return;
+  }
   if (!SAUCE_FORM_BRANCHES.includes(branch) || typeof SupaEngine === "undefined" || !SupaEngine.sendGoogleForm) return;
   const totals = sauceTotals(items);
   const statusEl = document.getElementById("remainingSaveStatus");
