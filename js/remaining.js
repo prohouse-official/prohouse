@@ -1469,10 +1469,13 @@ function toggleRemainingNote(itemId) {
 // خانات الشيف من شاشة المتبقي
 function openRemainingChefPicker(category) {
   const shown = new Set(getAllRemainingActiveItems(cachedReceivingDataForRemaining).map(it => it.id));
+  const rec = cachedReceivingDataForRemaining;
+  const recRemoved = new Set((rec && (rec.removedItemIds || (rec.meta && rec.meta.removedItemIds))) || []);
   openChefPicker({
     category,
     branch: currentRemainingBranch,
-    isUsed: (id) => shown.has(id),
+    // الخانة اللي انشالت (بالاستلام أو المتبقي) تنحسب مستخدمة — لو اخترناها بتضل مخفية
+    isUsed: (id) => shown.has(id) || currentRemainingRemovedIds.has(id) || recRemoved.has(id),
     extraNames: Object.values(currentRemainingAddedSlots),
     onPick(slot, name) {
       currentRemainingAddedSlots[slot.id] = name;

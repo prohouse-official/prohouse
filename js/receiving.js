@@ -958,7 +958,8 @@ function openReceivingChefPicker(category) {
   openChefPicker({
     category,
     branch: currentReceivingBranch,
-    isUsed: (id) => shown.has(id),
+    // الخانة اللي انشالت اليوم تنحسب مستخدمة — لو اخترناها بتضل مخفية وما يقدر يدخل وزنها
+    isUsed: (id) => shown.has(id) || currentReceivingRemovedIds.has(id),
     extraNames: Object.values(currentReceivingData).map(d => d && d.cookName),
     onPick(slot, name) {
       currentReceivingAddedIds.add(slot.id);
