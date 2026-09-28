@@ -113,15 +113,16 @@ async function loadBranchStatus(branch, dash) {
   const countedIds = new Set(items.filter(it => hasValue(it.remaining) || hasValue(it.remainingWeight) || hasValue(it.remainingSauce)).map(it => it.itemId));
   // نفس أصناف شاشة المتبقي: بدون الكارب واللي انشال اليوم، وخانات الشيف بس إذا انستلمت أو انجردت
   const isCarb = (c) => remainingHidesCategory(c, branch);
+  const remRemoved = new Set((dayData && dayData.remainingRemovedItemIds) || []);
   const remIds = Items.current.filter(it => {
-    if (removed.has(it.id) || isCarb(it.category)) return false;
+    if (removed.has(it.id) || remRemoved.has(it.id) || isCarb(it.category)) return false;
     const b = itemBranches(it);
     if (b.length && !b.includes(branch)) return false;
     if (isOptionalItem(it)) return receivedPositive.has(it.id) || countedIds.has(it.id);
     return true;
   }).map(it => it.id);
   items.forEach(it => {
-    if (!catalog.has(it.itemId) && !removed.has(it.itemId) && !isCarb(it.category) && !remIds.includes(it.itemId)) remIds.push(it.itemId);
+    if (!catalog.has(it.itemId) && !removed.has(it.itemId) && !remRemoved.has(it.itemId) && !isCarb(it.category) && !remIds.includes(it.itemId)) remIds.push(it.itemId);
   });
   const remainingVisible = remIds.map(id => ({ id }));
   let photosCount = 0;

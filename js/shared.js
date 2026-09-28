@@ -215,11 +215,16 @@ function showUndoBar(message, onUndo, ms = 8000) {
 }
 
 // بتشيل الصنف من قائمة المستبعدين عالسيرفر وبترجّع صفه متل ما كان
-async function restoreRemovedItem(date, branch, itemId, savedRows) {
+async function restoreRemovedItem(date, branch, itemId, savedRows, from) {
   if (typeof SupaEngine === "undefined" || typeof SUPABASE_URL === "undefined" || !SUPABASE_URL) return;
   const day = await SupaEngine.getDay(date, branch);
-  const stillRemoved = ((day && day.removedItemIds) || []).filter(id => id !== itemId);
-  await SupaEngine.saveDay({ date, branch, removedItemIds: stillRemoved });
+  if (from === "remaining") {
+    const stillRemoved = ((day && day.remainingRemovedItemIds) || []).filter(id => id !== itemId);
+    await SupaEngine.saveRemainingReport({ date, branch, removedItemIds: stillRemoved });
+  } else {
+    const stillRemoved = ((day && day.removedItemIds) || []).filter(id => id !== itemId);
+    await SupaEngine.saveDay({ date, branch, removedItemIds: stillRemoved });
+  }
   await SupaEngine.restoreEntryRows(savedRows);
 }
 

@@ -33,19 +33,26 @@ const API_URL = "https://script.google.com/macros/s/AKfycbykhtn0VUleuPkNYAKutt6A
 const APP_VERSION = "3.0.0-supabase";
 
 // ---- دوال التاريخ المشتركة ----
-// تاريخ اليوم بتوقيت الرياض دايماً — حتى لو منطقة الجوال الزمنية غلط (مسافر أو ضابطها يدوي)
+// "اليوم" = يوم الشغل بتوقيت الرياض — حتى لو منطقة الجوال الزمنية غلط (مسافر أو ضابطها يدوي).
+// يوم الشغل يخلص الساعة ٤ الفجر مو ١٢ الليل: جرد وطلبية بعد نص الليل تنحسب على نفس اليوم،
+// و"بكرة" ما تنقلب لبعد بكرة أول ما تصير الساعة ١٢.
+const WORKDAY_CUTOFF_HOUR = 4;
 function todayStr() {
+  const at = new Date(Date.now() - WORKDAY_CUTOFF_HOUR * 3600000);
   try {
-    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh", year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
   } catch (e) {
-    const d = new Date();
-    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    return at.getFullYear() + "-" + String(at.getMonth() + 1).padStart(2, "0") + "-" + String(at.getDate()).padStart(2, "0");
   }
 }
+// نص آمن داخل HTML وقيم الخانات (اسم فيه " أو < كان يكسر الخانة ويقص الملاحظة عند الحفظ)
+function escHtml(v) {
+  return String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+// بحساب UTC عشان التوقيت الصيفي بمنطقة الجوال ما يطلّع نفس اليوم مرتين أو يقفز يوم
 function addDaysStr(dateStr, delta) {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + delta);
-  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const [y, m, d] = String(dateStr).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + delta)).toISOString().slice(0, 10);
 }
 
 // قائمة افتراضية للفروع

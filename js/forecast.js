@@ -7,11 +7,7 @@ const ForecastEngine = {
 
   // الحصول على تاريخ بداية النطاق (مثلاً قبل 35 يوماً من اليوم)
   getHistoryStartDate(targetDateStr) {
-    const d = new Date(targetDateStr);
-    d.setDate(d.getDate() - 35);
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    return `${d.getFullYear()}-${mm}-${dd}`;
+    return addDaysStr(targetDateStr, -35);
   },
 
   // تحليل جلب واستخراج متوسطات الأصناف
@@ -42,21 +38,24 @@ const ForecastEngine = {
     const branchDays = reportData.days.filter(d => d.branch === branchName);
     if (!branchDays.length) return {};
 
-    const targetDateObj = new Date(targetDateStr);
-    const targetDayOfWeek = targetDateObj.getDay(); // 0 = الأحد, 1 = الاثنين...
+    // يوم الأسبوع بحساب UTC (جوال بمنطقة زمنية تانية كان يطلّع يوم غلط)
+    const weekday = (iso) => new Date(iso + "T12:00:00Z").getUTCDay();
+    const targetDayOfWeek = weekday(targetDateStr); // 0 = الأحد, 1 = الاثنين...
 
     // تجميع البيانات لكل صنف
     const itemSameDayStats = {}; // itemId -> { totalConsumed, count }
     const itemOverallStats = {}; // itemId -> { totalConsumed, count }
 
     branchDays.forEach(day => {
-      const dayDateObj = new Date(day.date);
-      const isSameDayOfWeek = dayDateObj.getDay() === targetDayOfWeek;
+      const isSameDayOfWeek = weekday(day.date) === targetDayOfWeek;
 
       (day.items || []).forEach(it => {
+        // الاستهلاك = المستلم − المتبقي آخر اليوم. (قبل كان المستلم − المرتجع، والمرتجع دايماً صفر،
+        // فالمقترح كان = المستلم + ١٠٪ ويكبر كل أسبوع.) يوم ما انجرد فيه الصنف ما ينحسب.
         const rec = Number(it.received) || 0;
-        const ret = Number(it.returned) || 0;
-        const netConsumed = Math.max(0, rec - ret);
+        const left = it.remainingWeight != null && it.remainingWeight !== "" ? it.remainingWeight : it.remaining;
+        if (left === null || left === undefined || left === "") return;
+        const netConsumed = Math.max(0, rec - (Number(left) || 0) - (Number(it.returned) || 0));
 
         // تجميع العام
         if (!itemOverallStats[it.itemId]) {

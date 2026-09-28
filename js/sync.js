@@ -114,12 +114,8 @@ const Sync = (() => {
       try {
         const result = await readFromSupabase(action, p);
         if (result !== undefined) {
-          const currentLocal = cacheGet(ck);
-          if (currentLocal && currentLocal.value && Array.isArray(currentLocal.value.removedItemIds) && currentLocal.value.removedItemIds.length > 0) {
-            if (result && (!result.removedItemIds || result.removedItemIds.length === 0)) {
-              result.removedItemIds = currentLocal.value.removedItemIds;
-            }
-          }
+          // (كان هون دمج لقائمة الأصناف المشالة من الكاش القديم — كان يخلّي صنف رجّعه جهاز تاني
+          // يضل مخفي. الحفظ المعلّق بيرجع من طابور الحفظ نفسه، فالسيرفر هو المرجع.)
           cacheSet(ck, result);
           markReadOk();
           if (onFresh) onFresh(result);
@@ -245,6 +241,16 @@ const Sync = (() => {
     if (typeof Auth !== "undefined") Auth.clearSessionAndReload && Auth.clearSessionAndReload();
   }
 
+  // الحفظ اللي فشل نهائياً ما بينرمى: بينحفظ على الجهاز (آخر ٣٠) عشان نقدر نرجّعه يدوي
+  const FAILED_KEY = "ph_failed_saves";
+  function parkFailed(item, msg) {
+    try {
+      const list = JSON.parse(localStorage.getItem(FAILED_KEY) || "[]");
+      list.push({ action: item.action, payload: item.payload, error: msg, at: Date.now() });
+      localStorage.setItem(FAILED_KEY, JSON.stringify(list.slice(-30)));
+    } catch (e) { /* الذاكرة مليانة */ }
+  }
+
   let flushing = false;
   async function flushQueue() {
     if (flushing) return;
@@ -269,11 +275,15 @@ const Sync = (() => {
           // بيجمّد الطابور كله فما بيوصل ولا حفظ بعده للسيرفر — حصل فعلاً مع saveWasteReport
           // وحجب حفظ الاستلام معه. هلأ منعزله ومنكمّل، ومنبلّغ المستخدم مرة وحدة.
           const msg = String(e.message || e);
-          const permanent = /unknown action|غير مصرح|لازم تحدد/.test(msg);
+          // خطأ بالبيانات نفسها (400/404/409/422) بيتكرر للأبد — كان يوقف كل الحفظ اللي بعده.
+          // (401/403 = الجلسة، و408/429/5xx = مؤقت: هدول بنعيد عليهم)
+          const clientError = [400, 404, 409, 422].includes(e.status);
+          const permanent = clientError || /unknown action|غير مصرح|لازم تحدد/.test(msg);
 
           if (permanent && item.attempts >= 2) {
             q = q.filter(x => x.id !== item.id);
             setQueue(q);
+            parkFailed(item, msg);
             console.error("انحذف من الطابور لفشل دائم:", item.action, msg);
             if (typeof showToast === "function") showToast("⚠ تعذّر حفظ " + item.action + " — " + msg.replace(/^(Error:\s*)+/, ""));
             continue; // نكمّل باقي الطابور بدل ما نجمّده

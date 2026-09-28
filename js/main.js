@@ -381,6 +381,9 @@ function rollScreensToToday(oldDay, newDay) {
   if (typeof currentOpeningDate !== "undefined" && currentOpeningDate === oldDay) { currentOpeningDate = newDay; setInput("openingDateInput", newDay); }
   if (typeof currentJuiceDate !== "undefined" && currentJuiceDate === oldDay) { currentJuiceDate = newDay; setInput("juiceDateInput", newDay); }
   if (typeof currentWasteDate !== "undefined" && currentWasteDate === oldDay) currentWasteDate = newDay;
+  if (typeof currentChecklistDate !== "undefined" && currentChecklistDate === oldDay) { currentChecklistDate = newDay; setInput("checklistDateInput", newDay); }
+  const chefDate = document.getElementById("tomorrowReportDate");
+  if (chefDate && chefDate.value === addDaysStr(oldDay, 1)) { chefDate.value = addDaysStr(newDay, 1); if (chefDate._phRefresh) chefDate._phRefresh(); }
   if (typeof currentTomorrowDate !== "undefined" && currentTomorrowDate === addDaysStr(oldDay, 1)) {
     currentTomorrowDate = addDaysStr(newDay, 1); setInput("tomorrowDateInput", currentTomorrowDate);
   }

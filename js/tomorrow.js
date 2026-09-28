@@ -283,13 +283,13 @@ function renderTomorrowView() {
         <!-- رأس الصنف -->
         <div class="rec-card-header">
           <div class="rec-item-title-wrap">
-            <span class="rec-item-name">${item.name}</span>
+            <span class="rec-item-name">${escHtml(item.name)}</span>
             <span class="rec-item-unit">(${item.unit || "جرام"})</span>
             ${item.isCustom ? '<span class="badge ok rec-custom-badge">إضافي</span>' : ''}
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
             ${isFilled ? '<span class="badge ok" style="font-size:11px;">✅ تم التحديد</span>' : '<span class="badge neutral" style="font-size:11px;">لم يحدد</span>'}
-            <button type="button" class="rec-btn-remove" ${ro} onclick="onRemoveTomorrowItem('${item.id}', '${String(item.name).replace(/'/g, "\\'")}')" title="استبعاد الصنف من طلبية الغد">✕</button>
+            <button type="button" class="rec-btn-remove" ${ro} onclick="onRemoveTomorrowItem('${item.id}', this.dataset.name)" data-name="${escHtml(item.name)}" title="استبعاد الصنف من طلبية الغد">✕</button>
           </div>
         </div>
 
@@ -346,7 +346,7 @@ function renderTomorrowView() {
         <div class="rem-note-drawer ${entry.notes ? 'expanded' : 'hidden'}" id="tomnote-drawer-${item.id}">
           <input type="text" placeholder="ملاحظة للمطبخ المركزي (تقطيع خاص، توصيل مبكر...)" 
                  data-id="${item.id}" data-field="notes" 
-                 value="${entry.notes || ""}" ${ro}
+                 value="${escHtml(entry.notes || "")}" ${ro}
                  class="rec-note-input">
         </div>
       `;
@@ -506,7 +506,8 @@ function exportTomorrowOrderWhatsApp() {
   msg += `--------------------------------\n`;
   msg += `✅ معتمدة آلياً عبر نظام Pro House التشغيلي`;
 
-  const encoded = encodeURI(msg);
+  // encodeURIComponent: الـ & و # بالملاحظات كانت تقص رسالة الواتساب
+  const encoded = encodeURIComponent(msg);
   const waUrl = `https://api.whatsapp.com/send?text=${encoded}`;
   window.open(waUrl, "_blank");
 }
@@ -544,13 +545,19 @@ function onTomorrowFieldChange(e) {
   scheduleTomorrowAutoSave();
 }
 
+let tomorrowLoadSeq = 0;
+// الحفظ بيستبدل طلبية اليوم كاملة (بيمسح اللي مو بالشاشة)، فإذا التحميل فشل (نت ضعيف)
+// والشاشة فاضية، أول تعديل كان يمسح الطلبية المحفوظة كلها. هلأ منوقف الحفظ لحد ما تنجح القراءة.
+let tomorrowLoadFailed = false;
 async function loadTomorrowOrder(dateStr) {
+  const seq = ++tomorrowLoadSeq; // تنقّل سريع بين الأيام/الفروع: نتيجة الطلب القديم ما تكتب فوق الجديد
   currentTomorrowBranch = Branch.get();
   const myBranches = allowedBranchList();
   if (myBranches.length === 1 && currentTomorrowBranch !== myBranches[0]) currentTomorrowBranch = myBranches[0];
   if (currentTomorrowBranch && !Auth.canSeeAllBranches() && !myBranches.includes(currentTomorrowBranch)) currentTomorrowBranch = myBranches[0] || "";
   Branch.set(currentTomorrowBranch);
   await Items.load();
+  if (seq !== tomorrowLoadSeq) return;
 
   if (!currentTomorrowBranch) {
     currentTomorrowOrder = {};
@@ -565,14 +572,19 @@ async function loadTomorrowOrder(dateStr) {
   loadChefNameMemory();
   currentTomorrowOrder = {};
   currentTomorrowAddedIds = new Set();
+  // الأصناف المضافة/المشالة تخص طلبية يوم وفرع بعينه — كانت تنتقل لطلبية يوم أو فرع تاني
+  currentTomorrowExtraItems = [];
+  currentTomorrowRemovedIds = new Set();
 
   // جلب طلبية الغد المحفوظة
   const cacheKey = "tomorrow:" + dateStr + ":" + currentTomorrowBranch;
-  const data = await Sync.get("getTomorrowOrder", { date: dateStr, branch: currentTomorrowBranch }, cacheKey, applyTomorrowData);
+  const data = await Sync.get("getTomorrowOrder", { date: dateStr, branch: currentTomorrowBranch }, cacheKey);
+  if (seq !== tomorrowLoadSeq) return;
+  tomorrowLoadFailed = data === null || data === undefined;
   applyTomorrowData(data);
 
-  // جلب بيانات اليوم (استلام ومتبقي) لحساب المقترحات التشغيلية الدقيقة
-  const today = todayStr();
+  // استلام ومتبقي اليوم اللي قبل الطلبية (مو دايماً "اليوم" — لو فتحت طلبية بعد بكرة أو يوم قديم)
+  const today = addDaysStr(dateStr, -1);
   try {
     const [todayRec, todayRem, aiRec] = await Promise.all([
       Sync.get("getDay", { date: today, branch: currentTomorrowBranch }, "day:" + today + ":" + currentTomorrowBranch).catch(() => null),
@@ -580,6 +592,7 @@ async function loadTomorrowOrder(dateStr) {
       ForecastEngine.getRecommendations(dateStr, currentTomorrowBranch).catch(() => ({}))
     ]);
 
+    if (seq !== tomorrowLoadSeq) return;
     currentTomorrowTodayReceived = {};
     if (todayRec && todayRec.items) {
       todayRec.items.forEach(it => { currentTomorrowTodayReceived[it.itemId] = it.received; });
@@ -590,16 +603,19 @@ async function loadTomorrowOrder(dateStr) {
       todayRem.items.forEach(it => { currentTomorrowTodayRemaining[it.itemId] = it.remainingWeight || it.remaining; });
     }
 
+    if (seq !== tomorrowLoadSeq) return;
     currentTomorrowRecommendations = aiRec || {};
   } catch (e) {
     console.warn("تعذر جلب بيانات اليوم المقارنة:", e);
   }
+  if (seq !== tomorrowLoadSeq) return;
 
   renderTomorrowView();
   const hasData = Object.keys(currentTomorrowOrder).length > 0;
   const st = document.getElementById("tomorrowStatus");
   if (st) {
-    st.textContent = hasData ? "تم تحميل طلبية محفوظة لهذا اليوم لهذا الفرع" : "ما فيه طلبية محفوظة لهذا اليوم لهذا الفرع للحين";
+    st.textContent = tomorrowLoadFailed ? "⚠ تعذّر تحميل الطلبية — تأكد من النت واسحب الشاشة لتحت للتحديث (الحفظ موقّف لحتى ما تنمسح الطلبية)"
+      : hasData ? "تم تحميل طلبية محفوظة لهذا اليوم لهذا الفرع" : "ما فيه طلبية محفوظة لهذا اليوم لهذا الفرع للحين";
   }
 }
 
@@ -623,6 +639,12 @@ function applyTomorrowData(list) {
 
 function saveTomorrowNow(showStatus) {
   if (Auth.isViewOnlyTomorrow()) return;
+  if (tomorrowLoadFailed) {
+    const st = document.getElementById("tomorrowStatus");
+    if (st) st.textContent = "⚠ ما انحفظ: الطلبية ما تحمّلت من السيرفر — تأكد من النت واسحب الشاشة لتحت للتحديث";
+    showToast("⚠ ما انحفظ — الطلبية ما تحمّلت. حدّث الشاشة أول");
+    return;
+  }
 
   const employeeName = (Auth.getEmployee() || {}).name || "";
   const branch = currentTomorrowBranch || "";
@@ -784,6 +806,23 @@ function confirmAddTomorrowItem(category) {
     return;
   }
 
+  // نفس الاسم موجود (حتى لو بمسافات أو همزة مختلفة): نستخدمه بدل ما نعمل صنف مكرر
+  const norm = (v) => String(v || "").replace(/[إأآ]/g, "ا").replace(/ة$/, "ه").replace(/\s+/g, "").trim();
+  const branchNow = currentTomorrowBranch || Branch.get();
+  const existing = (Items.current || []).find(it => norm(it.name) === norm(name) &&
+    (!itemBranches(it).length || itemBranches(it).includes(branchNow)));
+  if (existing) {
+    currentTomorrowRemovedIds.delete(existing.id);
+    currentTomorrowAddedIds.add(existing.id);
+    currentTomorrowOrder[existing.id] = { ...(currentTomorrowOrder[existing.id] || {}), qty: qty !== "" ? String(qty) : "", notes: notes || (currentTomorrowOrder[existing.id] || {}).notes || "" };
+    closeAddTomorrowItemModal();
+    showToast(`✅ "${existing.name}" موجود — انضاف للطلبية`);
+    renderTomorrowView();
+    saveTomorrowNow(false);
+    focusEntryById("tominput-" + existing.id);
+    return;
+  }
+
   const newCustomId = "custom_tom_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
   const newItem = {
     id: newCustomId,
@@ -807,6 +846,8 @@ function confirmAddTomorrowItem(category) {
       unit: unit,
       category: category,
       branches: currentTomorrowBranch || Branch.get(),
+      // اختياري: يطلع بس باليوم اللي انطلب فيه — ما يصير صنف ثابت كل يوم
+      optional: true,
       isCustom: true
     });
   } catch (err) {
@@ -893,6 +934,8 @@ async function renderWeekdayAverage(el, date, branch) {
   el.innerHTML = `<div class="wd-avg-title">📊 متوسط استهلاك أيام ${WD_NAMES[wd]}</div><div class="wd-avg-sub">جاري الحساب…</div>`;
   const key = date + "|" + branch;
   try {
+    // الكاش ١٠ دقايق بس: بعد ما تنسحب مبيعات جديدة (فوديكس/تاب سنس) المتوسط يتحدّث بدون إعادة فتح التطبيق
+    if (wdCache[key] && Date.now() - wdCache[key]._at > 10 * 60000) delete wdCache[key];
     const data = wdCache[key] || (wdCache[key] = await (async () => {
       const sorted = [...dates].sort();
       const mto = madeToOrderApplies(branch) && SupaEngine.getProductSales;
@@ -901,7 +944,7 @@ async function renderWeekdayAverage(el, date, branch) {
         Promise.all(dates.map(dt => SupaEngine.getDay(dt, branch).catch(() => null))),
         mto ? SupaEngine.getProductSales(sorted[0], sorted[sorted.length - 1], branch).catch(() => []) : Promise.resolve([])
       ]);
-      return { sales, days, products };
+      return { sales, days, products, _at: Date.now() };
     })());
     const catOf = {};
     (Items.current || []).forEach(it => { catOf[it.id] = it.category; });
