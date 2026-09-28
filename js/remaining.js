@@ -118,8 +118,7 @@ function getAllRemainingActiveItems(receivingData) {
       if (added && currentRemainingAddedSlots[id] && item.name === def.name) item.name = chefSlotName(def, currentRemainingAddedSlots[id]);
       if (isChefItem(def) && r && r.cookName && item.name === def.name) item.name = chefSlotName(def, r.cookName);
     }
-    const cat = String(item.category || "").trim();
-    if (cat.includes("كارب") || cat.toLowerCase().includes("carb")) return;
+    if (remainingHidesCategory(item.category, branch)) return;
     result.push(item);
   });
 
@@ -329,6 +328,18 @@ function calculateItemVariance(receivedGrams, soldMeals, actualRemainingGrams) {
   };
 }
 
+// أقسام ما لها مبيعات نقارن فيها (كارب، أطباق جانبية، حلويات): نعرض المستخدم بس، مو «عجز»
+function otherCatUnit(catItems) {
+  const u = String(((catItems || [])[0] || {}).unit || "جرام");
+  return /جرام|جم|كجم/.test(u) ? "جم" : u;
+}
+function otherCatUsedPill(received, remaining, catItems) {
+  const used = Math.round(Number(received || 0) - Number(remaining || 0));
+  const unit = otherCatUnit(catItems);
+  if (used < 0) return `<span class="cat-pill pill-warn">⚠ المتبقي أكثر من المستلم بـ ${Math.abs(used)} ${unit} — راجع الأرقام</span>`;
+  return `<span class="cat-pill pill-ok">🍽️ استُخدم: ${used} ${unit}</span>`;
+}
+
 function getVarianceBadge(variancePct) {
   const absPct = Math.abs(variancePct);
   if (absPct <= 5) return { label: "🟢 طبيعي", class: "ok", level: "normal" };
@@ -455,7 +466,7 @@ function renderRemainingView(receivingData, salesData) {
     const branches = itemBranches(it);
     if (branches.length && !branches.includes(currentRemainingBranch)) return;
     const cat = it.category || "عام";
-    if (cat.includes("كارب") || cat.toLowerCase().includes("carb")) return;
+    if (remainingHidesCategory(cat, currentRemainingBranch)) return;
     if (!byCat[cat]) byCat[cat] = [];
     byCat[cat].push(it);
   });
@@ -776,17 +787,10 @@ function renderRemainingView(receivingData, salesData) {
         varBadgeHtml = `<span class="cat-pill pill-pending">⏳ بانتظار الجرد</span>`;
       }
     } else {
-      recDisplay = `${Math.round(catReceivedSum)} جم`;
+      recDisplay = `${Math.round(catReceivedSum)} ${otherCatUnit(catItems)}`;
       soldDisplay = "—";
-      const catVarianceGrams = catActualChickenSum - catReceivedSum;
       if (hasRemainingRecorded && Auth.canSeeSales()) {
-        if (Math.abs(catVarianceGrams) <= 50) {
-          varBadgeHtml = `<span class="cat-pill pill-ok">✅ مطابق</span>`;
-        } else if (catVarianceGrams < 0) {
-          varBadgeHtml = `<span class="cat-pill pill-danger">🔻 عجز: ${Math.abs(Math.round(catVarianceGrams))} جم`;
-        } else {
-          varBadgeHtml = `<span class="cat-pill pill-warn">🔺 زيادة: +${Math.round(catVarianceGrams)} جم</span>`;
-        }
+        varBadgeHtml = otherCatUsedPill(catReceivedSum, catActualChickenSum + catActualSauceSum, catItems);
       } else {
         varBadgeHtml = `<span class="cat-pill pill-pending">⏳ بانتظار الجرد</span>`;
       }
@@ -966,15 +970,8 @@ function updateCategoryHeaderMetrics(itemId) {
           varPillContainer.innerHTML = `<span class="cat-pill pill-pending">⏳ بانتظار الجرد</span>`;
         }
       } else {
-        const catVarianceGrams = catActualChickenSum - catReceivedSum;
         if (hasRemainingRecorded) {
-          if (Math.abs(catVarianceGrams) <= 50) {
-            varPillContainer.innerHTML = `<span class="cat-pill pill-ok">✅ مطابق</span>`;
-          } else if (catVarianceGrams < 0) {
-            varPillContainer.innerHTML = `<span class="cat-pill pill-danger">🔻 عجز: ${Math.abs(Math.round(catVarianceGrams))} جم</span>`;
-          } else {
-            varPillContainer.innerHTML = `<span class="cat-pill pill-warn">🔺 زيادة: +${Math.round(catVarianceGrams)} جم</span>`;
-          }
+          varPillContainer.innerHTML = otherCatUsedPill(catReceivedSum, catActualChickenSum + catActualSauceSum, catItems);
         } else {
           varPillContainer.innerHTML = `<span class="cat-pill pill-pending">⏳ بانتظار الجرد</span>`;
         }
@@ -1430,6 +1427,24 @@ function confirmAddRemainingItem(category) {
     return;
   }
 
+  // الصنف موجود أصلاً (بأي قسم، حتى لو انشال اليوم)؟ نرجّعه هو ونسجّل متبقيه عليه بدل نسخة ثانية بنفس الاسم
+  const norm = (s) => String(s || "").replace(/[إأآ]/g, "ا").replace(/ة$/, "ه").replace(/\s+/g, "").trim();
+  const existing = (Items.current || []).find(it => norm(it.name) === norm(name) &&
+    (!itemBranches(it).length || itemBranches(it).includes(currentRemainingBranch)));
+  if (existing) {
+    currentRemainingRemovedIds.delete(existing.id);
+    if (!currentRemainingExtraItems.some(it => it.id === existing.id)) currentRemainingExtraItems.push({ ...existing });
+    const prev = currentRemainingData[existing.id] || {};
+    currentRemainingData[existing.id] = { ...prev, remaining: qty !== "" ? String(qty) : (prev.remaining || ""),
+      remainingWeight: qty !== "" ? String(qty) : (prev.remainingWeight || ""), remainingSauce: prev.remainingSauce || "" };
+    closeAddRemainingItemModal();
+    showToast(`✅ رجع صنف "${existing.name}" للجرد`);
+    renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
+    saveRemainingLocalDebounced();
+    updateSaveBarRemainingStatus();
+    return;
+  }
+
   const newCustomId = "custom_rem_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
   const newItem = {
     id: newCustomId,
@@ -1455,6 +1470,7 @@ function confirmAddRemainingItem(category) {
       unit: unit,
       category: category,
       branches: currentRemainingBranch,
+      optional: true, // يطلع بس باليوم اللي انجرد فيه — ما يصير صنف ثابت
       isCustom: true
     });
   } catch (err) {
