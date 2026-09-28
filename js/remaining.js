@@ -195,11 +195,9 @@ function updateItemRemainingDisplay(itemId) {
 function mergeFreshRemainingData(freshRem) {
   if (!freshRem) return;
   if (freshRem.meta) currentRemainingMeta = freshRem.meta;
-  if (Array.isArray(freshRem.removedItemIds)) {
-    freshRem.removedItemIds.forEach(id => currentRemainingRemovedIds.add(id));
-  } else if (freshRem.meta && Array.isArray(freshRem.meta.removedItemIds)) {
-    freshRem.meta.removedItemIds.forEach(id => currentRemainingRemovedIds.add(id));
-  }
+  // قائمة "ما ينجرد اليوم" الخاصة بالمتبقي (المشالة من الاستلام بتنشال لحالها عبر recRemoved)
+  const remRemoved = freshRem.remainingRemovedItemIds || (freshRem.meta && freshRem.meta.remainingRemovedItemIds) || [];
+  if (Array.isArray(remRemoved)) remRemoved.forEach(id => currentRemainingRemovedIds.add(id));
   (freshRem.items || []).forEach(it => {
     const existing = currentRemainingData[it.itemId];
     const userHasLocal = existing && (
@@ -240,7 +238,10 @@ function initRemainingModule() {
   currentRemainingDate = todayStr();
 }
 
+let remainingLoadSeq = 0;
+let remainingLoadOk = true;
 async function loadRemainingData(date, branch) {
+  const seq = ++remainingLoadSeq;
   await remainingAutosave.flush(); // أرقام اليوم اللي كان مفتوح بتنحفظ عيومها قبل ما نفتح يوم تاني
   remainingDataKey = null;
   currentRemainingDate = date || currentRemainingDate;
@@ -251,6 +252,7 @@ async function loadRemainingData(date, branch) {
 
   try {
     await Items.load();
+    if (seq !== remainingLoadSeq) return;
 
     // 1) فحص وجود أحدث بيانات استلام مسجلة محلياً في الذاكرة لنفس اليوم والفرع
     const activeRec = (typeof getActiveReceivingData === "function")
@@ -258,25 +260,18 @@ async function loadRemainingData(date, branch) {
       : null;
 
     const [receivingData, salesData, remainingData, wasteData] = await Promise.all([
-      (activeRec ? Promise.resolve(activeRec) : Sync.get("getDay", { date: currentRemainingDate, branch: currentRemainingBranch }, "day:" + currentRemainingDate + ":" + currentRemainingBranch, (freshRec) => {
-        if (freshRec && freshRec.items) {
-          cachedReceivingDataForRemaining = freshRec;
-          renderRemainingView(freshRec, cachedSalesDataForRemaining);
-        }
-      }).catch(() => null)),
+      (activeRec ? Promise.resolve(activeRec) : Sync.get("getDay", { date: currentRemainingDate, branch: currentRemainingBranch }, "day:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null)),
       Sync.get("getSalesByCategory", { start: currentRemainingDate, end: currentRemainingDate, branch: currentRemainingBranch }, "tabsense:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null),
-      Sync.get("getRemainingReport", { date: currentRemainingDate, branch: currentRemainingBranch }, "remaining:" + currentRemainingDate + ":" + currentRemainingBranch, (freshRem) => {
-        if (freshRem) {
-          mergeFreshRemainingData(freshRem);
-          renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
-        }
-      }).catch(() => null),
+      Sync.get("getRemainingReport", { date: currentRemainingDate, branch: currentRemainingBranch }, "remaining:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null),
       SupaEngine.getWasteReport(currentRemainingDate, currentRemainingBranch).catch(() => null)
     ]);
+    if (seq !== remainingLoadSeq) return;
+    remainingLoadOk = !!remainingData;
     currentRemainingWaste = (wasteData && wasteData.items) || [];
 
-    cachedReceivingDataForRemaining = activeRec || receivingData || cachedReceivingDataForRemaining;
-    cachedSalesDataForRemaining = salesData || cachedSalesDataForRemaining;
+    // إذا التحميل فشل ما منعرض استلام/مبيعات اليوم اللي كان مفتوح قبل كأنها لهاليوم
+    cachedReceivingDataForRemaining = activeRec || receivingData || null;
+    cachedSalesDataForRemaining = salesData || null;
 
     currentRemainingData = {};
     currentRemainingMeta = { isClosed: false, closedBy: "", closedAt: "" };
@@ -640,7 +635,7 @@ function renderRemainingView(receivingData, salesData) {
           <div class="rem-single-row">
             <!-- معلومات الصنف -->
             <div class="rem-info-group">
-              <span class="rem-item-name">${it.name}</span>
+              <span class="rem-item-name">${escHtml(it.name)}</span>
               <span class="rem-item-unit">(${itemUnitLabel})</span>
               ${it.isCustom ? '<span class="badge ok rec-custom-badge">إضافي</span>' : ''}
               <span class="rec-meta-chip rec-req-chip" title="المستلم صباحاً">📦 ${recQty > 0 ? Math.round(recQty) : '—'}</span>
@@ -657,7 +652,7 @@ function renderRemainingView(receivingData, salesData) {
               <div class="rem-inline-actions">
                 <button type="button" class="rem-waste-btn ${remainingWasteFor(it.id) ? 'has-waste' : ''}" ${isClosed ? 'disabled' : ''} onclick="openRemainingWaste('${it.id}')" title="تسجيل هدر">🗑${remainingWasteFor(it.id) ? ` ${Math.round(remainingWasteFor(it.id))}` : ''}</button>
                 <button type="button" class="rem-mini-note-btn ${remData.notes ? 'has-notes' : ''}" onclick="toggleRemainingNote('${it.id}')" title="ملاحظة">📝</button>
-                <button type="button" class="rec-btn-remove" onclick="onRemoveRemainingItem('${it.id}', '${String(it.name).replace(/'/g, "\\'")}')" title="استبعاد الصنف">✕</button>
+                <button type="button" class="rec-btn-remove" onclick="onRemoveRemainingItem('${it.id}', this.dataset.name)" data-name="${escHtml(it.name)}" title="استبعاد الصنف">✕</button>
               </div>
 
             <!-- خانات الإدخال المدمجة بصف واحد -->
@@ -695,7 +690,7 @@ function renderRemainingView(receivingData, salesData) {
 
           <!-- درج الملاحظات القابل للطي -->
           <div class="rem-note-drawer ${notesExpanded ? 'expanded' : 'hidden'}" id="remnote-drawer-${it.id}">
-            <input type="text" value="${remData.notes || ''}" 
+            <input type="text" value="${escHtml(remData.notes || '')}" 
                    placeholder="ملاحظات جرد هذا الصنف (تالف، هدر في التحضير، عينات...)"
                    id="remnote-${it.id}"
                    ${isClosed ? 'disabled' : ''}
@@ -1156,7 +1151,7 @@ function saveRemainingLocalDebounced() {
       branch: currentRemainingBranch,
       meta: currentRemainingMeta,
       items: itemsPayload,
-      removedItemIds: Array.from(currentRemainingRemovedIds)
+      remainingRemovedItemIds: Array.from(currentRemainingRemovedIds)
     });
   }, 400);
 }
@@ -1203,7 +1198,7 @@ async function saveRemainingReportData() {
     employeeName: emp ? emp.name : "",
     meta: currentRemainingMeta,
     items: itemsPayload,
-    removedItemIds: Array.from(currentRemainingRemovedIds),
+    removedItemIds: remainingLoadOk ? Array.from(currentRemainingRemovedIds) : undefined,
     savedAt: new Date().toISOString()
   };
 
@@ -1357,7 +1352,7 @@ async function onRemoveRemainingItem(itemId, itemName) {
       renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
       saveRemainingLocalDebounced();
     }
-    await restoreRemovedItem(date, branch, itemId, savedRows);
+    await restoreRemovedItem(date, branch, itemId, savedRows, "remaining");
   });
 }
 

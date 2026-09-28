@@ -37,7 +37,8 @@ const receivingAutosave = createAutosaver({
     const emp = Auth.getEmployee();
     return {
       date, branch, items,
-      payload: { date, branch, employeeName: emp ? emp.name : "", items, removedItemIds: Array.from(currentReceivingRemovedIds) },
+      // إذا قراءة اليوم فشلت، قائمة المشالة عندنا ناقصة — ما منكتبها فوق اللي عالسيرفر
+      payload: { date, branch, employeeName: emp ? emp.name : "", items, removedItemIds: receivingLoadOk ? Array.from(currentReceivingRemovedIds) : undefined },
       commit() { items.forEach(i => { receivingBaseline[i.itemId] = { received: i.received, notes: i.notes, cookName: i.cookName }; }); }
     };
   },
@@ -55,7 +56,10 @@ function initReceivingModule() {
   currentReceivingDate = todayStr();
 }
 
+let receivingLoadSeq = 0;
+let receivingLoadOk = true;
 async function loadReceivingData(date, branch) {
+  const seq = ++receivingLoadSeq; // تنقّل سريع بين الأيام: الطلب القديم ما يعرض أرقامه تحت تاريخ جديد
   await receivingAutosave.flush(); // أرقام اليوم اللي كان مفتوح بتنحفظ عيومها قبل ما نفتح يوم تاني
   receivingDataKey = null;
   currentReceivingDate = date || currentReceivingDate;
@@ -65,9 +69,11 @@ async function loadReceivingData(date, branch) {
   if (view) view.innerHTML = '<div class="loader"><div class="spinner"></div> جاري تحميل بيانات تقرير الاستلام…</div>';
 
   await Promise.all([Items.load(), loadChefNameMemory()]);
+  if (seq !== receivingLoadSeq) return;
 
   // 1) جلب كمية الطلب المعتمدة ليوم date من طلبية أمس (T-1)
   const requested = await loadRequestedOrder(currentReceivingDate, currentReceivingBranch);
+  if (seq !== receivingLoadSeq) return;
   currentReceivingOrdered = requested.qty || {};
   // فرع يطلب بالسفنديشات ويستلم بالجرام: الطلب ينعرض «1/3 × 2» بدون مقارنة زائد/ناقص
   receivingPanMode = isPanOrderBranch(currentReceivingBranch);
@@ -85,6 +91,8 @@ async function loadReceivingData(date, branch) {
 
   // 2) جلب السجل المحفوظ لهذا اليوم والفرع
   const dayData = await Sync.get("getDay", { date: currentReceivingDate, branch: currentReceivingBranch }, "day:" + currentReceivingDate + ":" + currentReceivingBranch);
+  if (seq !== receivingLoadSeq) return;
+  receivingLoadOk = !!dayData;
   currentReceivingData = {};
   currentReceivingExtraItems = [];
   currentReceivingAddedIds = new Set();
@@ -369,7 +377,7 @@ function renderReceivingView() {
           <!-- سطر معلومات الصنف الموحد (اسم، مطلوب، فرق، وجبات، حالة وحذف) -->
           <div class="rec-card-header">
             <div class="rec-item-header-main">
-              <span class="rec-item-name">${it.name}</span>
+              <span class="rec-item-name">${escHtml(it.name)}</span>
               <span class="rec-item-unit">(${isSandwich ? "ساندويتش" : (isSalad ? "حبة" : (it.unit || "جم"))})</span>
               ${it.isCustom ? '<span class="badge ok rec-custom-badge">إضافي</span>' : ''}
               <span class="rec-meta-chip rec-req-chip" title="المطلوب من المطبخ">📋 طلب: <strong>${receivingPanMode ? (receivingOrderLabel[it.id] || "—") : (ord !== "" ? ord : "—")}</strong></span>
@@ -382,7 +390,7 @@ function renderReceivingView() {
             </div>
             <div class="rec-item-header-actions">
               <span class="badge ${badgeClass}">${status}</span>
-              <button type="button" class="rec-btn-remove" onclick="onRemoveReceivingItem('${it.id}', '${String(it.name).replace(/'/g, "\\'")}')" title="حذف الصنف من استلام اليوم">✕</button>
+              <button type="button" class="rec-btn-remove" onclick="onRemoveReceivingItem('${it.id}', this.dataset.name)" data-name="${escHtml(it.name)}" title="حذف الصنف من استلام اليوم">✕</button>
             </div>
           </div>
 
@@ -431,7 +439,7 @@ function renderReceivingView() {
           </div>
 
           <div class="rec-notes-container ${notesExpanded ? 'expanded' : 'hidden'}" id="recnotes-wrap-${it.id}">
-            <input type="text" value="${recData.notes || ''}"
+            <input type="text" value="${escHtml(recData.notes || '')}"
                    placeholder="اكتب ملاحظات الاستلام (نقص من المطبخ، تالف، تأخير...)"
                    id="recnote-input-${it.id}"
                    oninput="onReceivingNotesChange('${it.id}', this.value)"
@@ -849,7 +857,7 @@ function flushReceivingSave() {
     date: key.date, 
     branch: key.branch, 
     items: itemsPayload,
-    removedItemIds: Array.from(currentReceivingRemovedIds)
+    removedItemIds: receivingLoadOk ? Array.from(currentReceivingRemovedIds) : undefined
   };
   if (receivingDataKey) Sync.cacheSet("day:" + key.date + ":" + key.branch, payload);
   receivingAutosave.schedule();
@@ -928,7 +936,7 @@ async function saveReceivingReportData() {
     branch: receivingDataKey.branch,
     employeeName: emp ? emp.name : "",
     items: itemsPayload,
-    removedItemIds: Array.from(currentReceivingRemovedIds),
+    removedItemIds: receivingLoadOk ? Array.from(currentReceivingRemovedIds) : undefined,
     savedAt: new Date().toISOString()
   };
 

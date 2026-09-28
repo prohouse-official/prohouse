@@ -63,7 +63,9 @@ const SupaEngine = (() => {
         const errJson = await res.json();
         msg = errJson.message || errJson.error || errJson.hint || "";
       } catch (e) { /* مو JSON */ }
-      throw new Error(msg || `Supabase error [${res.status}]`);
+      const err = new Error(msg || `Supabase error [${res.status}]`);
+      err.status = res.status;
+      throw err;
     }
     const text = await res.text();
     return text ? JSON.parse(text) : null;
@@ -88,7 +90,7 @@ const SupaEngine = (() => {
   }
 
   // أعمدة ميتا اليوم بدون الصور (الصور كبيرة وبتنجاب لحالها لما تنعرض) + عدد الصور محسوب بالداتابيس
-  const META_COLS = "date,branch,employee_name,payments_report_link,removed_item_ids,saved_at,updated_at,photos_count";
+  const META_COLS = "date,branch,employee_name,payments_report_link,removed_item_ids,remaining_removed_item_ids,saved_at,updated_at,photos_count";
 
   // أرقام بتترجع من الداتابيس: فاضي = null (بلا قيمة)، عدا هيك رقم
   function numOrNull(v) {
@@ -241,6 +243,8 @@ const SupaEngine = (() => {
           unit: it.unit || "جرام",
           has_custom_name: true,
           branches: branch || "",
+          // صنف انعمل تلقائي من الحفظ: يطلع بس باليوم اللي انسجل فيه
+          optional: true,
           active: true,
           sort_order: 99,
           updated_at: new Date().toISOString()
@@ -306,6 +310,8 @@ const SupaEngine = (() => {
       photosCount: m.photos_count,
       paymentsReportLink: m.payments_report_link,
       removedItemIds: Array.isArray(removedItemIds) ? removedItemIds : [],
+      // الأصناف اللي انشالت من جرد المتبقي بس (ما تمس الاستلام)
+      remainingRemovedItemIds: Array.isArray(m.remaining_removed_item_ids) ? m.remaining_removed_item_ids : [],
       savedAt: m.saved_at,
       updatedAt: m.updated_at
     };
@@ -326,7 +332,8 @@ const SupaEngine = (() => {
       branch,
       meta: mappedMeta,
       items: (entries || []).map(mapEntry),
-      removedItemIds: removedItemIds
+      removedItemIds: removedItemIds,
+      remainingRemovedItemIds: (mappedMeta && mappedMeta.remainingRemovedItemIds) || []
     };
   }
 
@@ -385,20 +392,29 @@ const SupaEngine = (() => {
   // حفظ تقرير المتبقي: بيحدّث أعمدة المتبقي فقط على نفس صف اليوم
   async function saveRemainingReport(payload) {
     const { date, branch, items, removedItemIds } = payload;
-    const remIds = Array.isArray(removedItemIds) ? removedItemIds : [];
+    const day = `date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`;
 
-    if (remIds.length > 0) {
-      // إزالة الأصناف المستبعدة من daily_entries لهذا اليوم والفرع
-      const idList = remIds.map(id => `"${encodeURIComponent(id)}"`).join(",");
-      await query(`daily_entries?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&item_id=in.(${idList})`, {
-        method: "DELETE"
-      }).catch(e => console.warn("delete remaining daily_entries error:", e));
-
-      // حفظ قائمة الاستبعاد بعمودها بس (بدون ما نلمس الصور وقائمة الفحص)
+    // شيل صنف من الجرد = "ما ينجرد اليوم" بس: منمسح أرقام المتبقي وبنخلي الاستلام زي ما هو.
+    // (قبل كان يمسح الصف كامل — فكان ينمسح معه المستلم واسم الطبخة)
+    if (Array.isArray(removedItemIds)) {
+      const remIds = removedItemIds;
+      if (remIds.length > 0) {
+        const idList = remIds.map(id => `"${encodeURIComponent(id)}"`).join(",");
+        await query(`daily_entries?${day}&item_id=in.(${idList})`, {
+          method: "PATCH",
+          body: JSON.stringify({ remaining: null, remaining_weight: null, remaining_sauce: null, remaining_notes: null })
+        }).catch(e => console.warn("clear remaining error:", e));
+        // صف ما فيه استلام ولا اسم طبخة ما إله لزوم
+        try {
+          const rows = (await query(`daily_entries?select=item_id,received,cook_name&${day}&item_id=in.(${idList})`)) || [];
+          const empty = rows.filter(r => !(Number(r.received) > 0) && !String(r.cook_name || "").trim()).map(r => `"${encodeURIComponent(r.item_id)}"`);
+          if (empty.length) await query(`daily_entries?${day}&item_id=in.(${empty.join(",")})`, { method: "DELETE" });
+        } catch (e) { console.warn("delete empty rows error:", e); }
+      }
       await query("day_meta", {
         method: "POST",
         headers: { "Prefer": "resolution=merge-duplicates" },
-        body: JSON.stringify({ date, branch, removed_item_ids: remIds, updated_at: new Date().toISOString() })
+        body: JSON.stringify({ date, branch, remaining_removed_item_ids: remIds, updated_at: new Date().toISOString() })
       }).catch(e => console.warn("saveRemainingReport day_meta error:", e));
     }
 

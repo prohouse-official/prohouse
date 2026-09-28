@@ -188,7 +188,7 @@ function renderJuicesView() {
         </div>
       </div>
       <div class="notes-row">
-        <input type="text" placeholder="ملاحظة (اختياري)" data-jid="${juice.id}" data-jfield="notes" value="${e.notes || ""}" ${ro}>
+        <input type="text" placeholder="ملاحظة (اختياري)" data-jid="${juice.id}" data-jfield="notes" value="${escHtml(e.notes || "")}" ${ro}>
       </div>
       <div class="badges" id="juicebadges-${juice.id}"></div>
     `;

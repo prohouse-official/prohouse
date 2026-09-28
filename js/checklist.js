@@ -31,7 +31,7 @@ const Checklist = (() => {
   ];
 
   function getKey(dateStr, branch, shift) {
-    const d = dateStr || new Date().toISOString().split("T")[0];
+    const d = dateStr || todayStr();
     const b = branch || (typeof Branch !== "undefined" ? Branch.get() : "default");
     const s = shift || "morning";
     return `prohouse_checklist_${b}_${d}_${s}`;
@@ -100,7 +100,7 @@ const Checklist = (() => {
 })();
 
 // variables للواجهة
-let currentChecklistDate = new Date().toISOString().split("T")[0];
+let currentChecklistDate = todayStr();
 let currentChecklistShift = "morning";
 
 async function renderChecklistView() {
