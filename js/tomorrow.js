@@ -984,7 +984,7 @@ function openChefSlotPicker(category) {
   openChefPicker({
     category,
     branch: currentTomorrowBranch || Branch.get(),
-    isUsed: (id) => currentTomorrowAddedIds.has(id) || !!currentTomorrowOrder[id],
+    isUsed: (id) => currentTomorrowAddedIds.has(id) || !!currentTomorrowOrder[id] || currentTomorrowRemovedIds.has(id),
     extraNames: Object.values(currentTomorrowOrder).map(o => o && o.cookName),
     onPick(slot, name) {
       currentTomorrowAddedIds.add(slot.id);
