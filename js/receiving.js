@@ -172,7 +172,9 @@ function getAllReceivingActiveItems() {
     return isChefItem(it) && d && d.cookName ? { ...it, name: chefSlotName(it, d.cookName) } : it;
   });
 
-  const extraItems = currentReceivingExtraItems.filter(it => !currentReceivingRemovedIds.has(it.id));
+  // الصنف الإضافي بينحفظ كمان بقائمة الأصناف، فما نعرضه مرتين
+  const baseIds = new Set(baseItems.map(it => it.id));
+  const extraItems = currentReceivingExtraItems.filter(it => !currentReceivingRemovedIds.has(it.id) && !baseIds.has(it.id));
   return [...baseItems, ...extraItems];
 }
 
@@ -753,6 +755,25 @@ function confirmAddReceivingItem(category) {
     return;
   }
 
+  // الصنف موجود أصلاً بهالقسم (حتى لو انشال اليوم أو اختياري)؟ نرجّعه هو بدل ما ننشئ نسخة ثانية بنفس الاسم
+  const norm = (s) => String(s || "").replace(/[إأآ]/g, "ا").replace(/ة$/, "ه").replace(/\s+/g, " ").trim();
+  const existing = (Items.current || []).find(it => (it.category || "عام") === category && norm(it.name) === norm(name) &&
+    (!itemBranches(it).length || itemBranches(it).includes(currentReceivingBranch)));
+  if (existing) {
+    currentReceivingRemovedIds.delete(existing.id);
+    currentReceivingAddedIds.add(existing.id);
+    const prev = currentReceivingData[existing.id] || { received: "", notes: "", cookName: "" };
+    currentReceivingData[existing.id] = { ...prev, received: qty !== "" ? String(qty) : prev.received,
+      status: computeReceivingItemStatus(qty !== "" ? qty : prev.received, currentReceivingOrdered[existing.id]) };
+    closeAddReceivingItemModal();
+    showToast(`✅ رجع صنف "${existing.name}" لقسم ${category}`);
+    renderReceivingView();
+    flushReceivingSave();
+    updateSaveBarReceivingStatus();
+    focusEntryById("recinput-" + existing.id);
+    return;
+  }
+
   const newCustomId = "custom_rec_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
   const newItem = {
     id: newCustomId,
@@ -780,6 +801,8 @@ function confirmAddReceivingItem(category) {
       unit: unit,
       category: category,
       branches: currentReceivingBranch,
+      // اختياري: يطلع بس باليوم اللي انستلم أو انطلب فيه — ما يصير صنف ثابت كل يوم
+      optional: true,
       isCustom: true
     });
   } catch (err) {
