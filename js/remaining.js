@@ -1274,13 +1274,23 @@ async function sendSauceFormIfChanged(date, branch, items) {
   if (!SAUCE_FORM_BRANCHES.includes(branch) || typeof SupaEngine === "undefined" || !SupaEngine.sendGoogleForm) return;
   const totals = sauceTotals(items);
   const statusEl = document.getElementById("remainingSaveStatus");
+  // كل إرسال = سطر جديد عند المحاسب (الأول ما ينمسح). فنرسل مرة وحدة باليوم، وبس لما يخلص الجرد كامل
+  const blank = (v) => v === "" || v === null || v === undefined;
+  const allCounted = items.length && items.every(it => !blank(it.remaining) || !blank(it.remainingWeight) || !blank(it.remainingSauce));
   try {
     const last = await SupaEngine.getLastFormSubmission("sauce", date, branch).catch(() => null);
-    const same = last && Object.keys(totals).every(k => String(totals[k]) === String((last.payload || {})[k]));
-    if (same) return;
+    if (last) {
+      const same = Object.keys(totals).every(k => String(totals[k]) === String((last.payload || {})[k]));
+      if (!same) showToast("ℹ️ نموذج الصوص انرسل قبل — أي تعديل بلّغ المحاسب فيه (ما نرسل مرة ثانية عشان ما ينحسب مرتين)");
+      return;
+    }
+    if (!allCounted) {
+      if (statusEl) statusEl.textContent += " · نموذج الصوص ينرسل لما يخلص الجرد كامل";
+      return;
+    }
     const emp = Auth.getEmployee();
     await SupaEngine.sendGoogleForm({ form: "sauce", date, branch, name: emp ? emp.name : "", ...totals });
-    showToast(last ? "📤 تم إرسال تعديل نموذج الصوص" : "📤 تم إرسال نموذج الصوص تلقائياً");
+    showToast("📤 تم إرسال نموذج الصوص تلقائياً");
     if (statusEl) statusEl.textContent += " · 📤 تم إرسال نموذج الصوص";
   } catch (e) {
     if (await phConfirm("⚠ لم يُرسل نموذج الصوص: " + (e.message || "تأكد من النت") + "\nنعيد المحاولة؟", { ok: "أعد الإرسال" })) {
