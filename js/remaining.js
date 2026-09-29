@@ -105,7 +105,10 @@ function getAllRemainingActiveItems(receivingData) {
   if (recData && Array.isArray(recData.items)) recData.items.forEach(r => { recById[r.itemId || r.id] = r; });
   const result = [];
   itemsMap.forEach((item, id) => {
-    if (currentRemainingRemovedIds.has(id)) return;
+    // الصنف اللي انستلم منه ما ينشال من الجرد: مستلمه لازم يدخل بالحساب (المبيعات فيها كل شي)،
+    // وإذا خلص ينكتب متبقيه 0. قبل: ✕ على صنف خلص كان يشيل مستلمه → مستلم 101 ومباع 119.
+    const wasReceived = recById[id] && Number(recById[id].received) > 0;
+    if (currentRemainingRemovedIds.has(id) && !wasReceived) return;
     if (recRemoved.has(id) && !extraIds.has(id)) return;
     const def = Items.byId(id);
     if (def && isOptionalItem(def) && !extraIds.has(id)) {
@@ -328,6 +331,11 @@ function otherCatUnit(catItems) {
   const u = String(((catItems || [])[0] || {}).unit || "جرام");
   return /جرام|جم|كجم/.test(u) ? "جم" : u;
 }
+// المباع أكثر من المستلم = فيه استلام ما انسجّل (أو صنف انشال) — مو "زيادة"
+function soldMoreThanReceivedPill() {
+  return `<span class="cat-pill pill-warn">⚠ المباع أكثر من المستلم — في استلام ناقص، راجع شاشة الاستلام</span>`;
+}
+
 function otherCatUsedPill(received, remaining, catItems) {
   const used = Math.round(Number(received || 0) - Number(remaining || 0));
   const unit = otherCatUnit(catItems);
@@ -730,7 +738,9 @@ function renderRemainingView(receivingData, salesData) {
 
       recDisplay = `${recMeals} وجبة`;
       soldDisplay = `${soldMeals || 0} وجبة`;
-      if (hasRemainingRecorded && Auth.canSeeSales()) {
+      if (hasRemainingRecorded && Auth.canSeeSales() && categoryConsumedGrams > catReceivedSum + 50) {
+        varBadgeHtml = soldMoreThanReceivedPill();
+      } else if (hasRemainingRecorded && Auth.canSeeSales()) {
         if (Math.abs(catVarianceGrams) <= 50) {
           varBadgeHtml = `<span class="cat-pill pill-ok">✅ مطابق</span>`;
         } else if (catVarianceGrams < 0) {
@@ -750,7 +760,9 @@ function renderRemainingView(receivingData, salesData) {
 
       recDisplay = `${recCount} ساندويتش`;
       soldDisplay = `${soldCount || 0} ساندويتش`;
-      if (hasRemainingRecorded && Auth.canSeeSales()) {
+      if (hasRemainingRecorded && Auth.canSeeSales() && soldCount > recCount + 0.5) {
+        varBadgeHtml = soldMoreThanReceivedPill();
+      } else if (hasRemainingRecorded && Auth.canSeeSales()) {
         if (catVariance === 0) {
           varBadgeHtml = `<span class="cat-pill pill-ok">✅ مطابق</span>`;
         } else if (catVariance < 0) {
@@ -770,7 +782,9 @@ function renderRemainingView(receivingData, salesData) {
 
       recDisplay = `${recCount} حبة`;
       soldDisplay = `${soldCount || 0} حبة`;
-      if (hasRemainingRecorded && Auth.canSeeSales()) {
+      if (hasRemainingRecorded && Auth.canSeeSales() && soldCount > recCount + 0.5) {
+        varBadgeHtml = soldMoreThanReceivedPill();
+      } else if (hasRemainingRecorded && Auth.canSeeSales()) {
         if (catVariance === 0) {
           varBadgeHtml = `<span class="cat-pill pill-ok">✅ مطابق</span>`;
         } else if (catVariance < 0) {
@@ -919,7 +933,9 @@ function updateCategoryHeaderMetrics(itemId) {
         const catVarianceGrams = catActualChickenSum + catActualSauceSum - expectedRemainingGrams; // الصوص الباقي بالصحن كان من وزن الاستلام — ينخصم من العجز
         const varMeals = (catVarianceGrams / MEAL_WEIGHT_G).toFixed(1).replace(/\.0$/, "");
 
-        if (hasRemainingRecorded) {
+        if (hasRemainingRecorded && categoryConsumedGrams > catReceivedSum + 50) {
+          varPillContainer.innerHTML = soldMoreThanReceivedPill();
+        } else if (hasRemainingRecorded) {
           if (Math.abs(catVarianceGrams) <= 50) {
             varPillContainer.innerHTML = `<span class="cat-pill pill-ok">✅ مطابق</span>`;
           } else if (catVarianceGrams < 0) {
@@ -936,7 +952,9 @@ function updateCategoryHeaderMetrics(itemId) {
         const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
         const catVariance = Math.round(catActualChickenSum) - expectedRem;
 
-        if (hasRemainingRecorded) {
+        if (hasRemainingRecorded && soldCount > recCount + 0.5) {
+          varPillContainer.innerHTML = soldMoreThanReceivedPill();
+        } else if (hasRemainingRecorded) {
           if (catVariance === 0) {
             varPillContainer.innerHTML = `<span class="cat-pill pill-ok">✅ مطابق</span>`;
           } else if (catVariance < 0) {
@@ -953,7 +971,9 @@ function updateCategoryHeaderMetrics(itemId) {
         const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
         const catVariance = Math.round(catActualChickenSum) - expectedRem;
 
-        if (hasRemainingRecorded) {
+        if (hasRemainingRecorded && soldCount > recCount + 0.5) {
+          varPillContainer.innerHTML = soldMoreThanReceivedPill();
+        } else if (hasRemainingRecorded) {
           if (catVariance === 0) {
             varPillContainer.innerHTML = `<span class="cat-pill pill-ok">✅ مطابق</span>`;
           } else if (catVariance < 0) {
@@ -1319,6 +1339,17 @@ async function closeOperationalDay() {
 // ---- وظائف إزالة وإضافة الأصناف في جرد المتبقي ----
 
 async function onRemoveRemainingItem(itemId, itemName) {
+  const rec = cachedReceivingDataForRemaining;
+  const recRow = rec && Array.isArray(rec.items) ? rec.items.find(r => (r.itemId || r.id) === itemId) : null;
+  if (recRow && Number(recRow.received) > 0) {
+    const ok = await phConfirm(`"${itemName || ""}" انستلم منه ${Math.round(Number(recRow.received))} الصبح — ما ينشال من الجرد.\nإذا خلص كله، نسجّل المتبقي 0؟`, { ok: "خلص — سجّل 0" });
+    if (!ok) return;
+    const inp = document.getElementById("remweight-" + itemId);
+    if (inp) { inp.value = "0"; inp.dispatchEvent(new Event("input", { bubbles: true })); }
+    else onRemainingWeightChange(itemId, "0");
+    showToast("✅ انسجّل: خلص (المتبقي 0)");
+    return;
+  }
   const confirmed = await phConfirm(`هل أنت متأكد من استبعاد الصنف "${itemName || ''}" من جرد المتبقي اليوم؟`, { ok: "شيله", danger: true });
   if (!confirmed) return;
 
