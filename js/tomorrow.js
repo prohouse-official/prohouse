@@ -172,6 +172,8 @@ function renderTomorrowView() {
       </div>`}
     </div>
 
+    ${typeof tabAllowed === "function" && tabAllowed("report") ? `<button type="button" class="btn primary tom-chef-btn" onclick="goToChefReport()">👨‍🍳 طلبية الشيف (PDF للواتساب)</button>` : ""}
+
     <!-- المقترح للمعلومة بس — ما فيه زر يعبّي الكميات تلقائياً (كان يمسح الأوزان المكتوبة) -->
 
     <!-- فلاتر سريعة للتركيز -->
@@ -687,6 +689,21 @@ function saveTomorrowNow(showStatus) {
       : "✅ محفوظ — جاري المزامنة " + savedAtText;
   }
   if (showStatus) showToast("تم حفظ طلبية الغد بنجاح!");
+}
+
+// يحفظ الطلبية ويستنى توصل للسيرفر، وبعدين يفتح تقرير الشيف (PDF) لنفس اليوم والفرع
+async function goToChefReport() {
+  if (!Auth.isViewOnlyTomorrow() && !tomorrowLoadFailed) {
+    clearTimeout(tomorrowAutoSaveTimer);
+    saveTomorrowNow(false);
+    const key = "saveTomorrowOrder:" + currentTomorrowDate + ":" + (currentTomorrowBranch || "");
+    for (let i = 0; i < 20 && Sync.getQueue().some(q => q.key === key); i++) {
+      await Sync.flushQueue();
+      await new Promise(r => setTimeout(r, 250));
+    }
+    if (Sync.getQueue().some(q => q.key === key)) showToast("⚠ الطلبية لسا ما وصلت للسيرفر — تأكد من النت قبل ما ترسل الـ PDF");
+  }
+  openChefReportFor(currentTomorrowDate, currentTomorrowBranch);
 }
 
 let tomorrowAutoSaveTimer = null;

@@ -3344,3 +3344,6 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 #entriesReportControls .toolbar select, #entriesReportControls .toolbar label { min-height: 44px; border-radius: 14px; }
 .report-actions .btn.secondary { flex: 0 0 auto; padding: 0 14px; }
 .report-actions #tomorrowReportPdfBtn { flex: 1.6 1 0; }
+
+/* زر تقرير الشيف من شاشة طلبية الغد */
+.tom-chef-btn { width: 100%; margin: 10px 0 4px; min-height: 44px; font-size: 15px; }
