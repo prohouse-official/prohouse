@@ -113,7 +113,8 @@ async function loadBranchStatus(branch, dash) {
   const countedIds = new Set(items.filter(it => hasValue(it.remaining) || hasValue(it.remainingWeight) || hasValue(it.remainingSauce)).map(it => it.itemId));
   // نفس أصناف شاشة المتبقي: بدون الكارب واللي انشال اليوم، وخانات الشيف بس إذا انستلمت أو انجردت
   const isCarb = (c) => remainingHidesCategory(c, branch);
-  const remRemoved = new Set((dayData && dayData.remainingRemovedItemIds) || []);
+  // ✕ على صنف انستلم = خلص (متبقي 0) — يضل محسوب
+  const remRemoved = new Set(((dayData && dayData.remainingRemovedItemIds) || []).filter(id => !receivedPositive.has(id)));
   const remIds = Items.current.filter(it => {
     if (removed.has(it.id) || remRemoved.has(it.id) || isCarb(it.category)) return false;
     const b = itemBranches(it);

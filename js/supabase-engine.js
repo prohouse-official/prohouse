@@ -394,22 +394,34 @@ const SupaEngine = (() => {
     const { date, branch, items, removedItemIds } = payload;
     const day = `date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`;
 
-    // شيل صنف من الجرد = "ما ينجرد اليوم" بس: منمسح أرقام المتبقي وبنخلي الاستلام زي ما هو.
-    // (قبل كان يمسح الصف كامل — فكان ينمسح معه المستلم واسم الطبخة)
+    // ✕ بالجرد: الصنف اللي انستلم منه = "خلص" → متبقيه 0 وبيضل بالحسبة (مستلمه لازم ينحسب قدام المبيعات).
+    // الصنف اللي ما انستلم = "ما ينجرد اليوم" → ينمسح متبقيه بس وبيدخل بقائمة المشالة. الاستلام ما ينمسح أبداً.
     if (Array.isArray(removedItemIds)) {
-      const remIds = removedItemIds;
+      let remIds = removedItemIds;
       if (remIds.length > 0) {
         const idList = remIds.map(id => `"${encodeURIComponent(id)}"`).join(",");
-        await query(`daily_entries?${day}&item_id=in.(${idList})`, {
-          method: "PATCH",
-          body: JSON.stringify({ remaining: null, remaining_weight: null, remaining_sauce: null, remaining_notes: null })
-        }).catch(e => console.warn("clear remaining error:", e));
-        // صف ما فيه استلام ولا اسم طبخة ما إله لزوم
-        try {
-          const rows = (await query(`daily_entries?select=item_id,received,cook_name&${day}&item_id=in.(${idList})`)) || [];
-          const empty = rows.filter(r => !(Number(r.received) > 0) && !String(r.cook_name || "").trim()).map(r => `"${encodeURIComponent(r.item_id)}"`);
-          if (empty.length) await query(`daily_entries?${day}&item_id=in.(${empty.join(",")})`, { method: "DELETE" });
-        } catch (e) { console.warn("delete empty rows error:", e); }
+        let rows = [];
+        try { rows = (await query(`daily_entries?select=item_id,received,cook_name,remaining&${day}&item_id=in.(${idList})`)) || []; }
+        catch (e) { console.warn("read removed rows error:", e); }
+        const finished = rows.filter(r => Number(r.received) > 0).map(r => r.item_id);
+        const finishedSet = new Set(finished);
+        const q = (ids) => ids.map(id => `"${encodeURIComponent(id)}"`).join(",");
+        if (finished.length) {
+          await query(`daily_entries?${day}&item_id=in.(${q(finished)})`, {
+            method: "PATCH",
+            body: JSON.stringify({ remaining: 0, remaining_weight: 0, remaining_sauce: null, saved_at: new Date().toISOString() })
+          }).catch(e => console.warn("finished=0 error:", e));
+        }
+        remIds = remIds.filter(id => !finishedSet.has(id));
+        if (remIds.length) {
+          await query(`daily_entries?${day}&item_id=in.(${q(remIds)})`, {
+            method: "PATCH",
+            body: JSON.stringify({ remaining: null, remaining_weight: null, remaining_sauce: null, remaining_notes: null })
+          }).catch(e => console.warn("clear remaining error:", e));
+          // صف ما فيه استلام ولا اسم طبخة ما إله لزوم
+          const empty = rows.filter(r => remIds.includes(r.item_id) && !(Number(r.received) > 0) && !String(r.cook_name || "").trim()).map(r => r.item_id);
+          if (empty.length) await query(`daily_entries?${day}&item_id=in.(${q(empty)})`, { method: "DELETE" }).catch(e => console.warn("delete empty rows error:", e));
+        }
       }
       await query("day_meta", {
         method: "POST",

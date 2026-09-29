@@ -287,7 +287,19 @@ async function loadRemainingData(date, branch) {
     }
     remainingBaseline = {};
     Object.keys(currentRemainingData).forEach(id => { remainingBaseline[id] = remainingSnapshot(currentRemainingData[id]); });
+    // صنف انستلم وانضغط عليه ✕ (خلص) بدون رقم = متبقيه 0، مو "ما انجرد"
+    const recRows = (cachedReceivingDataForRemaining && cachedReceivingDataForRemaining.items) || [];
+    let finishedFix = false;
+    recRows.forEach(r => {
+      const id = r.itemId || r.id;
+      if (!currentRemainingRemovedIds.has(id) || !(Number(r.received) > 0)) return;
+      const d = currentRemainingData[id];
+      if (d && [d.remaining, d.remainingWeight, d.remainingSauce].some(v => v !== "" && v != null)) return;
+      currentRemainingData[id] = { remaining: "0", remainingWeight: "0", remainingSauce: "", isSauce: false, notes: (d && d.notes) || "" };
+      finishedFix = true;
+    });
     remainingDataKey = { date: currentRemainingDate, branch: currentRemainingBranch };
+    if (finishedFix && !(currentRemainingMeta && currentRemainingMeta.isClosed) && !Auth.isViewOnlyEntry()) remainingAutosave.schedule();
 
     renderRemainingView(cachedReceivingDataForRemaining, cachedSalesDataForRemaining);
   } catch (err) {
@@ -1342,12 +1354,11 @@ async function onRemoveRemainingItem(itemId, itemName) {
   const rec = cachedReceivingDataForRemaining;
   const recRow = rec && Array.isArray(rec.items) ? rec.items.find(r => (r.itemId || r.id) === itemId) : null;
   if (recRow && Number(recRow.received) > 0) {
-    const ok = await phConfirm(`"${itemName || ""}" انستلم منه ${Math.round(Number(recRow.received))} الصبح — ما ينشال من الجرد.\nإذا خلص كله، نسجّل المتبقي 0؟`, { ok: "خلص — سجّل 0" });
-    if (!ok) return;
+    // ✕ على صنف انستلم = خلص: متبقيه 0 وبيضل بالحسبة
     const inp = document.getElementById("remweight-" + itemId);
     if (inp) { inp.value = "0"; inp.dispatchEvent(new Event("input", { bubbles: true })); }
     else onRemainingWeightChange(itemId, "0");
-    showToast("✅ انسجّل: خلص (المتبقي 0)");
+    showToast(`✅ "${itemName || ""}" خلص — انسجّل متبقيه 0 (ومستلمه محسوب)`);
     return;
   }
   const confirmed = await phConfirm(`هل أنت متأكد من استبعاد الصنف "${itemName || ''}" من جرد المتبقي اليوم؟`, { ok: "شيله", danger: true });
