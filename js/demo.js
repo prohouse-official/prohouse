@@ -19,7 +19,8 @@
   };
   const EMPLOYEES = {
     "1111": { id: "emp_2", name: "حسن", role: "owner", branches: "الروضة,الشاطئ," + AJL, token: "demo-owner" },
-    "2222": { id: "emp_6", name: "محمد البلول", role: "employee", branches: AJL, token: "demo-staff" }
+    "2222": { id: "emp_6", name: "محمد البلول", role: "employee", branches: AJL, token: "demo-staff" },
+    "3333": { id: "emp_5", name: "العامودي", role: "manager", branches: "الشاطئ", token: "demo-manager" }
   };
 
   function seed() {
@@ -53,7 +54,7 @@
     return {
       items, daily_entries, tabsense_sales,
       day_meta: [], tomorrow_orders: [], waste_log: [], juices: [], juice_counts: [], juice_sales: [],
-      settings: [{ key: "branches", value: "الروضة,الشاطئ," + AJL }],
+      settings: [{ key: "branches", value: "الروضة,الشاطئ," + AJL }, { key: "chef_report_employees", value: "emp_5" }],
       employees: Object.values(EMPLOYEES).map(({ token, ...e }) => ({ ...e, active: true })),
       tabsense_payments: [
         { date: riyadh(-1), branch: AJL, channel: "Cash", transactions: 6, amount: 212.4 },

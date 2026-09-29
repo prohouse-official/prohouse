@@ -25,6 +25,7 @@ const TAB_ROLE_ACCESS = {
 
 function tabAllowed(tab) {
   const role = Auth.role();
+  if (tab === "report" && typeof isChefReportOnlyUser === "function" && isChefReportOnlyUser()) return true;
   if (!(role && TAB_ROLE_ACCESS[tab] && TAB_ROLE_ACCESS[tab].includes(role))) return false;
   // صور التوثيق تنشال عن الموظف إذا كل فروعه لسا ما تحددت لها مناطق تصوير
   if (tab === "opening" && role !== "owner" && typeof isPhotoOffBranch === "function") {
@@ -127,6 +128,7 @@ function setActiveTab(tab) {
   if (tab === "checklist") { renderChecklistView(); }
   if (tab === "report") {
     const rt = document.getElementById("reportType");
+    if (typeof applyReportRoleView === "function" && applyReportRoleView()) return;
     if (rt && rt.value === "daily") runDailyReport();
     loadReportLibs().then(() => {
       if (!document.getElementById("reportContainer").classList.contains("hidden")) redrawTrendChartIfReady();

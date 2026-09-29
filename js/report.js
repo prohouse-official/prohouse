@@ -649,6 +649,46 @@ function initTomorrowReportControls() {
   }));
 }
 
+// موظف (مدير فرع) مسموح له يشوف تقرير الشيف بس — لفروعه، عشان يبعث PDF الطلبية للشيف.
+// من الإعدادات: chef_report_employees (أرقام الموظفين مفصولة بفاصلة، مثل emp_5)
+function isChefReportOnlyUser() {
+  if (typeof Auth === "undefined" || Auth.role() === "owner") return false;
+  const e = Auth.getEmployee();
+  const raw = (typeof currentSettings !== "undefined" && currentSettings.chef_report_employees) || "";
+  return !!e && raw.split(",").map(x => x.trim()).includes(e.id);
+}
+// المالك يشوف كل التقارير؛ صاحب «تقرير الشيف بس» يشوف طلبية الشيف لفروعه وبس
+function applyReportRoleView() {
+  const limited = isChefReportOnlyUser();
+  const type = document.getElementById("reportType");
+  const pills = type && type.nextElementSibling;
+  if (pills && pills.classList.contains("ph-tab-pills")) pills.classList.toggle("hidden", limited);
+  if (!limited) return false;
+  const brSel = document.getElementById("tomorrowReportBranch");
+  const mine = allowedBranchList();
+  if (brSel && brSel.dataset.limited !== mine.join(",")) {
+    brSel.innerHTML = mine.map(b => `<option value="${escHtml(b)}">${escHtml(b)}</option>`).join("");
+    brSel.dataset.limited = mine.join(",");
+  }
+  if (type.value !== "tomorrow") {
+    type.value = "tomorrow";
+    type.dispatchEvent(new Event("change", { bubbles: true })); // يفتح تقرير الشيف ويحمّله
+  } else runTomorrowReport();
+  return true;
+}
+// زر من شاشة طلبية الغد: يفتح تقرير الشيف على نفس اليوم والفرع
+function openChefReportFor(date, branch) {
+  if (!tabAllowed("report")) return;
+  setActiveTab("report");
+  const d = document.getElementById("tomorrowReportDate");
+  if (d && date) { d.value = date; if (d._phRefresh) d._phRefresh(); }
+  const b = document.getElementById("tomorrowReportBranch");
+  if (b && branch && [...b.options].some(o => o.value === branch)) b.value = branch;
+  const type = document.getElementById("reportType");
+  if (type.value !== "tomorrow") { type.value = "tomorrow"; type.dispatchEvent(new Event("change", { bubbles: true })); }
+  else runTomorrowReport();
+}
+
 let tomorrowReportRun = 0;
 async function runTomorrowReport() {
   const run = ++tomorrowReportRun;
@@ -658,7 +698,7 @@ async function runTomorrowReport() {
 
   const date = document.getElementById("tomorrowReportDate").value || addDaysStr(todayStr(), 1);
   const branchFilter = document.getElementById("tomorrowReportBranch").value;
-  const branches = branchFilter ? [branchFilter] : branchList();
+  const branches = branchFilter ? [branchFilter] : (isChefReportOnlyUser() ? allowedBranchList() : branchList());
   lastTomorrowReportDate = date;
 
   const [perBranch, perDay] = await Promise.all([
