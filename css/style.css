@@ -3399,3 +3399,13 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 .cust-photo-btn img{ width:44px; height:44px; object-fit:cover; border-radius:8px; }
 .cust-check{ display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; font-weight:700; color:var(--muted); }
 .cust-check input{ width:18px; height:18px; }
+
+/* سكان فاتورة المصروف: زر واضح بالرئيسية وفوق صفحة العهدة */
+.cust-scan-top, .home-scan{
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%; min-height:54px; margin-top:12px;
+  border:none; border-radius:16px; background:var(--yellow); color:var(--ink); font-family:inherit; font-size:16px; font-weight:900; cursor:pointer;
+  box-shadow:0 10px 22px -14px rgba(0,0,0,.45);
+}
+.home-scan{ margin:4px 0 14px; }
+.cust-exp-form.flash{ animation:custFlash 1.6s ease; border-radius:14px; }
+@keyframes custFlash{ 0%,60%{ background:#FFF6C9; } 100%{ background:transparent; } }
