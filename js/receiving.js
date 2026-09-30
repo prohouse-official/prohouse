@@ -224,7 +224,7 @@ function filterReceivingCardsUI() {
   // إخفاء التصنيفات الفارغة تلقائياً بحسب الفلتر
   document.querySelectorAll(".category-section").forEach(sec => {
     const visibleCards = sec.querySelectorAll('.receiving-item-card:not([style*="display: none"])');
-    sec.style.display = visibleCards.length > 0 ? "" : "none";
+    sec.style.display = visibleCards.length > 0 || (sec.dataset.core && receivingActiveFilter === "all") ? "" : "none";
   });
   updateEntryProgress(document.getElementById("receivingView"));
 }
@@ -320,6 +320,7 @@ function renderReceivingView() {
     if (!byCat[cat]) byCat[cat] = [];
     byCat[cat].push(it);
   });
+  ensureCoreCategories(byCat, currentReceivingBranch);
 
   const categories = Object.keys(byCat).sort((a, b) => categoryRank(a) - categoryRank(b));
   categories.forEach(cat => byCat[cat].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)));
@@ -337,7 +338,7 @@ function renderReceivingView() {
     }).length;
 
     html += `
-      <div class="category-section${receivingCollapsed[cat] ? " collapsed" : ""}" data-cat="${cat}">
+      <div class="category-section${receivingCollapsed[cat] ? " collapsed" : ""}" data-cat="${cat}"${byCat[cat].length ? "" : ' data-core="1"'}>
         <div class="category-header" onclick="toggleReceivingCategory('${String(cat).replace(/'/g, "\\'")}')">
           <span class="cat-label">${categoryIconSticker(cat)} ${cat}</span>
           ${recCatTotalHtml(cat)}
