@@ -408,24 +408,26 @@ function addOnExtraGrams(name) {
 }
 
 // ---- قراءة تقرير فوديكس «مجمّع حسب الفرع» ----
-const toNum = (t) => parseFloat(String(t || "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[,٬\s]/g, "").replace("٫", ".")) || 0;
+// أرقام فوديكس: أرقام عربية، فواصل آلاف، وعملة (ر.س / SAR) — نخلي الأرقام والنقطة والسالب بس
+const toNum = (t) => parseFloat(String(t || "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace("٫", ".").replace(/[,٬\s]/g, "").replace(/[^\d.\-]/g, "")) || 0;
 function branchMatches(cell, branch) {
   const c = normalizeArabic(cell || ""), b = normalizeArabic(branch);
   return !!c && c.includes(b);
 }
 
 // نجرّب مرتين: صفحات فوديكس أحياناً تتأخر بالتحميل فيختفي زر التجميع أو الجدول
-async function readGroupedReport(page, path, iso, nameLabel) {
-  let res = await readGroupedReportOnce(page, path, iso, nameLabel);
+async function readGroupedReport(page, path, iso, nameLabel, valueLabel) {
+  let res = await readGroupedReportOnce(page, path, iso, nameLabel, valueLabel);
   if (!res.ok) {
     await page.waitForTimeout(3000);
-    res = await readGroupedReportOnce(page, path, iso, nameLabel);
+    res = await readGroupedReportOnce(page, path, iso, nameLabel, valueLabel);
     if (!res.ok) console.warn(`⚠️ ${path}: ${res.reason}`);
   }
   return res;
 }
 
-async function readGroupedReportOnce(page, path, iso, nameLabel) {
+// valueLabel: عمود الرقم (افتراضياً «صافي الكمية»؛ لطرق الدفع عمود المبلغ)
+async function readGroupedReportOnce(page, path, iso, nameLabel, valueLabel) {
   const url = `https://console.foodics.com${path}?date=${iso}+-+${iso}`;
   await page.goto(url, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
   await page.waitForSelector("table", { timeout: 15000 }).catch(() => {});
@@ -446,7 +448,7 @@ async function readGroupedReportOnce(page, path, iso, nameLabel) {
 
   const all = [];
   for (let pageNo = 0; pageNo < 20; pageNo++) {
-    const part = await page.evaluate((nameLabel) => {
+    const part = await page.evaluate(([nameLabel, valueLabel]) => {
       const first = (el) => (el.innerText || "").split("\n")[0].trim();
       const table = document.querySelector("table");
       if (!table) return { error: "ما فيه جدول" };
@@ -454,7 +456,7 @@ async function readGroupedReportOnce(page, path, iso, nameLabel) {
       const idx = (re) => headers.findIndex(h => re.test(h));
       const nameIdx = idx(new RegExp("^" + nameLabel));
       const branchIdx = idx(/^الفرع/);
-      const qtyIdx = idx(/^صافي الكمية/);
+      const qtyIdx = idx(new RegExp("^(" + (valueLabel || "صافي الكمية") + ")"));
       const rows = [];
       let groupBranch = "";
       Array.from(table.querySelectorAll("tbody tr")).forEach(tr => {
@@ -467,7 +469,7 @@ async function readGroupedReportOnce(page, path, iso, nameLabel) {
         rows.push({ branch: branchIdx >= 0 ? texts[branchIdx] : groupBranch, name, qty: qtyIdx >= 0 ? texts[qtyIdx] : "" });
       });
       return { headers: headers.map(h => h.slice(0, 20)), nameIdx, branchIdx, qtyIdx, rows };
-    }, nameLabel).catch(e => ({ error: e.message }));
+    }, [nameLabel, valueLabel]).catch(e => ({ error: e.message }));
     if (part.error) return { ok: false, reason: part.error, rows: [] };
     if (pageNo === 0) {
       const branchesSeen = Array.from(new Set(part.rows.map(r => r.branch).filter(Boolean)));
@@ -483,6 +485,19 @@ async function readGroupedReportOnce(page, path, iso, nameLabel) {
     await page.waitForTimeout(2000);
   }
   return { ok: true, rows: all };
+}
+
+// تقرير المبيعات حسب طريقة الدفع — نجرب العناوين المحتملة لحد ما واحد يشتغل (نطبع الأعمدة بس، بدون أرقام)
+const PAYMENT_PATHS = ["/reports/payments", "/reports/sales-by-payment-method", "/reports/sales-by-payment-methods", "/reports/payment-methods", "/reports/sales-by-payment"];
+let paymentPathFound = null;
+async function readPaymentsReport(page, iso) {
+  const paths = paymentPathFound ? [paymentPathFound] : PAYMENT_PATHS;
+  for (const p of paths) {
+    const res = await readGroupedReportOnce(page, p, iso, "(طريقة الدفع|طرق الدفع|الدفع|وسيلة الدفع)", "(صافي المبلغ|المبلغ|صافي المبيعات|الإجمالي|المجموع)");
+    if (res.ok) { paymentPathFound = p; return res; }
+    console.log(`ℹ️ طرق الدفع: ${p} — ${res.reason}`);
+  }
+  return { ok: false, rows: [] };
 }
 
 async function run() {
@@ -549,6 +564,7 @@ async function run() {
       const cats = await readGroupedReport(page, "/reports/sales-by-category", iso, "التصنيف");
       const prods = await readGroupedReport(page, "/reports/sales-by-product", iso, "المنتج");
       const mods = await readGroupedReport(page, "/reports/sales-by-modifier-option", iso, "خيار الإضافة");
+      const pays = await readPaymentsReport(page, iso);
       if (cats.ok) structureOk = true;
       if (!cats.ok) { console.warn(`⚠️ ما قدرنا نقرأ تقرير التصنيفات حسب الفرع (${cats.reason}) — ما انرسل شي لهاليوم`); continue; }
 
@@ -590,6 +606,12 @@ async function run() {
         if (productRows.length) {
           try { await sendToSupabase("import_product_sales", iso, branch, productRows); console.log(`🧾 ${branch}: انحفظت مبيعات ${productRows.length} منتج`); }
           catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ مبيعات المنتجات:`, e.message); }
+        }
+        // طرق الدفع (كاش/شبكة) لمطابقة إغلاق العهدة
+        const payRows = pays.ok ? mine(pays.rows).filter(r => r.name && r.qty != null).map(r => ({ channel: r.name, transactions: 0, amount: r.qty })) : [];
+        if (payRows.length) {
+          try { await sendToSupabase("import_payments", iso, branch, payRows); console.log(`💳 ${branch}: انحفظت طرق الدفع (${payRows.length} طريقة)`); }
+          catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ طرق الدفع:`, e.message); }
         }
         const juiceRows = pickJuiceRows(prodRows, config.juiceCategories || DEFAULT_JUICE_CATEGORIES);
         if (juiceRows.length) {

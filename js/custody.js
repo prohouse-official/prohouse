@@ -17,7 +17,7 @@ const Custody = {
   async statusFor(date, branch) {
     try {
       const row = await this.get(date, branch);
-      return { closed: !!(row && row.closed_at) };
+      return { closed: !!(row && row.closed_at), opened: !!(row && row.opening_float != null) };
     } catch (e) {
       return null;
     }
@@ -77,98 +77,245 @@ async function loadCustody(date, branch) {
   renderCustodyView(payments || []);
 }
 
+// ---- الصفحة على ٣ خطوات: ① العهدة أول ما يوصل ② المصروفات مع صورة الفاتورة ③ الإغلاق آخر اليوم ----
+// كل خطوة تنحفظ لحالها فوراً (ما في شي يضيع لو سكّر الجوال بالنص)
+let custodyDraftExpense = { amount: "", note: "", photo: "", noReceipt: false };
+let custodyBusy = false;
+
+function custodyTime(ts) {
+  return ts ? new Date(ts).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" }) : "";
+}
+function custodyCanEdit() {
+  // بعد الإغلاق: المالك بس يعدّل
+  return !currentCustody.closed_at || Auth.isOwner();
+}
+
 function renderCustodyView(payments) {
   const c = currentCustody;
   const view = document.getElementById("custodyView");
   const closed = !!c.closed_at;
-  const closedAt = closed ? new Date(c.closed_at).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" }) : "";
+  const opened = toNum(c.opening_float) !== null;
   const branches = allowedBranchList();
+  const canEdit = custodyCanEdit();
+  const d = custodyDraftExpense;
+  const expTotal = custodyExpensesTotal(c.expenses);
 
   view.innerHTML = `
     <div class="cust-card">
       <div class="cust-head">
         <div>
-          <h2 class="cust-title">💰 إغلاق العهدة</h2>
-          <div class="cust-sub">${currentCustodyDate}${branches.length > 1 ? "" : " · " + currentCustodyBranch}</div>
+          <h2 class="cust-title">💰 العهدة والكاش</h2>
+          <div class="cust-sub">${currentCustodyDate}${branches.length > 1 ? "" : " · " + escHtml(currentCustodyBranch)}</div>
         </div>
-        ${closed ? `<span class="cust-state done">✅ تقفّلت ${closedAt}${c.closed_by ? " · " + c.closed_by : ""}</span>` : `<span class="cust-state">باقي ما تقفّلت</span>`}
+        ${closed ? `<span class="cust-state done">✅ تقفّلت ${custodyTime(c.closed_at)}${c.closed_by ? " · " + escHtml(c.closed_by) : ""}</span>`
+          : opened ? `<span class="cust-state">🟡 مفتوحة — باقي الإغلاق</span>` : `<span class="cust-state">⏳ باقي تسجيل العهدة</span>`}
       </div>
       ${branches.length > 1 ? `<select class="cust-branch" id="custodyBranchSelect">${branchOptionsHtml(currentCustodyBranch)}</select>` : ""}
+    </div>
 
-      <label class="cust-field">
-        <span class="cust-label"><b>1</b> العهدة أول اليوم (الفكة بالدرج)</span>
-        <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" data-field="opening_float" value="${numOrBlank(c.opening_float)}">
-      </label>
-      <label class="cust-field">
-        <span class="cust-label"><b>2</b> الكاش الموجود بالدرج الحين</span>
-        <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" data-field="cash_counted" value="${numOrBlank(c.cash_counted)}">
-      </label>
-      <label class="cust-field">
-        <span class="cust-label"><b>3</b> مجموع مكينة الشبكة (مدى)</span>
-        <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" data-field="card_total" value="${numOrBlank(c.card_total)}">
-      </label>
-
-      <div class="cust-field">
-        <span class="cust-label"><b>4</b> مصاريف صُرفت من الكاش</span>
-        <div id="custodyExpenses">
-          ${c.expenses.map((e, i) => `
-            <div class="cust-expense">
-              <input type="number" inputmode="decimal" step="any" min="0" placeholder="المبلغ" data-exp="${i}" data-key="amount" value="${numOrBlank(e.amount)}">
-              <input type="text" placeholder="على إيش؟ (مثلاً: ثلج)" data-exp="${i}" data-key="note" value="${String(e.note || "").replace(/"/g, "&quot;")}">
-              <button type="button" class="cust-exp-del" data-del="${i}" aria-label="حذف">✕</button>
-            </div>`).join("")}
+    <div class="cust-step ${opened ? "done" : "active"}">
+      <div class="cust-step-head"><b>1</b> العهدة أول ما توصل (الكاش اللي بالدرج)</div>
+      ${opened && !c._editOpening ? `
+        <div class="cust-step-done">
+          <span class="cust-amount">${sar(c.opening_float)}</span>
+          <span class="cust-meta">${c.opened_by ? "سجّلها " + escHtml(c.opened_by) : ""}${c.opened_at ? " · " + custodyTime(c.opened_at) : ""}</span>
+          ${canEdit ? `<button type="button" class="cust-link" id="custEditOpening">تعديل</button>` : ""}
+        </div>` : `
+        <div class="cust-inline">
+          <input type="number" inputmode="decimal" step="any" min="0" placeholder="المبلغ بالريال" id="custOpeningInput" value="${numOrBlank(c.opening_float)}">
+          <button type="button" class="cust-btn primary" id="custOpeningSave">✅ سجّل العهدة</button>
         </div>
-        <button type="button" class="cust-add" id="custodyAddExpense">➕ أضف مصروف</button>
-        ${c.expenses.length ? `<a class="cust-add cust-form-link" href="${CASH_EXPENSE_FORM_URL}" target="_blank" rel="noopener">📋 سجّل المصروف بنموذج المصروفات (مع صورة الفاتورة)</a>` : ""}
-        ${c.expenses.length ? `<div class="cust-total">مجموع المصاريف: <b>${sar(custodyExpensesTotal(c.expenses))}</b></div>` : ""}
-      </div>
+        <div class="cust-hint">عدّ الكاش أول ما توصل واكتبه. إذا صفر اكتب 0.</div>`}
+    </div>
 
+    <div class="cust-step ${opened ? "active" : "locked"}">
+      <div class="cust-step-head"><b>2</b> المصروفات من الكاش ${c.expenses.length ? `<span class="cust-count">${c.expenses.length} · ${sar(expTotal)}</span>` : ""}</div>
+      ${c.expenses.length ? `<div class="cust-exp-list">
+        ${c.expenses.map((e, i) => `
+          <div class="cust-exp-row">
+            <div class="cust-exp-main"><b>${sar(e.amount)}</b><span>${escHtml(e.note || "")}</span>
+              <small>${escHtml(e.by || "")}${e.at ? " · " + custodyTime(e.at) : ""}</small></div>
+            ${e.receipt ? `<button type="button" class="cust-receipt-btn" data-receipt="${escHtml(e.receipt)}">📄 الفاتورة</button>` : `<span class="cust-noreceipt">بدون فاتورة</span>`}
+            ${canEdit ? `<button type="button" class="cust-exp-del" data-del="${i}" aria-label="حذف">✕</button>` : ""}
+          </div>`).join("")}
+      </div>` : `<div class="cust-hint">ما فيه مصروفات للحين.</div>`}
+      ${opened && canEdit ? `
+      <div class="cust-exp-form">
+        <div class="cust-inline">
+          <input type="number" inputmode="decimal" step="any" min="0" placeholder="المبلغ" id="custExpAmount" value="${escHtml(d.amount)}">
+          <input type="text" placeholder="على إيش؟ (مثلاً: ثلج، غاز)" id="custExpNote" value="${escHtml(d.note)}">
+        </div>
+        <label class="cust-photo-btn ${d.photo ? "has" : ""}">
+          <input type="file" accept="image/*" capture="environment" id="custExpPhoto" hidden>
+          ${d.photo ? `<img src="${d.photo}" alt="الفاتورة"> <span>✓ الفاتورة جاهزة — اضغط لإعادة التصوير</span>` : `<span>📷 صوّر الفاتورة (سكان)</span>`}
+        </label>
+        <label class="cust-check"><input type="checkbox" id="custNoReceipt" ${d.noReceipt ? "checked" : ""}> ما في فاتورة (اكتب السبب بالملاحظة)</label>
+        <button type="button" class="cust-btn gold" id="custExpAdd">➕ أضف المصروف</button>
+      </div>` : ""}
+    </div>
+
+    <div class="cust-step ${closed ? "done" : opened ? "active" : "locked"}">
+      <div class="cust-step-head"><b>3</b> إغلاق آخر اليوم</div>
+      <label class="cust-field">
+        <span class="cust-label">الكاش الموجود بالدرج عند الإغلاق</span>
+        <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" data-field="cash_counted" value="${numOrBlank(c.cash_counted)}" ${opened && canEdit ? "" : "disabled"}>
+      </label>
+      <label class="cust-field">
+        <span class="cust-label">مجموع مكينة الشبكة (مدى)</span>
+        <input type="number" inputmode="decimal" step="any" min="0" placeholder="—" data-field="card_total" value="${numOrBlank(c.card_total)}" ${opened && canEdit ? "" : "disabled"}>
+      </label>
       <label class="cust-field">
         <span class="cust-label">ملاحظات (اختياري)</span>
-        <input type="text" data-field="notes" placeholder="أي شي لازم تعرفه الإدارة" value="${String(c.notes || "").replace(/"/g, "&quot;")}">
+        <input type="text" data-field="notes" placeholder="أي شي لازم تعرفه الإدارة" value="${escHtml(c.notes || "")}" ${canEdit ? "" : "disabled"}>
       </label>
-
-      <button type="button" class="cust-close-btn" id="custodyCloseBtn">${closed ? "💾 حفظ التعديل" : "🔒 إغلاق العهدة"}</button>
+      ${canEdit ? `<button type="button" class="cust-close-btn" id="custodyCloseBtn" ${opened ? "" : "disabled"}>${closed ? "💾 حفظ التعديل" : "🔒 إغلاق العهدة"}</button>` : ""}
+      ${opened ? "" : `<div class="cust-hint">سجّل العهدة (خطوة 1) أول.</div>`}
     </div>
     ${Auth.canSeeSales() ? custodyOwnerCardHtml(c, payments) : ""}
     ${Auth.isOwner() ? '<div id="custodyMonthCard" class="cust-owner"><div class="cust-owner-title">📅 ملخص الشهر</div><div class="cust-missing">جاري التحميل…</div></div>' : ""}
   `;
   if (Auth.isOwner()) renderCustodyMonth();
 
+  const $ = (id) => document.getElementById(id);
   view.querySelectorAll("[data-field]").forEach(inp => inp.addEventListener("input", () => {
     currentCustody[inp.dataset.field] = inp.dataset.field === "notes" ? inp.value : toNum(inp.value);
   }));
-  view.querySelectorAll("[data-exp]").forEach(inp => inp.addEventListener("input", () => {
-    const e = currentCustody.expenses[Number(inp.dataset.exp)];
-    e[inp.dataset.key] = inp.dataset.key === "amount" ? toNum(inp.value) : inp.value;
-  }));
-  view.querySelectorAll("[data-del]").forEach(btn => btn.addEventListener("click", () => {
-    currentCustody.expenses.splice(Number(btn.dataset.del), 1);
-    renderCustodyView(payments);
-  }));
-  document.getElementById("custodyAddExpense").addEventListener("click", () => {
-    currentCustody.expenses.push({ amount: null, note: "" });
-    renderCustodyView(payments);
-    const inputs = view.querySelectorAll('[data-key="amount"]');
-    if (inputs.length) inputs[inputs.length - 1].focus();
+  if ($("custEditOpening")) $("custEditOpening").addEventListener("click", () => { currentCustody._editOpening = true; renderCustodyView(payments); });
+  if ($("custOpeningSave")) $("custOpeningSave").addEventListener("click", () => saveCustodyOpening(payments));
+  if ($("custExpAmount")) $("custExpAmount").addEventListener("input", (e) => { d.amount = e.target.value; });
+  if ($("custExpNote")) $("custExpNote").addEventListener("input", (e) => { d.note = e.target.value; });
+  if ($("custNoReceipt")) $("custNoReceipt").addEventListener("change", (e) => { d.noReceipt = e.target.checked; });
+  if ($("custExpPhoto")) $("custExpPhoto").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try { d.photo = await receiptImageDataUrl(f); d.noReceipt = false; renderCustodyView(payments); }
+    catch (err) { showToast("⚠ ما قدرنا نقرأ الصورة — جرّب مرة ثانية"); }
   });
-  const branchSelect = document.getElementById("custodyBranchSelect");
+  if ($("custExpAdd")) $("custExpAdd").addEventListener("click", () => addCustodyExpense(payments));
+  view.querySelectorAll("[data-del]").forEach(btn => btn.addEventListener("click", () => deleteCustodyExpense(Number(btn.dataset.del), payments)));
+  view.querySelectorAll("[data-receipt]").forEach(btn => btn.addEventListener("click", () => openCustodyReceipt(btn.dataset.receipt)));
+  const branchSelect = $("custodyBranchSelect");
   if (branchSelect) branchSelect.addEventListener("change", () => {
     Branch.set(branchSelect.value);
     loadCustody(currentCustodyDate, branchSelect.value);
   });
-  document.getElementById("custodyCloseBtn").addEventListener("click", () => saveCustody(payments));
+  if ($("custodyCloseBtn")) $("custodyCloseBtn").addEventListener("click", () => saveCustody(payments));
+}
+
+// صورة الفاتورة: نصغّرها (أطول ضلع ١٦٠٠) ونضغطها JPEG — واضحة للقراءة وخفيفة على النت
+function receiptImageDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const max = 1600, k = Math.min(1, max / Math.max(img.width, img.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      resolve(cv.toDataURL("image/jpeg", 0.72));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image")); };
+    img.src = url;
+  });
+}
+
+// الحفظ دايماً على آخر نسخة بالسيرفر (جهازين ممكن يسجّلوا بنفس اليوم) — ونكتب بس الأعمدة اللي تغيّرت
+async function custodyPatch(mutate, payments, okMsg) {
+  if (custodyBusy) return false;
+  custodyBusy = true;
+  try {
+    const fresh = (await Custody.get(currentCustodyDate, currentCustodyBranch)) || { date: currentCustodyDate, branch: currentCustodyBranch, expenses: [] };
+    if (!Array.isArray(fresh.expenses)) fresh.expenses = [];
+    const patch = mutate(fresh);
+    if (!patch) return false;
+    const row = { date: currentCustodyDate, branch: currentCustodyBranch, ...patch, updated_at: new Date().toISOString() };
+    await SupaEngine.saveCustody(row);
+    currentCustody = { ...fresh, ...patch };
+    if (okMsg) showToast(okMsg);
+    renderCustodyView(payments);
+    return true;
+  } catch (e) {
+    showToast("⚠ ما انحفظ — تأكد من النت وجرب مرة ثانية (" + (e.message || e) + ")");
+    return false;
+  } finally {
+    custodyBusy = false;
+  }
+}
+
+async function saveCustodyOpening(payments) {
+  const inp = document.getElementById("custOpeningInput");
+  const v = toNum(inp && inp.value);
+  if (v === null) { showToast("⚠ اكتب مبلغ العهدة (إذا صفر اكتب 0)"); return; }
+  const emp = Auth.getEmployee();
+  await custodyPatch((fresh) => ({
+    opening_float: v,
+    opened_by: fresh.opened_by || (emp ? emp.name : ""),
+    opened_at: fresh.opened_at || new Date().toISOString()
+  }), payments, "✅ انسجّلت العهدة");
+}
+
+async function addCustodyExpense(payments) {
+  const d = custodyDraftExpense;
+  const amount = toNum(d.amount);
+  if (amount === null || amount <= 0) { showToast("⚠ اكتب مبلغ المصروف"); return; }
+  if (!String(d.note || "").trim()) { showToast("⚠ اكتب على إيش انصرف"); return; }
+  if (!d.photo && !d.noReceipt) { showToast("⚠ صوّر الفاتورة، أو اختر «ما في فاتورة»"); return; }
+  const btn = document.getElementById("custExpAdd");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ جاري الحفظ…"; }
+  let receipt = "";
+  if (d.photo) {
+    try { receipt = await SupaEngine.uploadReceipt(currentCustodyDate, currentCustodyBranch, d.photo); }
+    catch (e) {
+      showToast("⚠ ما انرفعت صورة الفاتورة — تأكد من النت وجرب مرة ثانية");
+      if (btn) { btn.disabled = false; btn.textContent = "➕ أضف المصروف"; }
+      return;
+    }
+  }
+  const emp = Auth.getEmployee();
+  const exp = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), amount, note: String(d.note).trim(), receipt, by: emp ? emp.name : "", at: new Date().toISOString() };
+  const ok = await custodyPatch((fresh) => ({ expenses: [...fresh.expenses, exp] }), payments, "✅ انضاف المصروف");
+  if (ok) { custodyDraftExpense = { amount: "", note: "", photo: "", noReceipt: false }; renderCustodyView(payments); }
+  else if (btn) { btn.disabled = false; btn.textContent = "➕ أضف المصروف"; }
+}
+
+async function deleteCustodyExpense(i, payments) {
+  const target = currentCustody.expenses[i];
+  if (!target) return;
+  const ok = await phConfirm(`تحذف مصروف ${sar(target.amount)} (${target.note || ""})؟`, { ok: "احذف", danger: true });
+  if (!ok) return;
+  await custodyPatch((fresh) => {
+    const same = (e) => (target.id && e.id === target.id) || (!target.id && e.amount === target.amount && e.note === target.note);
+    const idx = fresh.expenses.findIndex(same);
+    if (idx < 0) return null;
+    return { expenses: fresh.expenses.filter((_, k) => k !== idx) };
+  }, payments, "🗑️ انحذف المصروف");
+}
+
+async function openCustodyReceipt(path) {
+  const win = window.open("", "_blank");
+  try {
+    const url = await SupaEngine.receiptUrl(path);
+    if (win) win.location = url; else window.location.href = url;
+  } catch (e) {
+    if (win) win.close();
+    showToast("⚠ ما قدرنا نفتح الفاتورة — " + (e.message || e));
+  }
 }
 
 function custodyOwnerCardHtml(c, payments) {
   if (!payments.length) {
-    return `<div class="cust-owner"><div class="cust-owner-title">🔎 المطابقة مع تابسنس (لك بس)</div>
-      <div class="cust-missing">مبيعات تابسنس لهذا اليوم لم تُسحب بعد — المطابقة تظهر تلقائياً بعد السحب.</div></div>`;
+    return `<div class="cust-owner"><div class="cust-owner-title">🔎 المطابقة مع مبيعات ${salesSourceName(currentCustodyBranch)} (لك بس)</div>
+      <div class="cust-missing">طرق الدفع لهذا اليوم لسا ما انسحبت من ${salesSourceName(currentCustodyBranch)} — المطابقة تطلع تلقائياً بعد السحب.</div></div>`;
   }
   const r = custodyReconciliation(c, payments);
   return `
     <div class="cust-owner">
-      <div class="cust-owner-title">🔎 المطابقة مع تابسنس (لك بس)</div>
+      <div class="cust-owner-title">🔎 المطابقة مع مبيعات ${salesSourceName(currentCustodyBranch)} (لك بس)</div>
+      <div class="cust-row"><span>العهدة أول اليوم</span><b>${toNum(c.opening_float) === null ? "—" : sar(c.opening_float)}</b></div>
+      <div class="cust-row"><span>المصروفات (${(c.expenses || []).length})</span><b>${sar(r.expenses)}</b></div>
       <div class="cust-row"><span>مبيعات الكاش</span><b>${sar(r.cashSales)}</b></div>
       <div class="cust-row"><span>المتوقع بالدرج (العهدة + الكاش − المصاريف)</span><b>${sar(r.expectedCash)}</b></div>
       <div class="cust-row"><span>الكاش الموجود</span><b>${toNum(c.cash_counted) === null ? "—" : sar(c.cash_counted)}</b></div>
@@ -183,42 +330,18 @@ function custodyOwnerCardHtml(c, payments) {
 async function saveCustody(payments) {
   const c = currentCustody;
   const missing = [];
-  if (toNum(c.opening_float) === null) missing.push("العهدة أول اليوم");
   if (toNum(c.cash_counted) === null) missing.push("الكاش الموجود");
   if (toNum(c.card_total) === null) missing.push("مجموع الشبكة");
-  if (missing.length) {
-    showToast("⚠ عبّ: " + missing.join("، ") + " (إذا صفر اكتب 0)");
-    return;
-  }
-  const expenses = c.expenses.filter(e => toNum(e.amount) !== null || String(e.note || "").trim());
-  if (expenses.some(e => toNum(e.amount) === null)) {
-    showToast("⚠ فيه مصروف بدون مبلغ");
-    return;
-  }
-  const btn = document.getElementById("custodyCloseBtn");
-  btn.disabled = true;
+  if (missing.length) { showToast("⚠ عبّ: " + missing.join("، ") + " (إذا صفر اكتب 0)"); return; }
   const emp = Auth.getEmployee();
-  const row = {
-    date: currentCustodyDate,
-    branch: currentCustodyBranch,
-    opening_float: toNum(c.opening_float),
+  const wasClosed = !!c.closed_at;
+  await custodyPatch((fresh) => ({
     cash_counted: toNum(c.cash_counted),
     card_total: toNum(c.card_total),
-    expenses: expenses.map(e => ({ amount: toNum(e.amount), note: String(e.note || "").trim() })),
     notes: String(c.notes || "").trim(),
-    closed_by: emp ? emp.name : "",
-    closed_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-  try {
-    await SupaEngine.saveCustody(row);
-    currentCustody = row;
-    showToast("✅ تقفّلت العهدة وانحفظت");
-    renderCustodyView(payments);
-  } catch (e) {
-    btn.disabled = false;
-    showToast("⚠ لم يتم الحفظ — " + (e.message || e));
-  }
+    closed_by: wasClosed && fresh.closed_by ? fresh.closed_by : (emp ? emp.name : ""),
+    closed_at: fresh.closed_at || new Date().toISOString()
+  }), payments, wasClosed ? "✅ انحفظ التعديل" : "✅ تقفّلت العهدة");
 }
 
 function initCustodyTab() {

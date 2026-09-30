@@ -974,6 +974,14 @@ const SupaEngine = (() => {
     });
   }
 
+  // صورة فاتورة مصروف → مخزن خاص (receipts). بترجع المسار بس؛ العرض برابط مؤقت
+  async function uploadReceipt(date, branch, dataUrl) {
+    return (await photosFn({ action: "receipt", date, branch, dataUrl })).path;
+  }
+  async function receiptUrl(path) {
+    return (await photosFn({ action: "receipt_url", path })).url;
+  }
+
   // مبيعات تابسنس حسب طريقة الدفع — الداتابيس بترجّعها للمالك بس
   // ملخص الشهر للمالك: كل إغلاقات العهدة ومبيعات طرق الدفع بفترة
   async function getCustodyRange(start, end, branch) {
@@ -1046,6 +1054,8 @@ const SupaEngine = (() => {
     getEntryRows,
     getCustody,
     saveCustody,
+    uploadReceipt,
+    receiptUrl,
     getPayments,
     getCustodyRange,
     migratePhotosToStorage,
