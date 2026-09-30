@@ -106,7 +106,7 @@ function filterTomorrowCardsUI() {
 
   document.querySelectorAll(".category-section-tom").forEach(sec => {
     const visibleCards = sec.querySelectorAll('.tomorrow-item-card:not([style*="display: none"])');
-    sec.style.display = visibleCards.length > 0 ? "" : "none";
+    sec.style.display = visibleCards.length > 0 || (sec.dataset.core && tomorrowActiveFilter === "all") ? "" : "none";
   });
 }
 
@@ -211,11 +211,18 @@ function renderTomorrowView() {
     if (last && last.category === item.category) last.items.push(item);
     else groups.push({ category: item.category, items: [item] });
   });
+  // دجاج/لحم/بحري يضلوا ظاهرين حتى لو فاضيين — عشان زر إضافة طبخات الشيف
+  const core = {};
+  groups.forEach(g => { core[g.category] = g.items; });
+  ensureCoreCategories(core, currentTomorrowBranch);
+  Object.keys(core).forEach(cat => { if (!groups.some(g => g.category === cat)) groups.push({ category: cat, items: [] }); });
+  groups.sort((a, b) => categoryRank(a.category) - categoryRank(b.category));
 
   groups.forEach(group => {
     const section = document.createElement("div");
     section.className = "category-section category-section-tom";
     section.dataset.cat = group.category;
+    if (!group.items.length) section.dataset.core = "1";
     if (tomorrowCategoryCollapsed[group.category]) section.classList.add("collapsed");
 
     const filledInCat = group.items.filter(it => isTomorrowItemFilled(it.id)).length;

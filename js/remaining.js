@@ -438,7 +438,7 @@ function filterRemainingCardsUI() {
 
   document.querySelectorAll(".category-section-rem").forEach(sec => {
     const visibleCards = sec.querySelectorAll('.remaining-card-mobile:not([style*="display: none"])');
-    sec.style.display = visibleCards.length > 0 ? "" : "none";
+    sec.style.display = visibleCards.length > 0 || (sec.dataset.core && remainingActiveFilter === "all") ? "" : "none";
   });
   updateEntryProgress(document.getElementById("remainingView"));
 }
@@ -485,6 +485,7 @@ function renderRemainingView(receivingData, salesData) {
     if (!byCat[cat]) byCat[cat] = [];
     byCat[cat].push(it);
   });
+  ensureCoreCategories(byCat, currentRemainingBranch);
 
   const categories = Object.keys(byCat).sort((a, b) => categoryRank(a) - categoryRank(b));
   categories.forEach(cat => byCat[cat].sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)));
@@ -818,7 +819,7 @@ function renderRemainingView(receivingData, salesData) {
     }
 
     html += `
-      <div class="category-section category-section-rem${remainingCollapsed[cat] ? " collapsed" : ""}" data-cat="${cat}">
+      <div class="category-section category-section-rem${remainingCollapsed[cat] ? " collapsed" : ""}" data-cat="${cat}"${catItems.length ? "" : ' data-core="1"'}>
         <div class="category-header" onclick="toggleRemainingCategory('${String(cat).replace(/'/g, "\\'")}')">
           <div class="cat-header-main">
             <div class="cat-label">

@@ -399,6 +399,16 @@ function isChefSlot(it) {
   return isOptionalItem(it) && /الشيف\s*\d+\s*$/.test(String(it.name || ""));
 }
 const CHEF_SLOT_CATS = ["دجاج", "لحم", "بحري"];
+// الأقسام الأساسية (دجاج/لحم/بحري) تضل ظاهرة حتى لو كل أصنافها انشالت أو ما انطلب منها شي —
+// قبل كان القسم يختفي ويختفي معه زر «إضافة صنف»، فما يقدر الموظف يسجّل طبخات الشيف
+function ensureCoreCategories(byCat, branch) {
+  CHEF_SLOT_CATS.forEach(cat => {
+    if (byCat[cat]) return;
+    const has = (Items.current || []).some(it => it.category === cat && it.active !== false &&
+      (!itemBranches(it).length || itemBranches(it).includes(branch)));
+    if (has) byCat[cat] = [];
+  });
+}
 // صنف شيف = خانة شيف اختيارية، أو صنف ثابت اسمه "... الشيف 1" (لحم الشيف 1، سمك الشيف 1)
 function isChefItem(it) {
   return !!(it && usesChefSlots(it.category) && /الشيف\s*\d+\s*$/.test(String(it.name || "")));
