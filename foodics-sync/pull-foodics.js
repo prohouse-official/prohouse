@@ -550,6 +550,11 @@ async function run() {
       }
     }
 
+    // حساب فوديكس بدون اشتراك/صلاحية للوحة التحكم: التقارير ما تفتح — نوقف فوراً برسالة واضحة
+    if (page.url().includes("not-subscribed")) {
+      throw new Error("فوديكس حوّل لصفحة not-subscribed — اشتراك لوحة التحكم منتهي أو الحساب ما له صلاحية التقارير");
+    }
+
     // إغلاق أي نافذة منبثقة أو رسالة تجديد
     await dismissFoodicsModals(page);
 

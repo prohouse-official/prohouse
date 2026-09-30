@@ -152,6 +152,8 @@ const Sync = (() => {
 
   // ---- طلبات الكتابة (POST) — فائقة السرعة مع SupaEngine ----
   function enqueue(dedupeKey, action, payload) {
+    // حساب القراءة فقط: ما في حفظ أصلاً
+    if (typeof Auth !== "undefined" && Auth.isReadOnly && Auth.isReadOnly()) return null;
     const q = getQueue();
     const existingIdx = q.findIndex(item => item.key === dedupeKey);
     const entry = {

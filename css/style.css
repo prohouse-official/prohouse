@@ -3409,3 +3409,13 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 .home-scan{ margin:4px 0 14px; }
 .cust-exp-form.flash{ animation:custFlash 1.6s ease; border-radius:14px; }
 @keyframes custFlash{ 0%,60%{ background:#FFF6C9; } 100%{ background:transparent; } }
+
+/* حساب المحاسب: عرض فقط — كل الخانات والأزرار اللي تكتب مقفولة */
+body.readonly-user #receivingView input, body.readonly-user #remainingView input, body.readonly-user #tomorrowView input,
+body.readonly-user #custodyView input, body.readonly-user #wasteView input, body.readonly-user #juicesView input,
+body.readonly-user #checklistView input, body.readonly-user #receivingView select, body.readonly-user #remainingView select,
+body.readonly-user #tomorrowView select{ pointer-events:none; background:#F7F6F2 !important; }
+body.readonly-user .rec-btn-remove, body.readonly-user .rec-add-item-btn, body.readonly-user .rec-btn-quick,
+body.readonly-user .rem-waste-btn, body.readonly-user .rec-inline-btns, body.readonly-user .home-scan, body.readonly-user .cust-scan-top,
+body.readonly-user .save-bar, body.readonly-user .cust-close-btn, body.readonly-user .cust-exp-del,
+body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-item-btn{ display:none !important; }

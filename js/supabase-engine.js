@@ -42,7 +42,13 @@ const SupaEngine = (() => {
     return h;
   }
 
+  function assertWritable() {
+    if (typeof Auth !== "undefined" && Auth.isReadOnly && Auth.isReadOnly()) throw new Error("حساب المحاسب للقراءة فقط");
+  }
+
   async function query(endpoint, options = {}) {
+    const method = String(options.method || "GET").toUpperCase();
+    if (method !== "GET" && !endpoint.startsWith("rpc/")) assertWritable();
     const url = SUPABASE_URL + "/rest/v1/" + endpoint;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -121,7 +127,8 @@ const SupaEngine = (() => {
       emp_4: "أبو يونس",
       emp_5: "العامودي",
       emp_6: "محمد البلول",
-      emp_7: "غالب"
+      emp_7: "غالب",
+            emp_8: "محمد الشرقاوي"
     };
     const finalName = ROSTER_NAMES[emp.id] || (emp.name && !emp.name.includes("?") ? emp.name : "موظف");
     const isBranchUser = emp.id === "emp_6" || emp.id === "emp_7" || emp.role === "employee" || emp.role === "branch_staff";
@@ -904,6 +911,7 @@ const SupaEngine = (() => {
   // حفظ/حذف الصور ذرّي بالداتابيس (قفل للصف) — جهازين بيرفعوا صور سوا ما بيضيّعوا بعض
   // الصور بتنرفع كملفات على Storage عن طريق دالة photos (قاعدة البيانات بتحفظ الرابط بس)
   async function photosFn(body) {
+    if (body && body.action !== "receipt_url") assertWritable();
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), 30000);
     try {
@@ -931,6 +939,7 @@ const SupaEngine = (() => {
 
   // نماذج قوقل اللي الموقع بيبعتها لحاله (نموذج الصوص)
   async function sendGoogleForm(body) {
+    assertWritable();
     const res = await fetch(SUPABASE_URL + "/functions/v1/forms", { method: "POST", headers: fnHeaders(), body: JSON.stringify(body) });
     const out = await res.json().catch(() => ({}));
     if (!res.ok || !out.ok) throw new Error(out.error || `forms [${res.status}]`);

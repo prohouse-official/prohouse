@@ -295,11 +295,12 @@ async function renderDashboard() {
       </div>
       ${statuses.length > 1 ? `<div class="home-dots">${statuses.map((s, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${s.branch}"></button>`).join("")}</div>` : ""}
       ${flagged.length ? `<button type="button" class="home-flag" data-tab="report">⚠ ${flagged.length} صنف إرجاعه مرتفع هالشهر ‹</button>` : ""}
-      ${tabAllowed("custody") ? `<button type="button" class="home-scan" data-tab="custody" data-scan="1">📷 سكان فاتورة مصروف / مشتريات</button>` : ""}
+      ${tabAllowed("custody") && !Auth.isReadOnly() ? `<button type="button" class="home-scan" data-tab="custody" data-scan="1">📷 سكان فاتورة مصروف / مشتريات</button>` : ""}
+      ${Auth.isReadOnly() ? `<div class="home-past-note">👁 حساب المحاسب: تقدر تشوف كل البيانات والتقارير، بدون تعديل.</div>` : ""}
       <div id="monthAlertsCard"></div>
       <div id="pushCardHome" class="push-card-slot"></div>
     `;
-    if (Auth.isOwner && Auth.isOwner()) renderMonthAlerts(today);
+    if ((Auth.isOwner && Auth.isOwner()) || (Auth.isReadOnly && Auth.isReadOnly())) renderMonthAlerts(today);
   }
 
   const swiper = document.getElementById("homeSwiper");
