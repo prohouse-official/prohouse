@@ -145,13 +145,13 @@ function renderCustodyView(payments) {
       <div class="cust-exp-form" id="custExpForm">
         <div class="cust-inline">
           <input type="number" inputmode="decimal" step="any" min="0" placeholder="المبلغ" id="custExpAmount" value="${escHtml(d.amount)}">
-          <input type="text" placeholder="على إيش؟ (مثلاً: ثلج، غاز)" id="custExpNote" value="${escHtml(d.note)}">
+          <input type="text" placeholder="على إيش؟ (اختياري)" id="custExpNote" value="${escHtml(d.note)}">
         </div>
         <label class="cust-photo-btn ${d.photo ? "has" : ""}" id="custPhotoLabel">
           <input type="file" accept="image/*" capture="environment" id="custExpPhoto" hidden>
           ${d.photo ? `<img src="${d.photo}" alt="الفاتورة"> <span>✓ الفاتورة جاهزة — اضغط لإعادة التصوير</span>` : `<span>📷 صوّر الفاتورة (سكان)</span>`}
         </label>
-        <label class="cust-check"><input type="checkbox" id="custNoReceipt" ${d.noReceipt ? "checked" : ""}> ما في فاتورة (اكتب السبب بالملاحظة)</label>
+        <label class="cust-check"><input type="checkbox" id="custNoReceipt" ${d.noReceipt ? "checked" : ""}> ما في فاتورة</label>
         <button type="button" class="cust-btn gold" id="custExpAdd">➕ أضف المصروف</button>
       </div>` : ""}
     </div>
@@ -273,7 +273,6 @@ async function addCustodyExpense(payments) {
   const d = custodyDraftExpense;
   const amount = toNum(d.amount);
   if (amount === null || amount <= 0) { showToast("⚠ اكتب مبلغ المصروف"); return; }
-  if (!String(d.note || "").trim()) { showToast("⚠ اكتب على إيش انصرف"); return; }
   if (!d.photo && !d.noReceipt) { showToast("⚠ صوّر الفاتورة، أو اختر «ما في فاتورة»"); return; }
   const btn = document.getElementById("custExpAdd");
   if (btn) { btn.disabled = true; btn.textContent = "⏳ جاري الحفظ…"; }
