@@ -120,7 +120,8 @@ const Auth = (() => {
             emp_4: "أبو يونس",
             emp_5: "العامودي",
             emp_6: "محمد البلول",
-            emp_7: "غالب"
+            emp_7: "غالب",
+            emp_8: "محمد الشرقاوي"
           };
           const finalName = ROSTER_NAMES[emp.id] || (emp.name && !emp.name.includes("?") ? emp.name : "موظف");
           // موظفو فرع عبداللطيف جميل (محمد البلول وغالب) صلاحيتهم محصورة بالتشغيل وتسجيل البيانات فقط
@@ -162,18 +163,20 @@ const Auth = (() => {
   function branches() { const e = getEmployee(); return e ? (e.branches || []) : []; }
   function isOwner() { return role() === "owner"; }
   function isBranchStaff() { return role() === "branch_staff" || role() === "employee"; }
-  function canSeeAllBranches() { return role() === "owner" || role() === "chef"; }
+  // المحاسب: يشوف كل شي ويقرأ بس (الكتابة ممنوعة من قاعدة البيانات نفسها)
+  function isReadOnly() { return role() === "accountant"; }
+  function canSeeAllBranches() { return role() === "owner" || role() === "chef" || isReadOnly(); }
   function canEditBranch(branch) { return canSeeAllBranches() || branches().includes(branch); }
-  function isViewOnlyEntry() { return role() === "chef"; }
-  function isViewOnlyTomorrow() { return role() === "chef"; }
-  function canSeeReports() { return role() === "owner" || role() === "chef"; }
-  function canSeeFinancials() { return role() === "owner"; }
+  function isViewOnlyEntry() { return role() === "chef" || isReadOnly(); }
+  function isViewOnlyTomorrow() { return role() === "chef" || isReadOnly(); }
+  function canSeeReports() { return role() === "owner" || role() === "chef" || isReadOnly(); }
+  function canSeeFinancials() { return role() === "owner" || isReadOnly(); }
   function canManageItems() { return role() === "owner"; }
   function canManageSettings() { return role() === "owner"; }
   function canSeeSales() {
     const e = getEmployee();
     if (!e) return false;
-    if (e.role === "owner") return true;
+    if (e.role === "owner" || e.role === "accountant") return true;
     if (e.id === "emp_1" || e.id === "emp_2") return true;
     if (e.name && (e.name.includes("يزيد") || e.name.includes("حسن"))) return true;
     return false;
@@ -182,7 +185,7 @@ const Auth = (() => {
   return {
     getToken, getEmployee, isLoggedIn, login, logout, changePin, verify, clearSessionAndReload,
     role, branches, isOwner, isBranchStaff, canSeeAllBranches, canEditBranch,
-    isViewOnlyEntry, isViewOnlyTomorrow, canSeeReports, canSeeFinancials, canManageItems, canManageSettings,
+    isViewOnlyEntry, isViewOnlyTomorrow, isReadOnly, canSeeReports, canSeeFinancials, canManageItems, canManageSettings,
     canSeeSales
   };
 })();

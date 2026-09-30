@@ -1,22 +1,22 @@
 // ==================== التنقل بين التابات + الإقلاع + تسجيل الدخول ====================
 
 const TAB_ROLE_ACCESS = {
-  dashboard: ["owner", "manager", "chef", "branch_staff", "employee"],
-  help: ["owner", "manager", "chef", "branch_staff", "employee"],
-  assistant: ["owner", "manager", "chef", "branch_staff", "employee"],
-  branches: ["owner", "manager", "chef"],
-  opening: ["owner", "manager", "chef", "branch_staff", "employee"],
-  closing: ["owner", "manager", "chef", "branch_staff", "employee"],
-  inspection: ["owner"], // المراقبة الميدانية للمالك بس
-  receiving: ["owner", "manager", "chef", "branch_staff", "employee"],
-  remaining: ["owner", "manager", "chef", "branch_staff", "employee"],
-  custody: ["owner", "manager", "branch_staff", "employee"],
-  tomorrow: ["owner", "manager", "chef"],
+  dashboard: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
+  help: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
+  assistant: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
+  branches: ["owner", "manager", "chef", "accountant"],
+  opening: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
+  closing: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
+  inspection: ["owner", "accountant"], // المراقبة الميدانية للمالك بس
+  receiving: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
+  remaining: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
+  custody: ["owner", "manager", "branch_staff", "employee", "accountant"],
+  tomorrow: ["owner", "manager", "chef", "accountant"],
   // العصيرات وقائمة الفحص ما حدا عم يعبّيهم، فمخفيين عن موظفي الفروع لحتى القائمة تضل بسيطة
-  juices: ["owner", "manager"],
-  checklist: ["owner", "manager", "chef"],
-  waste: ["owner", "manager", "chef"],
-  report: ["owner"],
+  juices: ["owner", "manager", "accountant"],
+  checklist: ["owner", "manager", "chef", "accountant"],
+  waste: ["owner", "manager", "chef", "accountant"],
+  report: ["owner", "accountant"],
   items: ["owner"],
   users: ["owner"],
   audit: ["owner"],
@@ -158,6 +158,8 @@ document.addEventListener("DOMContentLoaded", () => {
 const NAV_HIDDEN_TABS = ["branches", "items", "users", "waste", "checklist", "closing"]; // الهدر صار جوّا تقرير المتبقي (زر 🗑 بكل صنف)
 
 function applyRoleUiGating() {
+  // حساب القراءة فقط (المحاسب): كل الخانات والأزرار اللي تكتب تنقفل
+  document.body.classList.toggle("readonly-user", !!(Auth.isReadOnly && Auth.isReadOnly()));
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.classList.toggle("hidden", !tabAllowed(btn.dataset.tab) || NAV_HIDDEN_TABS.includes(btn.dataset.tab));
   });
@@ -184,7 +186,8 @@ function applyRoleUiGating() {
     emp_4: "أبو يونس",
     emp_5: "العامودي",
     emp_6: "محمد البلول",
-    emp_7: "غالب"
+    emp_7: "غالب",
+            emp_8: "محمد الشرقاوي"
   };
   const displayName = emp ? (ROSTER_NAMES[emp.id] || (emp.name && !emp.name.includes("?") ? emp.name : "موظف")) : "";
   document.getElementById("userBarName").textContent = displayName;

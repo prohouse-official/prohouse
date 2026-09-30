@@ -7,7 +7,8 @@ const ROLE_LABELS = {
   chef: "شيف مطبخ (Kitchen Chef)",
   branch_staff: "موظف فرع (تشغيل وتسجيل بيانات)",
   employee: "موظف فرع (تشغيل وتسجيل بيانات)",
-  viewer: "مراقب وقارئ (Read-Only Viewer)"
+  viewer: "مراقب وقارئ (Read-Only Viewer)",
+  accountant: "محاسب (قراءة فقط لكل البيانات)"
 };
 
 let usersListState = [];
@@ -21,7 +22,8 @@ async function loadUsersData() {
     emp_4: "أبو يونس",
     emp_5: "العامودي",
     emp_6: "محمد البلول",
-    emp_7: "غالب"
+    emp_7: "غالب",
+            emp_8: "محمد الشرقاوي"
   };
 
   if (data && Array.isArray(data) && data.length > 0) {

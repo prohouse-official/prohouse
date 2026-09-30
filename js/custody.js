@@ -88,6 +88,7 @@ function custodyTime(ts) {
 }
 function custodyCanEdit() {
   // بعد الإغلاق: المالك بس يعدّل
+  if (Auth.isReadOnly && Auth.isReadOnly()) return false;
   return !currentCustody.closed_at || Auth.isOwner();
 }
 
@@ -174,9 +175,9 @@ function renderCustodyView(payments) {
       ${opened ? "" : `<div class="cust-hint">سجّل العهدة (خطوة 1) أول.</div>`}
     </div>
     ${Auth.canSeeSales() ? custodyOwnerCardHtml(c, payments) : ""}
-    ${Auth.isOwner() ? '<div id="custodyMonthCard" class="cust-owner"><div class="cust-owner-title">📅 ملخص الشهر</div><div class="cust-missing">جاري التحميل…</div></div>' : ""}
+    ${Auth.isOwner() || Auth.isReadOnly() ? '<div id="custodyMonthCard" class="cust-owner"><div class="cust-owner-title">📅 ملخص الشهر</div><div class="cust-missing">جاري التحميل…</div></div>' : ""}
   `;
-  if (Auth.isOwner()) renderCustodyMonth();
+  if (Auth.isOwner() || Auth.isReadOnly()) renderCustodyMonth();
 
   const $ = (id) => document.getElementById(id);
   view.querySelectorAll("[data-field]").forEach(inp => inp.addEventListener("input", () => {
