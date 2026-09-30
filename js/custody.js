@@ -81,6 +81,7 @@ async function loadCustody(date, branch) {
 // كل خطوة تنحفظ لحالها فوراً (ما في شي يضيع لو سكّر الجوال بالنص)
 let custodyDraftExpense = { amount: "", note: "", photo: "", noReceipt: false };
 let custodyBusy = false;
+let custodyScanRequested = false; // جاي من زر «سكان فاتورة» بالرئيسية
 
 function custodyTime(ts) {
   return ts ? new Date(ts).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" }) : "";
@@ -104,13 +105,14 @@ function renderCustodyView(payments) {
     <div class="cust-card">
       <div class="cust-head">
         <div>
-          <h2 class="cust-title">💰 العهدة والكاش</h2>
+          <h2 class="cust-title">💰 العهدة والمصروفات</h2>
           <div class="cust-sub">${currentCustodyDate}${branches.length > 1 ? "" : " · " + escHtml(currentCustodyBranch)}</div>
         </div>
         ${closed ? `<span class="cust-state done">✅ تقفّلت ${custodyTime(c.closed_at)}${c.closed_by ? " · " + escHtml(c.closed_by) : ""}</span>`
           : opened ? `<span class="cust-state">🟡 مفتوحة — باقي الإغلاق</span>` : `<span class="cust-state">⏳ باقي تسجيل العهدة</span>`}
       </div>
       ${branches.length > 1 ? `<select class="cust-branch" id="custodyBranchSelect">${branchOptionsHtml(currentCustodyBranch)}</select>` : ""}
+      ${canEdit ? `<button type="button" class="cust-scan-top" id="custScanTop">📷 سكان فاتورة مصروف / مشتريات</button>` : ""}
     </div>
 
     <div class="cust-step ${opened ? "done" : "active"}">
@@ -128,8 +130,8 @@ function renderCustodyView(payments) {
         <div class="cust-hint">عدّ الكاش أول ما توصل واكتبه. إذا صفر اكتب 0.</div>`}
     </div>
 
-    <div class="cust-step ${opened ? "active" : "locked"}">
-      <div class="cust-step-head"><b>2</b> المصروفات من الكاش ${c.expenses.length ? `<span class="cust-count">${c.expenses.length} · ${sar(expTotal)}</span>` : ""}</div>
+    <div class="cust-step active" id="custExpStep">
+      <div class="cust-step-head"><b>2</b> المصروفات والمشتريات من الكاش ${c.expenses.length ? `<span class="cust-count">${c.expenses.length} · ${sar(expTotal)}</span>` : ""}</div>
       ${c.expenses.length ? `<div class="cust-exp-list">
         ${c.expenses.map((e, i) => `
           <div class="cust-exp-row">
@@ -139,13 +141,13 @@ function renderCustodyView(payments) {
             ${canEdit ? `<button type="button" class="cust-exp-del" data-del="${i}" aria-label="حذف">✕</button>` : ""}
           </div>`).join("")}
       </div>` : `<div class="cust-hint">ما فيه مصروفات للحين.</div>`}
-      ${opened && canEdit ? `
-      <div class="cust-exp-form">
+      ${canEdit ? `
+      <div class="cust-exp-form" id="custExpForm">
         <div class="cust-inline">
           <input type="number" inputmode="decimal" step="any" min="0" placeholder="المبلغ" id="custExpAmount" value="${escHtml(d.amount)}">
           <input type="text" placeholder="على إيش؟ (مثلاً: ثلج، غاز)" id="custExpNote" value="${escHtml(d.note)}">
         </div>
-        <label class="cust-photo-btn ${d.photo ? "has" : ""}">
+        <label class="cust-photo-btn ${d.photo ? "has" : ""}" id="custPhotoLabel">
           <input type="file" accept="image/*" capture="environment" id="custExpPhoto" hidden>
           ${d.photo ? `<img src="${d.photo}" alt="الفاتورة"> <span>✓ الفاتورة جاهزة — اضغط لإعادة التصوير</span>` : `<span>📷 صوّر الفاتورة (سكان)</span>`}
         </label>
@@ -192,6 +194,16 @@ function renderCustodyView(payments) {
     catch (err) { showToast("⚠ ما قدرنا نقرأ الصورة — جرّب مرة ثانية"); }
   });
   if ($("custExpAdd")) $("custExpAdd").addEventListener("click", () => addCustodyExpense(payments));
+  // زر السكان فوق: ينزل لنموذج المصروف ويفتح الكاميرا مباشرة
+  if ($("custScanTop")) $("custScanTop").addEventListener("click", () => {
+    const form = $("custExpForm");
+    if (form) form.scrollIntoView({ behavior: "smooth", block: "center" });
+    if ($("custExpPhoto")) $("custExpPhoto").click();
+  });
+  if (custodyScanRequested && $("custExpForm")) {
+    custodyScanRequested = false;
+    setTimeout(() => { $("custExpForm").scrollIntoView({ behavior: "smooth", block: "center" }); $("custExpForm").classList.add("flash"); }, 150);
+  }
   view.querySelectorAll("[data-del]").forEach(btn => btn.addEventListener("click", () => deleteCustodyExpense(Number(btn.dataset.del), payments)));
   view.querySelectorAll("[data-receipt]").forEach(btn => btn.addEventListener("click", () => openCustodyReceipt(btn.dataset.receipt)));
   const branchSelect = $("custodyBranchSelect");

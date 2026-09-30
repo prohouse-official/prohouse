@@ -196,7 +196,7 @@ function dayStepsFor(s) {
   }
   steps.push({ tab: "remaining", icon: "📊", title: "جرد المتبقي", state: state(s.remainingCounted, s.remainingTotal), note: fraction(s.remainingCounted, s.remainingTotal) });
   if (tabAllowed("custody")) {
-    steps.push({ tab: "custody", icon: "💰", title: "العهدة والكاش", state: s.custodyClosed ? "done" : s.custodyOpened ? "partial" : "todo",
+    steps.push({ tab: "custody", icon: "💰", title: "العهدة والمصروفات", state: s.custodyClosed ? "done" : s.custodyOpened ? "partial" : "todo",
       note: s.custodyClosed ? "تقفّلت" : s.custodyOpened ? "باقي الإغلاق" : "باقي" });
   }
   return steps;
@@ -274,6 +274,7 @@ async function renderDashboard() {
           <span class="home-next-title">${next.icon} ${next.title}</span>
         </button>` : `<div class="home-all-done">✅ خلّصت كل خطوات اليوم. يعطيك العافية!</div>`}
       ${s ? stepsCardHtml(s, false) : ""}
+      ${tabAllowed("custody") ? `<button type="button" class="home-scan" data-tab="custody" data-branch="${s ? s.branch : ""}" data-scan="1">📷 سكان فاتورة مصروف / مشتريات</button>` : ""}
       <div id="pushCardHome" class="push-card-slot"></div>
       <button type="button" class="home-help-link" data-tab="help">📘 أول مرة؟ شوف طريقة الاستخدام</button>
       <button type="button" class="home-help-link" data-tab="assistant">💬 عندك سؤال؟ اسأل المساعد</button>
@@ -294,6 +295,7 @@ async function renderDashboard() {
       </div>
       ${statuses.length > 1 ? `<div class="home-dots">${statuses.map((s, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${s.branch}"></button>`).join("")}</div>` : ""}
       ${flagged.length ? `<button type="button" class="home-flag" data-tab="report">⚠ ${flagged.length} صنف إرجاعه مرتفع هالشهر ‹</button>` : ""}
+      ${tabAllowed("custody") ? `<button type="button" class="home-scan" data-tab="custody" data-scan="1">📷 سكان فاتورة مصروف / مشتريات</button>` : ""}
       <div id="monthAlertsCard"></div>
       <div id="pushCardHome" class="push-card-slot"></div>
     `;
@@ -327,6 +329,7 @@ async function renderDashboard() {
       if (btn.dataset.branch) Branch.set(btn.dataset.branch);
       // مهمة من يوم فات: الشاشة تنفتح على نفس اليوم
       if (btn.classList.contains("day-step") || btn.classList.contains("home-next")) openScreensOnDay(dashDay());
+      if (btn.dataset.scan && typeof custodyScanRequested !== "undefined") custodyScanRequested = true;
       setActiveTab(btn.dataset.tab);
     });
   });
