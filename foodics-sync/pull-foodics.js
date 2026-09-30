@@ -489,14 +489,16 @@ async function readGroupedReportOnce(page, path, iso, nameLabel, valueLabel) {
 
 // تقرير المبيعات حسب طريقة الدفع — نجرب العناوين المحتملة لحد ما واحد يشتغل (نطبع الأعمدة بس، بدون أرقام)
 const PAYMENT_PATHS = ["/reports/payments", "/reports/sales-by-payment-method", "/reports/sales-by-payment-methods", "/reports/payment-methods", "/reports/sales-by-payment"];
-let paymentPathFound = null;
+let paymentPathFound = null, paymentsUnavailable = false;
 async function readPaymentsReport(page, iso) {
+  if (paymentsUnavailable) return { ok: false, rows: [] }; // ما لقيناه باليوم الأول — ما نضيّع وقت بباقي الأيام
   const paths = paymentPathFound ? [paymentPathFound] : PAYMENT_PATHS;
   for (const p of paths) {
     const res = await readGroupedReportOnce(page, p, iso, "(طريقة الدفع|طرق الدفع|الدفع|وسيلة الدفع)", "(صافي المبلغ|المبلغ|صافي المبيعات|الإجمالي|المجموع)");
     if (res.ok) { paymentPathFound = p; return res; }
     console.log(`ℹ️ طرق الدفع: ${p} — ${res.reason}`);
   }
+  if (!paymentPathFound) paymentsUnavailable = true;
   return { ok: false, rows: [] };
 }
 
