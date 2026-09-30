@@ -3347,3 +3347,17 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 
 /* زر تقرير الشيف من شاشة طلبية الغد */
 .tom-chef-btn { width: 100%; margin: 10px 0 4px; min-height: 44px; font-size: 15px; }
+
+/* الرئيسية: التنقل بين الأيام (أمس / اليوم) */
+.home-daybar{ display:flex; align-items:center; gap:8px; margin:-6px 0 14px; }
+.home-day-chips{ display:flex; gap:8px; flex:1; }
+.home-day-chip, .home-day-arrow{
+  font-family:inherit; font-weight:800; font-size:14px; border-radius:14px; cursor:pointer;
+  border:1.5px solid #E6E1D3; background:#fff; color:var(--ink); min-height:40px;
+}
+.home-day-chip{ flex:1; }
+.home-day-chip.active{ background:var(--yellow); border-color:var(--yellow-dark); }
+.home-day-arrow{ width:44px; font-size:18px; }
+.home-day-arrow:disabled{ opacity:.35; cursor:default; }
+.home-past-note{ font-size:13px; font-weight:700; color:#8a6d00; background:#FFF8D6; border:1px solid #F3E3A0;
+  border-radius:12px; padding:8px 12px; margin:-4px 0 14px; }

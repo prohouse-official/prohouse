@@ -45,8 +45,12 @@ function applyDashboardPayload(dash) {
   });
 }
 
+// اليوم المعروض بالرئيسية ("" = اليوم). المالك يرجع لأمس يشوف إذا خلصت مهامه
+let dashboardDate = "";
+function dashDay() { return dashboardDate || todayStr(); }
+
 async function loadBranchStatus(branch, dash) {
-  const today = todayStr();
+  const today = dashDay();
   const yesterday = addDaysStr(today, -1);
   const tomorrow = addDaysStr(today, 1);
 
@@ -145,7 +149,8 @@ async function loadBranchStatus(branch, dash) {
       const cps = typeof getCheckpointsForBranch === "function" ? getCheckpointsForBranch(branch) : [];
       const prefix = "INSP-" + branch.replace(/\s+/g, "_") + "-" + today.replace(/-/g, "") + "-";
       const doneIn = (stg) => cps.filter(cp => (dayPhotos || []).some(p => p.sessionId === prefix + stg.id.toUpperCase() && p.checkpointId === cp.id)).length;
-      const autoIdx = Math.max(0, INSPECTION_STAGES.findIndex(st => st.id === getAutoInspectionStage()));
+      // يوم فات: كل الجولات جا وقتها
+      const autoIdx = today < todayStr() ? INSPECTION_STAGES.length - 1 : Math.max(0, INSPECTION_STAGES.findIndex(st => st.id === getAutoInspectionStage()));
       const due = INSPECTION_STAGES.slice(0, autoIdx + 1).map((st, i) => ({ n: i + 1, done: doneIn(st), total: cps.length }));
       // الجولة اللي جا وقتها الحين (حسب الساعة)، ونذكر إذا جولة قبلها ناقصة
       const cur = due[due.length - 1];
@@ -230,7 +235,8 @@ async function renderDashboard() {
   // الموظف: فرعه الشغّال. المالك: كل الفروع (الشغّالة أول) ببطاقات بتنسحب
   const working = workingBranchList();
   const branches = Auth.isBranchStaff() ? working : [...working, ...allowedBranchList().filter(b => !working.includes(b))];
-  const today = todayStr();
+  const today = dashDay();
+  const isPast = today < todayStr();
   const dash = await Sync.get("getDashboard", { date: today }, "dashboard:" + today, (fresh) => applyDashboardPayload(fresh));
   applyDashboardPayload(dash);
   const statuses = await Promise.all(branches.map(b => loadBranchStatus(b, dash)));
@@ -238,7 +244,18 @@ async function renderDashboard() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "صباح الخير" : "مساء الخير";
   const name = (Auth.getEmployee() || {}).name || "";
-  const dateLabel = new Date().toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long" });
+  const dateLabel = new Date(today + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+  const dayWord = today === todayStr() ? "اليوم" : today === addDaysStr(todayStr(), -1) ? "أمس" : "";
+  const dayBar = `
+    <div class="home-daybar">
+      <button type="button" class="home-day-arrow" data-dash-shift="-1" aria-label="اليوم السابق">→</button>
+      <div class="home-day-chips">
+        <button type="button" class="home-day-chip${dayWord === "أمس" ? " active" : ""}" data-dash-go="${addDaysStr(todayStr(), -1)}">أمس</button>
+        <button type="button" class="home-day-chip${dayWord === "اليوم" ? " active" : ""}" data-dash-go="">اليوم</button>
+      </div>
+      <button type="button" class="home-day-arrow" data-dash-shift="1" aria-label="اليوم التالي" ${isPast ? "" : "disabled"}>←</button>
+    </div>
+    ${isPast ? `<div class="home-past-note">📅 مهام يوم ${dateLabel} — اضغط على أي مهمة تفتحها على نفس اليوم</div>` : ""}`;
 
   if (Auth.isBranchStaff()) {
     const activeBranch = Branch.get() || branches[0] || "";
@@ -248,6 +265,7 @@ async function renderDashboard() {
     view.innerHTML = `
       <div class="home-hello">${greeting}، ${name} 👋</div>
       <div class="home-sub">${dateLabel} · ${activeBranch}</div>
+      ${dayBar}
       ${next ? `
         <button type="button" class="home-next" data-tab="${next.tab}" data-branch="${s.branch}">
           <span class="home-next-label">الخطوة الجاية</span>
@@ -268,6 +286,7 @@ async function renderDashboard() {
     view.innerHTML = `
       <div class="home-hello">${greeting}، ${name}</div>
       <div class="home-sub">${dateLabel}</div>
+      ${dayBar}
       <div class="home-swiper" id="homeSwiper">
         ${statuses.map(s => `<div class="home-slide">${stepsCardHtml(s, true)}</div>`).join("")}
       </div>
@@ -291,13 +310,33 @@ async function renderDashboard() {
     dots.forEach(d => d.addEventListener("click", () => slides[Number(d.dataset.slide)].scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" })));
   }
 
+  view.querySelectorAll("[data-dash-go]").forEach(btn => btn.addEventListener("click", () => {
+    dashboardDate = btn.dataset.dashGo;
+    renderDashboard();
+  }));
+  view.querySelectorAll("[data-dash-shift]").forEach(btn => btn.addEventListener("click", () => {
+    const next = addDaysStr(dashDay(), Number(btn.dataset.dashShift));
+    dashboardDate = next >= todayStr() ? "" : next;
+    renderDashboard();
+  }));
+
   view.querySelectorAll("[data-tab]").forEach(btn => {
     btn.addEventListener("click", () => {
       if (btn.dataset.branch) Branch.set(btn.dataset.branch);
+      // مهمة من يوم فات: الشاشة تنفتح على نفس اليوم
+      if (btn.classList.contains("day-step") || btn.classList.contains("home-next")) openScreensOnDay(dashDay());
       setActiveTab(btn.dataset.tab);
     });
   });
   if (typeof mountPushCard === "function") mountPushCard(document.getElementById("pushCardHome"), { compact: true });
+}
+
+function openScreensOnDay(day) {
+  const setInput = (id, v) => { const el = document.getElementById(id); if (el) { el.value = v; if (el._phRefresh) el._phRefresh(); } };
+  currentReceivingDate = day; setInput("receivingDateInput", day);
+  currentRemainingDate = day; setInput("remainingDateInput", day);
+  if (typeof currentCustodyDate !== "undefined") { currentCustodyDate = day; setInput("custodyDateInput", day); }
+  if (typeof currentOpeningDate !== "undefined") { currentOpeningDate = day; setInput("openingDateInput", day); }
 }
 
 // ==================== تنبيهات الشهر (للمالك) ====================
