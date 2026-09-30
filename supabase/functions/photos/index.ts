@@ -4,6 +4,8 @@
 //   POST {action:"delete", date, branch, id}                        → بتشيلها من اليوم ومن التخزين
 //   POST {action:"migrate"}  (المالك بس)                           → بتنقل الصور القديمة من base64 لملفات
 //   POST {action:"cleanup"}  (المالك بس)                           → بتمسح ملفات صور ما إلها يوم
+//   POST {action:"receipt", date, branch, dataUrl}                 → صورة فاتورة مصروف بمخزن خاص (receipts)
+//   POST {action:"receipt_url", path}                              → رابط مؤقت (ساعة) لعرض الفاتورة
 // كل طلب لازم يكون معه x-session-token صالح (نفس جلسة الموقع).
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -76,7 +78,7 @@ Deno.serve(async (req) => {
   const emp = (sess as any)?.employees;
   if (!sess || !emp?.active) return json({ error: "لازم تسجل دخول" }, 401);
 
-  let body: { action?: string; date?: string; branch?: string; id?: string; photo?: Photo; minAge?: number } = {};
+  let body: { action?: string; date?: string; branch?: string; id?: string; photo?: Photo; minAge?: number; dataUrl?: string; path?: string } = {};
   try { body = await req.json(); } catch { return json({ error: "طلب غلط" }, 400); }
 
   try {
@@ -143,6 +145,26 @@ Deno.serve(async (req) => {
       const list = ((orphans || []) as unknown[]).map((o) => typeof o === "string" ? o : Object.values(o as object)[0] as string);
       await removeFiles(list);
       return json({ removed: list.length });
+    }
+
+    // فواتير المصروفات: مخزن خاص، والملف ما ينحذف مع تنظيف صور التوثيق
+    if (body.action === "receipt") {
+      const { date, branch } = body;
+      if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !branch) return json({ error: "ناقص التاريخ أو الفرع" }, 400);
+      const f = decodeDataUrl(String(body.dataUrl || ""));
+      if (!f) return json({ error: "صيغة الصورة غير مدعومة" }, 400);
+      if (f.bytes.length > 4 * 1024 * 1024) return json({ error: "الصورة كبيرة" }, 400);
+      const path = `${date}/${crypto.randomUUID()}.${f.ext}`;
+      const { error } = await admin.storage.from("receipts").upload(path, f.bytes, { contentType: f.type, upsert: false });
+      if (error) throw new Error("فشل رفع الفاتورة: " + error.message);
+      return json({ path });
+    }
+    if (body.action === "receipt_url") {
+      const p = String(body.path || "");
+      if (!/^\d{4}-\d{2}-\d{2}\/[\w-]+\.(jpg|webp|png)$/.test(p)) return json({ error: "مسار غلط" }, 400);
+      const { data, error } = await admin.storage.from("receipts").createSignedUrl(p, 3600);
+      if (error) throw new Error(error.message);
+      return json({ url: data.signedUrl });
     }
 
     return json({ error: "action?" }, 400);

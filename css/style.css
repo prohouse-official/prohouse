@@ -3361,3 +3361,41 @@ html[dir="ltr"] .chef-sheet { transform-origin: top left; }
 .home-day-arrow:disabled{ opacity:.35; cursor:default; }
 .home-past-note{ font-size:13px; font-weight:700; color:#8a6d00; background:#FFF8D6; border:1px solid #F3E3A0;
   border-radius:12px; padding:8px 12px; margin:-4px 0 14px; }
+
+/* العهدة على ٣ خطوات */
+.cust-card .cust-head{ margin-bottom:0; }
+.cust-step{ background:#fff; border:1.5px solid var(--line); border-radius:20px; padding:16px; margin-bottom:14px; box-shadow:var(--shadow); }
+.cust-step.active{ border-color:#E6CB3A; }
+.cust-step.done{ border-color:#CDEBDB; }
+.cust-step.locked{ opacity:.6; }
+.cust-step-head{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:15.5px; font-weight:900; margin-bottom:12px; }
+.cust-step-head > b{ display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:999px; background:var(--yellow); font-size:13px; }
+.cust-step.done .cust-step-head > b{ background:#DDF3E7; color:#137A50; }
+.cust-count{ margin-inline-start:auto; font-size:12.5px; font-weight:800; color:var(--muted); background:var(--canvas); border-radius:999px; padding:4px 10px; }
+.cust-inline{ display:flex; gap:8px; }
+.cust-inline input{ flex:1; min-width:0; min-height:50px; padding:10px 12px; border-radius:14px; border:1.5px solid var(--line-strong); font-family:inherit; font-size:17px; font-weight:800; background:#fff; }
+.cust-inline input[type=text]{ font-size:15px; font-weight:700; }
+.cust-inline input[type=number]{ max-width:140px; text-align:center; }
+.cust-inline input:focus{ outline:none; border-color:#E6CB3A; box-shadow:var(--ring); }
+.cust-btn{ border:none; border-radius:14px; min-height:50px; padding:0 16px; font-family:inherit; font-size:15px; font-weight:900; cursor:pointer; white-space:nowrap; }
+.cust-btn.primary{ background:var(--ink); color:var(--yellow); }
+.cust-btn.gold{ width:100%; background:var(--yellow); color:var(--ink); margin-top:10px; }
+.cust-btn:disabled{ opacity:.6; }
+.cust-step-done{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cust-amount{ font-size:22px; font-weight:900; }
+.cust-meta{ font-size:12.5px; font-weight:700; color:var(--muted); }
+.cust-link{ margin-inline-start:auto; background:none; border:none; color:#5E17EB; font-family:inherit; font-weight:800; font-size:13.5px; cursor:pointer; }
+.cust-hint{ font-size:12.5px; font-weight:700; color:var(--muted); margin-top:8px; }
+.cust-exp-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; }
+.cust-exp-row{ display:flex; align-items:center; gap:8px; padding:10px; border-radius:14px; background:var(--canvas); }
+.cust-exp-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; font-size:14px; font-weight:700; }
+.cust-exp-main small{ font-size:11.5px; color:var(--muted); }
+.cust-exp-row .cust-exp-del{ width:40px; height:40px; }
+.cust-receipt-btn{ border:1px solid #D9CCFA; background:#F4EFFF; color:#5E17EB; border-radius:12px; padding:8px 10px; font-family:inherit; font-weight:800; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+.cust-noreceipt{ font-size:11.5px; font-weight:800; color:#9A5B00; background:#FFF5E8; border-radius:999px; padding:4px 8px; white-space:nowrap; }
+.cust-exp-form{ border-top:1px dashed var(--line); padding-top:12px; }
+.cust-photo-btn{ display:flex; align-items:center; justify-content:center; gap:10px; min-height:56px; margin-top:10px; border:1.5px dashed var(--line-strong); border-radius:14px; background:#fff; font-weight:800; font-size:14.5px; cursor:pointer; padding:8px; }
+.cust-photo-btn.has{ border-style:solid; border-color:#CDEBDB; background:#EEF8F2; color:#137A50; }
+.cust-photo-btn img{ width:44px; height:44px; object-fit:cover; border-radius:8px; }
+.cust-check{ display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; font-weight:700; color:var(--muted); }
+.cust-check input{ width:18px; height:18px; }

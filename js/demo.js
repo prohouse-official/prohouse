@@ -182,6 +182,13 @@
         out = { photo };
       } else if (body.action === "delete") {
         out = { photos: handle("POST", "https://demo.supabase.co/rest/v1/rpc/delete_inspection_photo", { p_date: body.date, p_branch: body.branch, p_id: body.id })[1] };
+      } else if (body.action === "receipt") {
+        // الفاتورة بالمعاينة: بتنحفظ بالذاكرة بس
+        const path = body.date + "/demo" + Date.now() + ".jpg";
+        db.receipts = db.receipts || {}; db.receipts[path] = body.dataUrl; persist();
+        out = { path };
+      } else if (body.action === "receipt_url") {
+        out = { url: (db.receipts || {})[body.path] || "about:blank" };
       } else out = { moved: 0 };
       return new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } });
     }

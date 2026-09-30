@@ -166,6 +166,7 @@ async function loadBranchStatus(branch, dash) {
     remainingCounted: remainingVisible.filter(it => countedIds.has(it.id)).length,
     photosCount, photoRound,
     custodyClosed: !!(custody && custody.closed),
+    custodyOpened: !!(custody && custody.opened),
     mealsToday: mealsFromDayItems(items),
     mealsYesterday: mealsFromDayItems((yesterdayData && yesterdayData.items) || []),
     tomorrowSaved: !!(tomorrowOrder && tomorrowOrder.length),
@@ -195,7 +196,8 @@ function dayStepsFor(s) {
   }
   steps.push({ tab: "remaining", icon: "📊", title: "جرد المتبقي", state: state(s.remainingCounted, s.remainingTotal), note: fraction(s.remainingCounted, s.remainingTotal) });
   if (tabAllowed("custody")) {
-    steps.push({ tab: "custody", icon: "💰", title: "إغلاق العهدة", state: s.custodyClosed ? "done" : "todo", note: s.custodyClosed ? "تقفّلت" : "باقي" });
+    steps.push({ tab: "custody", icon: "💰", title: "العهدة والكاش", state: s.custodyClosed ? "done" : s.custodyOpened ? "partial" : "todo",
+      note: s.custodyClosed ? "تقفّلت" : s.custodyOpened ? "باقي الإغلاق" : "باقي" });
   }
   return steps;
 }
