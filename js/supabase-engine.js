@@ -994,6 +994,19 @@ const SupaEngine = (() => {
     return (await photosFn({ action: "receipt_url", path })).url;
   }
 
+  // --- المشتريات ---
+  // الكتابة كلها من دالة purchase_save بالداتابيس (هي اللي تتحقق: المالك كل شي، والمحاسب المراجعة بس)
+  async function getPurchases(start, end) {
+    return (await queryAll(`purchase_invoices?select=*&invoice_date=gte.${start}&invoice_date=lte.${end}`, "invoice_date,id")) || [];
+  }
+  async function savePurchase(row) {
+    return rpc("purchase_save", { p_row: row });
+  }
+  // مصروفات العهدة لكل الفروع بفترة (تطلع بالمشتريات عشان المحاسب يصنّفها)
+  async function getCustodyExpensesRange(start, end) {
+    return (await queryAll(`custody_closings?select=date,branch,expenses&date=gte.${start}&date=lte.${end}`, "date,branch")) || [];
+  }
+
   // مبيعات تابسنس حسب طريقة الدفع — الداتابيس بترجّعها للمالك بس
   // ملخص الشهر للمالك: كل إغلاقات العهدة ومبيعات طرق الدفع بفترة
   async function getCustodyRange(start, end, branch) {
@@ -1070,6 +1083,9 @@ const SupaEngine = (() => {
     receiptUrl,
     getPayments,
     getCustodyRange,
+    getPurchases,
+    savePurchase,
+    getCustodyExpensesRange,
     migratePhotosToStorage,
     sendGoogleForm,
     askAssistant,

@@ -42,6 +42,30 @@ assert.strictEqual(add("2026-09-29", -7), "2026-09-22");
 const esc = vm.runInContext(`escHtml('a"b<c>&\\'')`, ctx);
 assert.strictEqual(esc, "a&quot;b&lt;c&gt;&amp;&#39;");
 
+// 2b) المشتريات: فحوصات المحاسب والملخص
+vm.runInContext(fs.readFileSync("js/purchases.js", "utf8"), ctx);
+const pur = (code) => vm.runInContext(code, ctx);
+ctx.__inv = { id: "a", kind: "invoice", source: "google_form", invoice_date: "2026-10-01", invoice_no: "1", supplier: "س",
+  subtotal: 100, vat: 15, total: 115, lines: [{ name: "دجاج", qty: 2, unit: "كيلو", unit_price: 50, total: 100, category: "لحوم" }] };
+assert.strictEqual(JSON.stringify(pur("purchaseChecks(__inv, [])")), "[]");
+assert.ok(pur("purchaseChecks({ ...__inv, vat: 20 }, [])").some(w => w.includes("١٥٪")));
+assert.ok(pur("purchaseChecks({ ...__inv, lines: [{ ...__inv.lines[0], unit: '' }] }, [])").some(w => w.includes("الوحدة")));
+assert.ok(pur("purchaseChecks({ ...__inv, lines: [{ ...__inv.lines[0], total: 90 }] }, [])").some(w => w.includes("الكمية × السعر")));
+assert.ok(pur("purchaseChecks(__inv, [{ ...__inv, id: 'b', status: 'approved' }])").some(w => w.includes("مكررة")));
+assert.strictEqual(JSON.stringify(pur("purchaseChecks(__inv, [{ ...__inv, id: 'b', status: 'rejected' }])")), "[]");
+// أسعار الأصناف شاملة الضريبة: مقبولة
+assert.strictEqual(JSON.stringify(pur("purchaseChecks({ ...__inv, lines: [{ ...__inv.lines[0], unit_price: 57.5, total: 115 }] }, [])")), "[]");
+const sum = pur(`purchaseSummary([__inv, { ...__inv, id: "r", kind: "return", subtotal: 50, vat: 7.5, total: 57.5, lines: [{ ...__inv.lines[0], qty: 1, total: 50 }] },
+  { ...__inv, id: "x", status: "rejected" }, { ...__inv, id: "p", status: "pending" }])`);
+assert.strictEqual(sum.total, 172.5);          // 115 − 57.5 + 115 (المرجّعة ما تنحسب)
+assert.strictEqual(sum.vat, 22.5);
+assert.strictEqual(sum.byCategory["لحوم"], 150);
+assert.strictEqual(sum.pendingCount, 1);
+// مصروف عهدة → فاتورة بانتظار التصنيف بمرجع ثابت (ما يتكرر)
+const ci = pur(`custodyExpenseToInvoice({ date: "2026-10-01", branch: "الشاطئ" }, { id: "e1", amount: 46, note: "خبز" })`);
+assert.strictEqual(ci.source_ref, "2026-10-01|الشاطئ|e1");
+assert.strictEqual(ci.total, 46);
+
 // 3) رقم نسخة الملفات لازم يكون نفسه بكل مكان (وإلا الجوال يضل على نسخة قديمة من ملف)
 const html = fs.readFileSync("index.html", "utf8");
 const versions = new Set([...html.matchAll(/\?v=([\d.]+)/g)].map(m => m[1]));
