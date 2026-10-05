@@ -187,7 +187,8 @@ function applyRoleUiGating() {
     emp_5: "العامودي",
     emp_6: "محمد البلول",
     emp_7: "غالب",
-            emp_8: "محمد الشرقاوي"
+            emp_8: "محمد الشرقاوي",
+            emp_9: "شكيل"
   };
   const displayName = emp ? (ROSTER_NAMES[emp.id] || (emp.name && !emp.name.includes("?") ? emp.name : "موظف")) : "";
   document.getElementById("userBarName").textContent = displayName;

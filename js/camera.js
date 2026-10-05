@@ -22,11 +22,94 @@ const DEFAULT_INSPECTION_CHECKPOINTS = [
   { id: "delivery", name: "منطقة التسليم واستلام الطلبات", icon: "🛵", required: true }
 ];
 
+// أماكن التصوير الافتراضية لكل فرع (لو ما تعدّلت من الشاشة). الروضة: ٦ أماكن — نفس معرّفات القائمة العامة
+// عشان أي صور قديمة تضل مربوطة بمكانها
+const BRANCH_CHECKPOINT_DEFAULTS = {
+  "الروضة": ["counter", "kitchen", "prep", "fridges", "freezers", "storage"]
+    .map(id => DEFAULT_INSPECTION_CHECKPOINTS.find(c => c.id === id))
+};
+function checkpointsSettingKey(branch) { return "photo_checkpoints:" + branch; }
+
+// أماكن التصوير: المحفوظة بالإعدادات للفرع (مدير الفرع يعدّلها) ← الافتراضي للفرع ← القائمة العامة
 function getCheckpointsForBranch(branchName) {
+  const raw = typeof currentSettings !== "undefined" && branchName ? currentSettings[checkpointsSettingKey(branchName)] : "";
+  if (raw) {
+    try {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list) && list.length) return list.filter(c => c && c.id && c.name).map(c => ({ icon: "📷", required: true, ...c }));
+    } catch (e) { /* قيمة تالفة: نرجع للافتراضي */ }
+  }
+  if (branchName && BRANCH_CHECKPOINT_DEFAULTS[branchName]) return BRANCH_CHECKPOINT_DEFAULTS[branchName];
   if (branchName && branchName.includes("عبداللطيف جميل")) {
     return JAMEEL_INSPECTION_CHECKPOINTS;
   }
   return DEFAULT_INSPECTION_CHECKPOINTS;
+}
+
+// المالك أو مدير الفرع نفسه يقدر يعدّل أماكن التصوير
+function canEditCheckpoints(branch) {
+  if (typeof Auth === "undefined" || (Auth.isReadOnly && Auth.isReadOnly())) return false;
+  if (Auth.isOwner()) return true;
+  return Auth.role() === "manager" && (Auth.branches() || []).includes(branch);
+}
+
+function openCheckpointsEditor(branch) {
+  if (!canEditCheckpoints(branch)) return;
+  let rows = getCheckpointsForBranch(branch).map(c => ({ id: c.id, name: c.name, icon: c.icon || "📷" }));
+  document.getElementById("cpEditor")?.remove();
+  const wrap = document.createElement("div");
+  wrap.id = "cpEditor";
+  wrap.className = "custom-rec-modal-backdrop";
+  const render = () => {
+    wrap.innerHTML = `
+      <div class="custom-rec-modal-box">
+        <div class="custom-rec-modal-header">
+          <h3>✏️ أماكن التصوير — ${escHtml(branch)}</h3>
+          <button type="button" class="custom-rec-modal-close" data-act="close">✕</button>
+        </div>
+        <div class="custom-rec-modal-body">
+          <div class="cp-edit-hint">اكتب اسم كل مكان. تقدر تضيف وتشيل (أقل شي مكان واحد).</div>
+          ${rows.map((r, i) => `
+            <div class="cp-edit-row">
+              <span class="cp-edit-num">${i + 1}</span>
+              <input type="text" value="${escHtml(r.name)}" data-i="${i}" placeholder="اسم المكان">
+              <button type="button" class="cust-exp-del" data-del="${i}" ${rows.length <= 1 ? "disabled" : ""} aria-label="شيل">✕</button>
+            </div>`).join("")}
+          <button type="button" class="cust-add" data-act="add">➕ أضف مكان</button>
+          <div class="custom-rec-modal-actions">
+            <button type="button" class="btn-save" data-act="save">💾 حفظ الأماكن</button>
+            <button type="button" class="btn-cancel" data-act="close">إلغاء</button>
+          </div>
+        </div>
+      </div>`;
+    wrap.querySelectorAll("input[data-i]").forEach(inp => inp.addEventListener("input", () => { rows[Number(inp.dataset.i)].name = inp.value; }));
+    wrap.querySelectorAll("[data-del]").forEach(btn => btn.addEventListener("click", () => { rows.splice(Number(btn.dataset.del), 1); render(); }));
+  };
+  wrap.addEventListener("click", async (e) => {
+    const act = e.target.closest("[data-act]")?.dataset.act || (e.target === wrap ? "close" : "");
+    if (act === "close") wrap.remove();
+    if (act === "add") {
+      rows.push({ id: "cp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: "", icon: "📷" });
+      render();
+      const inputs = wrap.querySelectorAll("input[data-i]"); inputs[inputs.length - 1]?.focus();
+    }
+    if (act === "save") {
+      const clean = rows.map(r => ({ ...r, name: String(r.name || "").trim() })).filter(r => r.name);
+      if (!clean.length) { showToast("⚠ لازم مكان واحد على الأقل"); return; }
+      const value = JSON.stringify(clean);
+      try {
+        await SupaEngine.saveSettings({ [checkpointsSettingKey(branch)]: value });
+        currentSettings[checkpointsSettingKey(branch)] = value;
+        wrap.remove();
+        showToast(`✅ انحفظت ${clean.length} أماكن تصوير`);
+        if (typeof renderOpeningView === "function") renderOpeningView();
+      } catch (err) {
+        showToast("⚠ ما انحفظ — " + (err.message || err));
+      }
+    }
+  });
+  render();
+  document.body.appendChild(wrap);
 }
 
 let dbInstance = null;

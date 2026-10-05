@@ -197,6 +197,7 @@ async function renderOpeningView() {
           <select onchange="onOpeningBranchChange(this.value)">
             ${branchOptionsHtml(branch)}
           </select>
+          ${typeof canEditCheckpoints === "function" && canEditCheckpoints(branch) ? `<button class="btn secondary" onclick="openCheckpointsEditor(this.dataset.branch)" data-branch="${escHtml(branch)}" style="font-size:12px;padding:6px 12px;">✏️ أماكن التصوير (${checkpoints.length})</button>` : ""}
         </div>
       </div>
 
