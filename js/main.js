@@ -11,6 +11,7 @@ const TAB_ROLE_ACCESS = {
   receiving: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
   remaining: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
   custody: ["owner", "manager", "branch_staff", "employee", "accountant"],
+  purchases: ["owner", "accountant"],
   tomorrow: ["owner", "manager", "chef", "accountant"],
   // العصيرات وقائمة الفحص ما حدا عم يعبّيهم، فمخفيين عن موظفي الفروع لحتى القائمة تضل بسيطة
   juices: ["owner", "manager", "accountant"],
@@ -27,6 +28,8 @@ function tabAllowed(tab) {
   const role = Auth.role();
   if (tab === "report" && typeof isChefReportOnlyUser === "function" && isChefReportOnlyUser()) return true;
   if (!(role && TAB_ROLE_ACCESS[tab] && TAB_ROLE_ACCESS[tab].includes(role))) return false;
+  // المشتريات بمرحلة التجربة: تطلع بوضع المعاينة بس
+  if (tab === "purchases" && !(typeof purchasesEnabled === "function" && purchasesEnabled())) return false;
   // صور التوثيق تنشال عن الموظف إذا كل فروعه لسا ما تحددت لها مناطق تصوير
   if (tab === "opening" && role !== "owner" && typeof isPhotoOffBranch === "function") {
     const mine = (Auth.branches && Auth.branches()) || [];
@@ -60,7 +63,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -122,6 +125,7 @@ function setActiveTab(tab) {
     loadRemainingData(currentRemainingDate, Branch.get() || currentRemainingBranch); 
   }
   if (tab === "custody") { loadCustody(currentCustodyDate, Branch.get()); }
+  if (tab === "purchases") { loadPurchases(); }
   if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
   if (tab === "users") { renderUsersView(); }
   if (tab === "audit") { renderAuditView(); }

@@ -12,7 +12,7 @@
   if (!on) return;
 
   const AJL = "عبداللطيف جميل";
-  const DB_KEY = "ph_demo_db_v2";
+  const DB_KEY = "ph_demo_db_v3";
   const riyadh = (offset) => {
     const d = new Date(Date.now() + offset * 86400000);
     return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(d);
@@ -62,8 +62,34 @@
         { date: riyadh(-1), branch: AJL, channel: "Cash", transactions: 6, amount: 212.4 },
         { date: riyadh(-1), branch: AJL, channel: "Mada", transactions: 79, amount: 1498.5 }
       ],
-      custody_closings: [], push_subscriptions: [], reminder_settings: []
+      custody_closings: [
+        { date: riyadh(-1), branch: "الشاطئ", opening_float: 500, opened_by: "العامودي", cash_counted: 640, card_total: 1200, closed_at: new Date().toISOString(),
+          expenses: [{ id: "e1", amount: 46, note: "خبز من البقالة", receipt: "", by: "العامودي", at: new Date().toISOString() },
+            { id: "e2", amount: 18.5, note: "أكياس نايلون", receipt: "", by: "العامودي", at: new Date().toISOString() }] },
+        { date: riyadh(-2), branch: AJL, opening_float: 300, opened_by: "محمد البلول", expenses: [{ id: "e3", amount: 35, note: "ليمون ونعناع", receipt: "", by: "محمد البلول", at: new Date().toISOString() }] }
+      ],
+      purchase_invoices: demoPurchases(),
+      push_subscriptions: [], reminder_settings: []
     };
+  }
+  // فواتير مشتريات وهمية بأخطاء متعمدة (وحدة ناقصة، ضريبة غلط، مكررة) عشان نجرّب فحوصات المحاسب
+  function demoPurchases() {
+    const L = (name, qty, unit, unit_price, category) => ({ name, qty, unit, unit_price, total: Math.round(qty * unit_price * 100) / 100, category });
+    const inv = (id, off, supplier, no, lines, extra) => {
+      const sub = Math.round(lines.reduce((a, l) => a + l.total, 0) * 100) / 100;
+      const vat = Math.round(sub * 0.15 * 100) / 100;
+      return { id, source: "google_form", source_ref: "form_" + id, kind: "invoice", invoice_date: riyadh(off), invoice_no: no, supplier, branch: "الروضة",
+        subtotal: sub, vat, total: Math.round((sub + vat) * 100) / 100, lines, receipt: "", status: "pending", created_by: "يزيد", created_at: new Date().toISOString(), ...(extra || {}) };
+    };
+    return [
+      inv("p1", -1, "مؤسسة اللحوم الطازجة", "4471", [L("صدور دجاج", 40, "كيلو", 21.5, "لحوم"), L("لحم بقري مفروم", 12, "كيلو", 48, "لحوم")]),
+      inv("p2", -1, "سوق الخضار المركزي", "A-982", [L("طماطم", 3, "كرتون", 38, "خضراوات"), L("خس", 20, "حبة", 3.5, "خضراوات"), L("بصل", 10, "", 4, "خضراوات")]),
+      inv("p3", -2, "مستودع البهارات", "311", [L("بابريكا", 2, "كيلو", 55, "بهارات"), L("كمون", 1, "كيلو", 42, "بهارات")], { vat: 20 }),
+      inv("p4", -2, "شركة التغليف الحديثة", "7720", [L("علب بلاستيك ٧٥٠ مل", 4, "كرتون", 95, "بلاستيك وتغليف"), L("أكياس توصيل", 2, "كرتون", 60, "")]),
+      inv("p5", -3, "مؤسسة اللحوم الطازجة", "4471", [L("صدور دجاج", 40, "كيلو", 21.5, "لحوم")], { status: "approved", reviewed_by: "محمد الشرقاوي", reviewed_at: new Date().toISOString() }),
+      inv("p6", -3, "النظافة المثالية", "C-55", [L("معقم أسطح", 6, "علبة", 22, "منظفات"), L("كلور", 4, "لتر", 9.5, "منظفات")], { status: "approved", reviewed_by: "محمد الشرقاوي", reviewed_at: new Date().toISOString() }),
+      inv("p7", -4, "بقالة الحي", "", [L("سكر", 2, "كيس", 18, "بقالة"), L("زيت دوار الشمس", 3, "لتر", 14, "بقالة")], { status: "rejected", review_note: "رقم الفاتورة مو واضح بالصورة — صوّرها مرة ثانية" })
+    ];
   }
   let db;
   try { db = JSON.parse(sessionStorage.getItem(DB_KEY)); } catch (e) { db = null; }
@@ -72,7 +98,7 @@
 
   const KEYS = {
     daily_entries: ["date", "branch", "item_id"], day_meta: ["date", "branch"], items: ["id"], settings: ["key"], juices: ["id"],
-    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], custody_closings: ["date", "branch"],
+    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], custody_closings: ["date", "branch"], purchase_invoices: ["id"],
     push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"], tabsense_payments: ["date", "branch", "channel"]
   };
 
@@ -116,6 +142,14 @@
       // الأرقام السرية بالمعاينة: أرقام المعاينة نفسها
       if (fn === "owner_list_pins") return [200, Object.entries(EMPLOYEES).map(([pin, e]) => ({ id: e.id, pin }))];
       if (fn === "owner_set_pin") return [200, { ok: true }];
+      if (fn === "purchase_save") {
+        const row = (body && body.p_row) || {};
+        const list = db.purchase_invoices = db.purchase_invoices || [];
+        const i = list.findIndex(x => x.id === row.id);
+        if (i >= 0) list[i] = { ...list[i], ...row }; else list.push(row);
+        persist();
+        return [200, row];
+      }
       if (fn === "verify_session") {
         const e = Object.values(EMPLOYEES).find(x => x.token === (body && body.p_token));
         if (!e) return [200, null];
@@ -224,7 +258,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     const bar = document.createElement("div");
     bar.className = "demo-banner";
-    bar.innerHTML = '🧪 نسخة معاينة — بيانات وهمية ولا تُحفظ في النظام الحقيقي · دخول: <b>1111</b> مالك · <b>2222</b> موظف <button type="button">إعادة البيانات</button>';
+    bar.innerHTML = '🧪 نسخة معاينة — بيانات وهمية ولا تُحفظ في النظام الحقيقي · دخول: <b>1111</b> مالك · <b>2222</b> موظف · <b>4444</b> محاسب <button type="button">إعادة البيانات</button>';
     bar.querySelector("button").addEventListener("click", () => window.PH_DEMO_RESET());
     document.body.prepend(bar);
     document.body.classList.add("is-demo");
