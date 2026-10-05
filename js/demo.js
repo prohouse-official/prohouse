@@ -113,6 +113,9 @@
         const { token, ...employee } = e;
         return [200, { token, employee }];
       }
+      // الأرقام السرية بالمعاينة: أرقام المعاينة نفسها
+      if (fn === "owner_list_pins") return [200, Object.entries(EMPLOYEES).map(([pin, e]) => ({ id: e.id, pin }))];
+      if (fn === "owner_set_pin") return [200, { ok: true }];
       if (fn === "verify_session") {
         const e = Object.values(EMPLOYEES).find(x => x.token === (body && body.p_token));
         if (!e) return [200, null];

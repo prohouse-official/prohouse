@@ -38,15 +38,18 @@ async function loadUsersData() {
       };
     });
   } else {
-    usersListState = [
-      { pin: "7284", name: "أ.يزيد", role: "owner", branches: "كل الفروع" },
-      { pin: "5931", name: "حسن", role: "owner", branches: "كل الفروع" },
-      { pin: "4062", name: "الشيف عصام", role: "chef", branches: "كل الفروع" },
-      { pin: "8317", name: "أبو يونس", role: "manager", branches: "الروضة" },
-      { pin: "2649", name: "العامودي", role: "manager", branches: "الشاطئ" },
-      { pin: "6503", name: "محمد البلول", role: "branch_staff", branches: "عبداللطيف جميل" },
-      { pin: "9174", name: "غالب", role: "branch_staff", branches: "عبداللطيف جميل" }
-    ];
+    usersListState = [];
+  }
+  // الأرقام السرية: للمالك بس، من دالة بقاعدة البيانات تتحقق إن الجلسة مالك
+  if (Auth.isOwner() && typeof SupaEngine !== "undefined") {
+    try {
+      const pins = await SupaEngine.rpc("owner_list_pins", {});
+      const byId = Object.fromEntries((pins || []).map(p => [p.id, p.pin]));
+      usersListState.forEach(u => { u.pin = byId[u.id] || "—"; });
+    } catch (e) {
+      usersListState.forEach(u => { u.pin = "⚠"; });
+      showToast("⚠ تعذّر جلب الأرقام السرية — " + (e.message || e));
+    }
   }
 }
 
@@ -90,10 +93,11 @@ async function renderUsersView() {
                 <tr>
                   <td><strong>${u.name}</strong></td>
                   <td><span class="badge ${u.role === 'owner' ? 'ok' : (u.role === 'chef' ? 'warn' : 'neutral')}">${ROLE_LABELS[u.role] || u.role}</span></td>
-                  <td><code>${u.pin}</code></td>
+                  <td><code class="pin-code">${escHtml(u.pin || "••••")}</code></td>
                   <td>${u.branches ? u.branches : 'كل الفروع'}</td>
                   <td>
-                    <button class="btn primary" style="padding:4px 8px;font-size:11px;" onclick="editUserRole(${idx})">تعديل</button>
+                    <button class="btn primary" style="padding:4px 8px;font-size:11px;" onclick="editUserRole(${idx})">✏️ تغيير الرقم</button>
+                    <button class="btn secondary" style="padding:4px 8px;font-size:11px;" onclick="regenerateUserPin(${idx})">🔄 رقم جديد</button>
                   </td>
                 </tr>
               `).join("")}
@@ -111,13 +115,37 @@ function openAddUserModal() {
   showToast("ℹ️ يمكنك إضافة موظف جديد وتخصيص رمزه السري وفروعه المسموحة.");
 }
 
+// تغيير الرقم السري فعلياً بقاعدة البيانات (قبل كان يتغيّر بالشاشة بس وما ينحفظ)
 async function editUserRole(idx) {
   const u = usersListState[idx];
-  if (!u) return;
-  const newPin = await phPrompt(`تعديل الرمز السري للموظف (${u.name}):`, u.pin);
-  if (newPin && newPin.trim()) {
-    u.pin = newPin.trim();
-    showToast("✓ تم تحديث الرمز السري بنجاح!");
+  if (!u || !Auth.isOwner()) return;
+  const newPin = await phPrompt(`الرقم السري الجديد لـ (${u.name}) — من 4 لـ 8 أرقام:`, "");
+  if (!newPin || !newPin.trim()) return;
+  const pin = newPin.trim();
+  if (!/^[0-9]{4,8}$/.test(pin)) { showToast("⚠ الرقم لازم يكون من 4 لـ 8 أرقام"); return; }
+  try {
+    await SupaEngine.rpc("owner_set_pin", { p_employee_id: u.id, p_pin: pin });
+    showToast(`✅ تغيّر الرقم السري لـ ${u.name}`);
     renderUsersView();
+  } catch (e) {
+    showToast("⚠ ما تغيّر — " + (e.message || e));
+  }
+}
+
+// رقم عشوائي جديد (٦ أرقام) بضغطة
+async function regenerateUserPin(idx) {
+  const u = usersListState[idx];
+  if (!u || !Auth.isOwner()) return;
+  const ok = await phConfirm(`تعطي ${u.name} رقم سري جديد عشوائي؟ الرقم القديم يبطل.`, { ok: "رقم جديد" });
+  if (!ok) return;
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  const pin = String(buf[0] % 1000000).padStart(6, "0");
+  try {
+    await SupaEngine.rpc("owner_set_pin", { p_employee_id: u.id, p_pin: pin });
+    showToast(`✅ رقم ${u.name} الجديد: ${pin}`);
+    renderUsersView();
+  } catch (e) {
+    showToast("⚠ ما تغيّر — " + (e.message || e));
   }
 }
