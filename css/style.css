@@ -3419,3 +3419,11 @@ body.readonly-user .rec-btn-remove, body.readonly-user .rec-add-item-btn, body.r
 body.readonly-user .rem-waste-btn, body.readonly-user .rec-inline-btns, body.readonly-user .home-scan, body.readonly-user .cust-scan-top,
 body.readonly-user .save-bar, body.readonly-user .cust-close-btn, body.readonly-user .cust-exp-del,
 body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-item-btn{ display:none !important; }
+
+/* محرر أماكن التصوير */
+.cp-edit-hint{ font-size:13px; font-weight:700; color:var(--muted); margin-bottom:10px; }
+.cp-edit-row{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.cp-edit-row input{ flex:1; min-width:0; min-height:46px; padding:8px 12px; border-radius:12px; border:1.5px solid var(--line-strong); font-family:inherit; font-size:15px; font-weight:700; }
+.cp-edit-row .cust-exp-del{ width:44px; height:44px; }
+.cp-edit-row .cust-exp-del:disabled{ opacity:.35; }
+.cp-edit-num{ width:26px; height:26px; border-radius:999px; background:var(--yellow); display:inline-flex; align-items:center; justify-content:center; font-weight:900; font-size:13px; }

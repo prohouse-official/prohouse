@@ -21,7 +21,8 @@
     "1111": { id: "emp_2", name: "حسن", role: "owner", branches: "الروضة,الشاطئ," + AJL, token: "demo-owner" },
     "2222": { id: "emp_6", name: "محمد البلول", role: "employee", branches: AJL, token: "demo-staff" },
     "3333": { id: "emp_5", name: "العامودي", role: "manager", branches: "الشاطئ", token: "demo-manager" },
-    "4444": { id: "emp_8", name: "محمد الشرقاوي", role: "accountant", branches: "", token: "demo-accountant" }
+    "4444": { id: "emp_8", name: "محمد الشرقاوي", role: "accountant", branches: "", token: "demo-accountant" },
+    "5555": { id: "emp_9", name: "شكيل", role: "employee", branches: "الروضة", token: "demo-rawdah-staff" }
   };
 
   function seed() {
