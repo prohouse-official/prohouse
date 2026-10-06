@@ -596,6 +596,7 @@ async function exportExcel() {
 // نفس عرض الأعمدة وارتفاع الصفوف والخطوط تبع ملف الإكسل، وتطلع Excel أو PDF جاهز للطباعة وينرسل واتساب.
 
 let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
+let tomorrowReportCombined = false; // ورقة مجمعة لكل الفروع (اختيار لحاله — أوراق الفروع ما تتغير)
 let lastTomorrowReportDate = "";
 
 // مقاسات ملف الإكسل الأصلي (عرض الأعمدة بوحدة الإكسل، ارتفاع الصفوف بالنقطة)
@@ -643,8 +644,15 @@ function initTomorrowReportControls() {
   document.getElementById("tomorrowReportGoBtn").addEventListener("click", runTomorrowReport);
   document.getElementById("tomorrowReportExportBtn").addEventListener("click", exportTomorrowReportExcel);
   document.getElementById("tomorrowReportPdfBtn").addEventListener("click", shareTomorrowReportPdf);
+  document.getElementById("tomorrowReportCombinedBtn").addEventListener("click", () => {
+    tomorrowReportCombined = !tomorrowReportCombined;
+    const sel = document.getElementById("tomorrowReportBranch");
+    if (tomorrowReportCombined && sel.value) { sel.value = ""; if (sel._phRender) sel._phRender(); }
+    runTomorrowReport();
+  });
   // تغيير الفرع أو التاريخ يحدّث التقرير مباشرة (بدون ما تضغط «عرض» مرة ثانية)
   ["tomorrowReportBranch", "tomorrowReportDate"].forEach(id => document.getElementById(id).addEventListener("change", () => {
+    if (id === "tomorrowReportBranch" && document.getElementById(id).value) tomorrowReportCombined = false;
     if (document.getElementById("tomorrowReportView").children.length) runTomorrowReport();
   }));
 }
@@ -748,12 +756,88 @@ async function runTomorrowReport() {
     return { branch, rows };
   }).filter(s => s.rows.length);
 
+  const cBtn = document.getElementById("tomorrowReportCombinedBtn");
+  if (cBtn) {
+    const can = !branchFilter ? branches.length > 1 : (isChefReportOnlyUser() ? allowedBranchList() : branchList()).length > 1;
+    cBtn.classList.toggle("hidden", !can);
+    cBtn.classList.toggle("active", tomorrowReportCombined && !branchFilter);
+    cBtn.textContent = tomorrowReportCombined && !branchFilter ? "✓ ورقة مجمعة — اضغط لأوراق الفروع" : "📋 ورقة مجمعة لكل الفروع";
+  }
+  // ورقة مجمعة (اختيار لحاله): الصنف، إجمالي المطلوب، وكم طالب كل فرع
+  if (tomorrowReportCombined && !branchFilter && branches.length > 1) {
+    const combined = chefCombinedSheet(branches, perBranch, order);
+    lastTomorrowReportSheets = combined.rows.length ? [combined] : [];
+  }
+
   renderTomorrowReport();
+}
+
+// قيمة الطلب لفرع: بالجرام للأصناف الموزونة، وعدد السفنديشات لفروع السفنديش
+// (المفتاح يجمع المتشابه: جرامات مع جرامات، سفنديش ١/٣ مع ١/٣، طاسة مع طاسة)
+const chefIsPanSize = (u) => /\d\/\d/.test(String(u || ""));
+function chefOrderPart(branch, e, it) {
+  const qty = Number(e.qty);
+  if (isPanOrderBranch(branch)) {
+    const size = e.unit || itemPanSize(it);
+    return { key: "n:" + size, qty, text: chefIsPanSize(size) ? `${qty} (${size})` : String(qty) };
+  }
+  const unit = it.unit || e.unit;
+  if (/كجم|كيلو/.test(String(unit || ""))) return { key: "g", qty: qty * 1000, text: `${qty * 1000} جم` };
+  if (isWeightUnit(unit)) return { key: "g", qty, text: `${qty} جم` };
+  return { key: "n:" + (unit || ""), qty, text: chefIsPanSize(unit) ? `${qty} (${unit})` : String(qty) };
+}
+function chefTotalText(parts) {
+  const byKey = new Map();
+  parts.forEach(p => byKey.set(p.key, (byKey.get(p.key) || 0) + p.qty));
+  return [...byKey.entries()].map(([k, q]) => {
+    const n = Math.round(q * 100) / 100;
+    if (k === "g") return `${n} جم`;
+    const u = k.slice(2);
+    return chefIsPanSize(u) ? `${n} (${u})` : String(n);
+  }).join(" + ");
+}
+
+function chefCombinedSheet(branches, perBranch, order) {
+  const rows = new Map();
+  branches.forEach((branch, bi) => {
+    (perBranch[bi] || []).filter(e => e.qty !== "" && e.qty != null && Number(e.qty) > 0).forEach(e => {
+      const it = Items.byId(e.itemId) || { id: e.itemId, name: e.itemName, category: "-", unit: e.unit };
+      const name = chefReportName(it, e.cookName);
+      // خانات الشيف: نفس الخانة بطبخة مختلفة بكل فرع = سطرين
+      const key = it.id + "|" + name;
+      if (!rows.has(key)) rows.set(key, {
+        category: it.category || "-", name, size: itemPanSize(it),
+        parts: {}, rank: categoryRank(it.category), sort: order.has(it.id) ? order.get(it.id) : 9999
+      });
+      const row = rows.get(key);
+      row.parts[branch] = chefOrderPart(branch, e, it);
+    });
+  });
+  const list = [...rows.values()].map(r => ({
+    ...r, total: chefTotalText(Object.values(r.parts)),
+    byBranch: branches.map(b => (r.parts[b] ? r.parts[b].text : ""))
+  })).sort((a, b) => a.rank - b.rank || a.sort - b.sort);
+  const used = branches.filter((b, i) => list.some(r => r.byBranch[i]));
+  const idx = used.map(b => branches.indexOf(b));
+  return { combined: true, branch: "كل الفروع", branches: used, rows: list.map(r => ({ ...r, byBranch: idx.map(i => r.byBranch[i]) })) };
+}
+
+// أعمدة ورقة كل الفروع: استلام | الفئة | تسليم | اسم الصنف | حجم السفنديش | إجمالي المطلوب | فرع، فرع…
+// خلية التاريخ بالعنوان: عمودين (وعمود واحد لو الورقة فيها فرع واحد بس)
+function chefDateSpan(sheet) { return sheet.combined && sheet.branches.length < 2 ? 1 : 2; }
+function chefCombinedLayout(sheet) {
+  const n = sheet.branches.length;
+  const branchW = n > 3 ? 24 : 30;
+  return {
+    cols: [15.2, 15.2, 15.2, 40, 23.68, 40, ...sheet.branches.map(() => branchW)],
+    headers: ["استلام", "الفئة", "تسليم", "اسم الصنف", "حجم السفنديش", "إجمالي المطلوب", ...sheet.branches]
+  };
 }
 
 // ورقة HTML بنفس مقاسات الإكسل بالبكسل (تنعرض مصغّرة بالشاشة، وتتصوّر للـ PDF بحجمها الحقيقي)
 function chefSheetHtml(sheet, date) {
-  const S = CHEF_SHEET;
+  const S = sheet.combined ? { ...CHEF_SHEET, ...chefCombinedLayout(sheet) } : CHEF_SHEET;
+  const dateSpan = chefDateSpan(sheet);
   const colW = S.cols.map(chefColPx);
   const totalW = colW.reduce((a, b) => a + b, 0);
   const esc = (t) => String(t ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -763,18 +847,21 @@ function chefSheetHtml(sheet, date) {
   const groups = [];
   sheet.rows.forEach(r => { const g = groups[groups.length - 1]; if (g && g.category === r.category) g.rows.push(r); else groups.push({ category: r.category, rows: [r] }); });
   const box = () => cell("□", `font-size:${chefPtPx(S.boxFont)}px`);
+  const tail = (r) => sheet.combined
+    ? cell(r.total, "font-weight:700;background:#F2F2F2") + r.byBranch.map(t => cell(t)).join("")
+    : `${cell(r.qty)}${cell(r.rec || "")}${cell(r.rem || "")}${cell(r.notes)}`;
   const body = groups.map(g => g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
       ${box()}
       ${i === 0 ? `<td rowspan="${g.rows.length}" style="border:${bd}">${esc(g.category)}</td>` : ""}
-      ${box()}${cell(r.name)}${cell(r.size)}${cell(r.qty)}${cell(r.rec || "")}${cell(r.rem || "")}${cell(r.notes)}
+      ${box()}${cell(r.name)}${cell(r.size)}${tail(r)}
     </tr>`).join("")).join("");
   return `<div class="chef-sheet" style="width:${totalW}px">
     <table style="width:${totalW}px">
       <colgroup>${colW.map(w => `<col style="width:${w}px">`).join("")}</colgroup>
       <tr class="chef-title" style="height:${chefPtPx(S.titleH)}px">
         <td colspan="3" style="text-align:left">اليوم:</td><td style="text-align:right">${esc(chefDayName(date))}</td>
-        <td style="text-align:right">التاريخ:</td><td colspan="2" style="text-align:right">${esc(chefDateText(date))}</td>
-        <td colspan="2">فرع ${esc(sheet.branch)}</td>
+        <td style="text-align:right">التاريخ:</td><td colspan="${dateSpan}" style="text-align:right">${esc(chefDateText(date))}</td>
+        <td colspan="${S.cols.length - 5 - dateSpan}">${sheet.combined ? "كل الفروع" : "فرع " + esc(sheet.branch)}</td>
       </tr>
       <tr class="chef-head" style="height:${chefPtPx(S.headH)}px">${S.headers.map(h => cell(h, `background:#${S.headFill}`)).join("")}</tr>
       ${body}
@@ -827,22 +914,27 @@ async function exportTomorrowReportExcel() {
   const font = (sz) => ({ name: "Aptos Narrow", size: sz, color: { argb: "FF000000" } });
   const center = { horizontal: "center", vertical: "middle", wrapText: true, readingOrder: "rtl" };
   lastTomorrowReportSheets.forEach(sheetData => {
+    const L = sheetData.combined ? { ...S, ...chefCombinedLayout(sheetData) } : S;
     const ws = workbook.addWorksheet(String(sheetData.branch).slice(0, 31));
     ws.views = [{ rightToLeft: true }];
-    ws.columns = S.cols.map(w => ({ width: w }));
+    ws.columns = L.cols.map(w => ({ width: w }));
     ws.pageSetup = { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 1,
       margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 } };
     // الصف 1: اليوم / التاريخ / الفرع
-    ws.mergeCells("A1:C1"); ws.mergeCells("F1:G1"); ws.mergeCells("H1:I1");
+    const lastCol = L.cols.length;
+    ws.mergeCells("A1:C1");
+    const span = chefDateSpan(sheetData);
+    if (span === 2) ws.mergeCells(1, 6, 1, 7);
+    if (lastCol > 6 + span) ws.mergeCells(1, 6 + span, 1, lastCol);
     const [y, m, d] = lastTomorrowReportDate.split("-").map(Number);
     const title = [["A1", "اليوم:", "left"], ["D1", chefDayName(lastTomorrowReportDate), "right"], ["E1", "التاريخ:", "right"],
-      ["F1", new Date(Date.UTC(y, m - 1, d)), "right"], ["H1", "فرع " + sheetData.branch, "center"]];
+      ["F1", new Date(Date.UTC(y, m - 1, d)), "right"], [ws.getCell(1, 6 + chefDateSpan(sheetData)).address, sheetData.combined ? "كل الفروع" : "فرع " + sheetData.branch, "center"]];
     title.forEach(([a, v, h]) => { const c = ws.getCell(a); c.value = v; c.font = font(S.titleFont); c.alignment = { horizontal: h, vertical: "middle" }; });
     ws.getCell("F1").numFmt = "dd-mm-yyyy";
     ws.getRow(1).height = S.titleH;
     // الصف 2: العناوين
     const head = ws.getRow(2);
-    S.headers.forEach((h, i) => {
+    L.headers.forEach((h, i) => {
       const c = head.getCell(i + 1);
       c.value = h; c.font = font(S.bodyFont); c.alignment = center; c.border = border;
       c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + S.headFill } };
@@ -856,10 +948,12 @@ async function exportTomorrowReportExcel() {
       const start = r;
       g.rows.forEach((x, i) => {
         const row = ws.getRow(r);
-        ["□", i === 0 ? g.category : null, "□", x.name, x.size, x.qty, x.rec || null, x.rem || null, x.notes || null].forEach((v, ci) => {
+        const tail = sheetData.combined ? [x.total, ...x.byBranch.map(t => t || null)] : [x.qty, x.rec || null, x.rem || null, x.notes || null];
+        ["□", i === 0 ? g.category : null, "□", x.name, x.size, ...tail].forEach((v, ci) => {
           const c = row.getCell(ci + 1);
           if (v !== null) c.value = v;
           c.font = font(ci === 0 || ci === 2 ? S.boxFont : S.bodyFont); c.alignment = center; c.border = border;
+          if (sheetData.combined && ci === 5) { c.font = { ...c.font, bold: true }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } }; }
         });
         row.getCell(5).numFmt = "@";
         row.height = S.rowH;
