@@ -809,9 +809,10 @@ function chefCombinedSheet(branches, perBranch, order) {
   branches.forEach((branch, bi) => {
     (perBranch[bi] || []).filter(e => e.qty !== "" && e.qty != null && Number(e.qty) > 0).forEach(e => {
       const it = Items.byId(e.itemId) || { id: e.itemId, name: e.itemName, category: "-", unit: e.unit };
-      const name = chefReportName(it, e.cookName);
-      // خانات الشيف: نفس الخانة بطبخة مختلفة بكل فرع = سطرين
-      const key = it.id + "|" + name;
+      // أطباق الشيف: كل خانة (دجاج الشيف 1، 2…) سطر واحد لكل الفروع وبدون اسم طبخة — الشيف هو اللي يسمّي
+      const chef = /الشيف/.test(String(it.name || ""));
+      const name = chef ? `${String(it.name).replace(/\s*\(.*\)\s*$/, "").trim()} ……` : chefReportName(it, e.cookName);
+      const key = chef ? it.id : it.id + "|" + name;
       if (!rows.has(key)) rows.set(key, {
         category: it.category || "-", name, size: itemPanSize(it),
         parts: {}, rank: categoryRank(it.category), sort: order.has(it.id) ? order.get(it.id) : 9999
