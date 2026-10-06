@@ -777,6 +777,13 @@ async function runTomorrowReport() {
 const chefIsPanSize = (u) => /\d\/\d/.test(String(u || ""));
 function chefOrderPart(branch, e, it) {
   const qty = Number(e.qty);
+  // صنف بالجرام: حتى فرع السفنديش (الشاطئ) يكتب الجرامات والحجم بس للسفنديش — فيتجمع مع باقي الفروع.
+  // رقم صغير (أقل من ٥٠) بفرع سفنديش = عدد سفنديشات مو جرامات
+  const weight = /كجم|كيلو/.test(String(it.unit || "")) ? 1000 : isWeightUnit(it.unit) ? 1 : 0;
+  if (weight && !(isPanOrderBranch(branch) && qty < 50)) {
+    const g = qty * weight;
+    return { key: "g", qty: g, text: `${g} جم` };
+  }
   if (isPanOrderBranch(branch)) {
     const size = e.unit || itemPanSize(it);
     return { key: "n:" + size, qty, text: chefIsPanSize(size) ? `${qty} (${size})` : String(qty) };
