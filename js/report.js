@@ -596,6 +596,7 @@ async function exportExcel() {
 // نفس عرض الأعمدة وارتفاع الصفوف والخطوط تبع ملف الإكسل، وتطلع Excel أو PDF جاهز للطباعة وينرسل واتساب.
 
 let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
+let tomorrowReportCombined = false; // ورقة مجمعة لكل الفروع (اختيار لحاله — أوراق الفروع ما تتغير)
 let lastTomorrowReportDate = "";
 
 // مقاسات ملف الإكسل الأصلي (عرض الأعمدة بوحدة الإكسل، ارتفاع الصفوف بالنقطة)
@@ -643,8 +644,15 @@ function initTomorrowReportControls() {
   document.getElementById("tomorrowReportGoBtn").addEventListener("click", runTomorrowReport);
   document.getElementById("tomorrowReportExportBtn").addEventListener("click", exportTomorrowReportExcel);
   document.getElementById("tomorrowReportPdfBtn").addEventListener("click", shareTomorrowReportPdf);
+  document.getElementById("tomorrowReportCombinedBtn").addEventListener("click", () => {
+    tomorrowReportCombined = !tomorrowReportCombined;
+    const sel = document.getElementById("tomorrowReportBranch");
+    if (tomorrowReportCombined && sel.value) { sel.value = ""; if (sel._phRender) sel._phRender(); }
+    runTomorrowReport();
+  });
   // تغيير الفرع أو التاريخ يحدّث التقرير مباشرة (بدون ما تضغط «عرض» مرة ثانية)
   ["tomorrowReportBranch", "tomorrowReportDate"].forEach(id => document.getElementById(id).addEventListener("change", () => {
+    if (id === "tomorrowReportBranch" && document.getElementById(id).value) tomorrowReportCombined = false;
     if (document.getElementById("tomorrowReportView").children.length) runTomorrowReport();
   }));
 }
@@ -748,8 +756,15 @@ async function runTomorrowReport() {
     return { branch, rows };
   }).filter(s => s.rows.length);
 
-  // كل الفروع ← ورقة وحدة للشيف: الصنف، إجمالي المطلوب، وكم طالب كل فرع
-  if (!branchFilter && branches.length > 1) {
+  const cBtn = document.getElementById("tomorrowReportCombinedBtn");
+  if (cBtn) {
+    const can = !branchFilter ? branches.length > 1 : (isChefReportOnlyUser() ? allowedBranchList() : branchList()).length > 1;
+    cBtn.classList.toggle("hidden", !can);
+    cBtn.classList.toggle("active", tomorrowReportCombined && !branchFilter);
+    cBtn.textContent = tomorrowReportCombined && !branchFilter ? "✓ ورقة مجمعة — اضغط لأوراق الفروع" : "📋 ورقة مجمعة لكل الفروع";
+  }
+  // ورقة مجمعة (اختيار لحاله): الصنف، إجمالي المطلوب، وكم طالب كل فرع
+  if (tomorrowReportCombined && !branchFilter && branches.length > 1) {
     const combined = chefCombinedSheet(branches, perBranch, order);
     lastTomorrowReportSheets = combined.rows.length ? [combined] : [];
   }
