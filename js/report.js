@@ -807,27 +807,50 @@ function chefTotalText(parts) {
   }).join(" + ");
 }
 
+// أصناف تنجمع بالورقة المجمعة تحت اسم واحد (الشيف هو اللي يقرر الطبخة)
+// الهدف بدون رقم = أول خانة شيف موجودة بالورقة بنفس الاسم (سمك الشيف 1، 2…)
+const CHEF_COMBINED_ALIASES = { "رز بخاري": "رز الشيف", "سمك فيليه": "سمك الشيف", "جمبري داينمت": "جمبري الشيف" };
+const chefNormName = (n) => String(n || "").replace(/\s*\(.*\)\s*$/, "").replace(/[ة]$/, "ه").replace(/\s+/g, " ").trim();
+
 function chefCombinedSheet(branches, perBranch, order) {
   const rows = new Map();
+  const aliased = []; // [{ base, branch, e, it }]
+  const addTo = (key, init, branch, e, it) => {
+    if (!rows.has(key)) rows.set(key, { ...init, sizes: new Set(), parts: {}, notes: [] });
+    const row = rows.get(key);
+    const sz = itemPanSize(it);
+    if (sz) row.sizes.add(sz);
+    row.rank = Math.min(row.rank, categoryRank(it.category));
+    row.sort = Math.min(row.sort, order.has(it.id) ? order.get(it.id) : 9999);
+    (row.parts[branch] = row.parts[branch] || []).push(chefOrderPart(branch, e, it));
+    if (String(e.notes || "").trim()) row.notes.push(`${branch}: ${String(e.notes).trim()}`);
+  };
   branches.forEach((branch, bi) => {
     (perBranch[bi] || []).filter(e => e.qty !== "" && e.qty != null && Number(e.qty) > 0).forEach(e => {
       const it = Items.byId(e.itemId) || { id: e.itemId, name: e.itemName, category: "-", unit: e.unit };
+      const norm = chefNormName(it.name);
+      const alias = Object.keys(CHEF_COMBINED_ALIASES).find(k => chefNormName(k) === norm);
+      if (alias) { aliased.push({ base: CHEF_COMBINED_ALIASES[alias], branch, e, it }); return; }
       // أطباق الشيف: كل خانة (دجاج الشيف 1، 2…) سطر واحد لكل الفروع وبدون اسم طبخة — الشيف هو اللي يسمّي
-      const chef = /الشيف/.test(String(it.name || ""));
-      const name = chef ? `${String(it.name).replace(/\s*\(.*\)\s*$/, "").trim()} ……` : chefReportName(it, e.cookName);
-      const key = chef ? it.id : it.id + "|" + name;
-      if (!rows.has(key)) rows.set(key, {
-        category: it.category || "-", name, size: itemPanSize(it),
-        parts: {}, notes: [], rank: categoryRank(it.category), sort: order.has(it.id) ? order.get(it.id) : 9999
-      });
-      const row = rows.get(key);
-      row.parts[branch] = chefOrderPart(branch, e, it);
-      if (String(e.notes || "").trim()) row.notes.push(`${branch}: ${String(e.notes).trim()}`);
+      // والأصناف العادية بنفس الاسم (رز أبيض، ويدجز…) سطر واحد حتى لو كل فرع إله صنف مختلف
+      const chef = /الشيف/.test(norm);
+      const name = chef ? `${norm} ……` : chefReportName(it, e.cookName);
+      const key = (chef ? "chef:" : "n:") + chefNormName(chef ? norm : name);
+      addTo(key, { category: it.category || "-", name, base: chef ? norm.replace(/\s*\d+$/, "") : "", rank: 999, sort: 9999 }, branch, e, it);
     });
   });
+  aliased.forEach(({ base, branch, e, it }) => {
+    // أول خانة شيف بنفس الاسم (أصغر رقم) — وإذا ما فيه، سطر جديد باسم الشيف
+    const target = [...rows.entries()].filter(([k, r]) => k.startsWith("chef:") && r.base === base)
+      .sort((x, y) => x[0].localeCompare(y[0], "en", { numeric: true }))[0];
+    const key = target ? target[0] : "chef:" + base;
+    const cat = target ? target[1].category : (it.category || "-");
+    addTo(key, { category: cat, name: `${base} ……`, base, rank: 999, sort: 9999 }, branch, e, it);
+  });
   const list = [...rows.values()].map(r => ({
-    ...r, total: chefTotalText(Object.values(r.parts)), notes: r.notes.join(" · "),
-    byBranch: branches.map(b => (r.parts[b] ? r.parts[b].text : ""))
+    ...r, size: [...r.sizes].join("، "),
+    total: chefTotalText(Object.values(r.parts).flat()), notes: r.notes.join(" · "),
+    byBranch: branches.map(b => (r.parts[b] ? chefTotalText(r.parts[b]) : ""))
   })).sort((a, b) => a.rank - b.rank || a.sort - b.sort);
   const used = branches.filter((b, i) => list.some(r => r.byBranch[i]));
   const idx = used.map(b => branches.indexOf(b));
