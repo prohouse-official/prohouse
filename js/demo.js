@@ -98,7 +98,7 @@
 
   const KEYS = {
     daily_entries: ["date", "branch", "item_id"], day_meta: ["date", "branch"], items: ["id"], settings: ["key"], juices: ["id"],
-    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], custody_closings: ["date", "branch"], purchase_invoices: ["id"],
+    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], purchase_invoices: ["id"],
     push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"], tabsense_payments: ["date", "branch", "channel"]
   };
 

@@ -3501,3 +3501,7 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .pur-line-nums .ph-picker, .pur-line-nums .chip-picker{ min-width:0; }
 .tom-combined-btn{ width:100%; min-height:46px; margin:8px 0; border:1.5px dashed var(--line-strong); background:#fff; border-radius:14px; font-family:inherit; font-size:14.5px; font-weight:900; cursor:pointer; color:var(--ink); }
 .tom-combined-btn.active{ background:var(--ink); color:var(--yellow); border-style:solid; border-color:var(--ink); }
+/* طلبية الغد: قائمة الوحدة جنب خانة الكمية بنفس السطر (كانت تنزل تحتها) */
+.rec-input-wrapper:has(.tom-pan-select){ display:flex; align-items:center; gap:6px; }
+.rec-input-wrapper:has(.tom-pan-select) .rec-main-input{ flex:1; min-width:0; padding:0 8px; }
+.rec-input-wrapper .tom-pan-select{ flex:0 0 auto; max-width:112px; height:48px; font-size:13.5px; color:var(--ink, #111); }
