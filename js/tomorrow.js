@@ -602,6 +602,10 @@ async function loadTomorrowOrder(dateStr) {
   if (seq !== tomorrowLoadSeq) return;
   tomorrowLoadFailed = data === null || data === undefined;
   applyTomorrowData(data);
+  // الأصناف المشالة (✕) محفوظة بالسيرفر — اللي رجع له طلب بعدين يضل ظاهر
+  const removed = await Sync.get("getTomorrowRemoved", { date: dateStr, branch: currentTomorrowBranch }, "tomremoved:" + dateStr + ":" + currentTomorrowBranch).catch(() => null);
+  if (seq !== tomorrowLoadSeq) return;
+  currentTomorrowRemovedIds = new Set((Array.isArray(removed) ? removed : []).filter(id => !currentTomorrowOrder[id]));
 
   // استلام ومتبقي اليوم اللي قبل الطلبية (مو دايماً "اليوم" — لو فتحت طلبية بعد بكرة أو يوم قديم)
   const today = addDaysStr(dateStr, -1);
@@ -696,6 +700,7 @@ function saveTomorrowNow(showStatus) {
   };
   Sync.enqueue("saveTomorrowOrder:" + currentTomorrowDate + ":" + branch, "saveTomorrowOrder", payload);
   Sync.cacheSet("tomorrow:" + currentTomorrowDate + ":" + branch, items);
+  Sync.cacheSet("tomremoved:" + currentTomorrowDate + ":" + branch, Array.from(currentTomorrowRemovedIds));
 
   const missing = [];
   if (!branch) missing.push("الفرع");

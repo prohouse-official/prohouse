@@ -490,8 +490,15 @@ const SupaEngine = (() => {
     }));
   }
 
+  // الأصناف اللي انشالت من طلبية يوم وفرع (✕) — كانت تنحفظ بالذاكرة بس، فترجع بعد أي تحديث
+  async function getTomorrowRemoved(date, branch) {
+    const res = await query(`tomorrow_meta?select=removed_item_ids&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
+    const v = res && res[0] && res[0].removed_item_ids;
+    return Array.isArray(v) ? v : [];
+  }
+
   async function saveTomorrowOrder(payload) {
-    const { date, branch, items, employeeName } = payload;
+    const { date, branch, items, employeeName, removedItemIds } = payload;
 
     // استبدال كامل لطلبية نفس اليوم والفرع (نفس سلوك النظام القديم) — عشان لو
     // الموظف شال صنف من الطلبية، ما يضل صف قديم إله بيرجع يبيّن بالمقارنة
@@ -521,6 +528,13 @@ const SupaEngine = (() => {
     }
     const notIn = keepIds.length ? `&item_id=not.in.(${keepIds.map(id => `"${encodeURIComponent(id)}"`).join(",")})` : "";
     await query(`tomorrow_orders?date=eq.${date}&branch=eq.${encodeURIComponent(branch)}${notIn}`, { method: "DELETE" });
+    if (Array.isArray(removedItemIds)) {
+      await query("tomorrow_meta?on_conflict=date,branch", {
+        method: "POST",
+        headers: { "Prefer": "resolution=merge-duplicates" },
+        body: JSON.stringify({ date, branch, removed_item_ids: removedItemIds, updated_at: new Date().toISOString() })
+      });
+    }
     return { date, branch, savedAt: new Date().toISOString() };
   }
 
@@ -1095,6 +1109,7 @@ const SupaEngine = (() => {
     saveDay,
     saveRemainingReport,
     getTomorrowOrder,
+    getTomorrowRemoved,
     getRecentCookNames,
     saveTomorrowOrder,
     getWasteReport,

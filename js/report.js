@@ -818,14 +818,15 @@ function chefCombinedSheet(branches, perBranch, order) {
       const key = chef ? it.id : it.id + "|" + name;
       if (!rows.has(key)) rows.set(key, {
         category: it.category || "-", name, size: itemPanSize(it),
-        parts: {}, rank: categoryRank(it.category), sort: order.has(it.id) ? order.get(it.id) : 9999
+        parts: {}, notes: [], rank: categoryRank(it.category), sort: order.has(it.id) ? order.get(it.id) : 9999
       });
       const row = rows.get(key);
       row.parts[branch] = chefOrderPart(branch, e, it);
+      if (String(e.notes || "").trim()) row.notes.push(`${branch}: ${String(e.notes).trim()}`);
     });
   });
   const list = [...rows.values()].map(r => ({
-    ...r, total: chefTotalText(Object.values(r.parts)),
+    ...r, total: chefTotalText(Object.values(r.parts)), notes: r.notes.join(" · "),
     byBranch: branches.map(b => (r.parts[b] ? r.parts[b].text : ""))
   })).sort((a, b) => a.rank - b.rank || a.sort - b.sort);
   const used = branches.filter((b, i) => list.some(r => r.byBranch[i]));
@@ -840,8 +841,8 @@ function chefCombinedLayout(sheet) {
   const n = sheet.branches.length;
   const branchW = n > 3 ? 24 : 30;
   return {
-    cols: [15.2, 15.2, 15.2, 40, 23.68, 40, ...sheet.branches.map(() => branchW)],
-    headers: ["استلام", "الفئة", "تسليم", "اسم الصنف", "حجم السفنديش", "إجمالي المطلوب", ...sheet.branches]
+    cols: [15.2, 15.2, 15.2, 40, 23.68, 40, ...sheet.branches.map(() => branchW), 50],
+    headers: ["استلام", "الفئة", "تسليم", "اسم الصنف", "حجم السفنديش", "إجمالي المطلوب", ...sheet.branches, "ملاحظات"]
   };
 }
 
@@ -859,7 +860,7 @@ function chefSheetHtml(sheet, date) {
   sheet.rows.forEach(r => { const g = groups[groups.length - 1]; if (g && g.category === r.category) g.rows.push(r); else groups.push({ category: r.category, rows: [r] }); });
   const box = () => cell("□", `font-size:${chefPtPx(S.boxFont)}px`);
   const tail = (r) => sheet.combined
-    ? cell(r.total, "font-weight:700;background:#F2F2F2") + r.byBranch.map(t => cell(t)).join("")
+    ? cell(r.total, "font-weight:700;background:#F2F2F2") + r.byBranch.map(t => cell(t)).join("") + cell(r.notes || "")
     : `${cell(r.qty)}${cell(r.rec || "")}${cell(r.rem || "")}${cell(r.notes)}`;
   const body = groups.map(g => g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
       ${box()}
@@ -959,7 +960,7 @@ async function exportTomorrowReportExcel() {
       const start = r;
       g.rows.forEach((x, i) => {
         const row = ws.getRow(r);
-        const tail = sheetData.combined ? [x.total, ...x.byBranch.map(t => t || null)] : [x.qty, x.rec || null, x.rem || null, x.notes || null];
+        const tail = sheetData.combined ? [x.total, ...x.byBranch.map(t => t || null), x.notes || null] : [x.qty, x.rec || null, x.rem || null, x.notes || null];
         ["□", i === 0 ? g.category : null, "□", x.name, x.size, ...tail].forEach((v, ci) => {
           const c = row.getCell(ci + 1);
           if (v !== null) c.value = v;

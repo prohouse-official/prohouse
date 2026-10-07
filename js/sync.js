@@ -74,6 +74,7 @@ const Sync = (() => {
       case "getItems": return await SupaEngine.getItems(p.all === "1");
       case "getDay": return await SupaEngine.getDay(p.date, p.branch);
       case "getTomorrowOrder": return await SupaEngine.getTomorrowOrder(p.date, p.branch);
+      case "getTomorrowRemoved": return await SupaEngine.getTomorrowRemoved(p.date, p.branch);
       case "getWasteReport": return await SupaEngine.getWasteReport(p.date, p.branch);
       case "getJuices": return await SupaEngine.getJuices(p.all === "1");
       case "getJuiceDay": return await SupaEngine.getJuiceDay(p.date, p.branch);
