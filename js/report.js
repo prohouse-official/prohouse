@@ -736,8 +736,11 @@ async function runTomorrowReport() {
       return {
         category: it.category || "-", name: chefReportName(it, (d && d.cookName) || (e && e.cookName)),
         // فرع يطلب بالسفنديشات: الحجم من الطلبية نفسها والعدد عدد سفنديشات
-        size: e && isPanOrderBranch(branch) ? (e.unit || itemPanSize(it)) : itemPanSize({ ...it, unit: it.unit || (e && e.unit) }),
-        qty: !e ? "—" : isPanOrderBranch(branch) ? Number(e.qty) : chefQtyText(Number(e.qty), it.unit || e.unit),
+        // فرع عادي اختار وحدة غير الجرام (سفنديش/طاسة…): الحجم = الوحدة المختارة والعدد رقم بس
+        size: e && isPanOrderBranch(branch) ? (e.unit || itemPanSize(it))
+          : e && e.unit && !isWeightUnit(e.unit) ? e.unit : itemPanSize({ ...it, unit: it.unit || (e && e.unit) }),
+        qty: !e ? "—" : isPanOrderBranch(branch) ? Number(e.qty)
+          : e.unit && !isWeightUnit(e.unit) ? Number(e.qty) : chefQtyText(Number(e.qty), e.unit || it.unit),
         rec: a.rec, rem: a.rem, notes,
         rank: categoryRank(it.category), sort: order.has(it.id) ? order.get(it.id) : 9999
       };
@@ -779,7 +782,9 @@ function chefOrderPart(branch, e, it) {
   const qty = Number(e.qty);
   // صنف بالجرام: حتى فرع السفنديش (الشاطئ) يكتب الجرامات والحجم بس للسفنديش — فيتجمع مع باقي الفروع.
   // رقم صغير (أقل من ٥٠) بفرع سفنديش = عدد سفنديشات مو جرامات
-  const weight = /كجم|كيلو/.test(String(it.unit || "")) ? 1000 : isWeightUnit(it.unit) ? 1 : 0;
+  // فرع عادي: الوحدة اللي اختارها بالطلبية. فرع سفنديش: وحدة الصنف (الوحدة المحفوظة عنده حجم السفنديش)
+  const baseUnit = isPanOrderBranch(branch) ? it.unit : (e.unit || it.unit);
+  const weight = /كجم|كيلو/.test(String(baseUnit || "")) ? 1000 : isWeightUnit(baseUnit) ? 1 : 0;
   if (weight && !(isPanOrderBranch(branch) && qty < 50)) {
     const g = qty * weight;
     return { key: "g", qty: g, text: `${g} جم` };
@@ -788,9 +793,7 @@ function chefOrderPart(branch, e, it) {
     const size = e.unit || itemPanSize(it);
     return { key: "n:" + size, qty, text: chefIsPanSize(size) ? `${qty} (${size})` : String(qty) };
   }
-  const unit = it.unit || e.unit;
-  if (/كجم|كيلو/.test(String(unit || ""))) return { key: "g", qty: qty * 1000, text: `${qty * 1000} جم` };
-  if (isWeightUnit(unit)) return { key: "g", qty, text: `${qty} جم` };
+  const unit = baseUnit;
   return { key: "n:" + (unit || ""), qty, text: chefIsPanSize(unit) ? `${qty} (${unit})` : String(qty) };
 }
 function chefTotalText(parts) {

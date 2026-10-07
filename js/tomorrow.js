@@ -133,7 +133,8 @@ function renderTomorrowView() {
     if (ord && ord.qty) {
       const q = Number(ord.qty);
       if (!isNaN(q) && q > 0) {
-        if (isMealCategory(it.category) || (it.unit && (it.unit.includes("جرام") || it.unit.includes("جم")))) {
+        const u = ord.unit || it.unit;
+        if (tomIsWeightUnit(u) || (isMealCategory(it.category) && !tomIsPanUnit(u))) {
           totalRequestedWeight += q;
           totalEstimatedMeals += q / MEAL_WEIGHT_G;
         }
@@ -340,7 +341,9 @@ function renderTomorrowView() {
                    class="rec-main-input ${isFilled ? 'border-green' : ''}">
             ${panMode ? `<select class="tom-pan-select" ${ro} onchange="onTomorrowPanChange('${item.id}', this.value)" title="حجم السفنديش">
                 ${(() => { const cur = entry.unit || itemPanSize(item) || "1/3"; return [...new Set([cur, ...PAN_SIZES])].map(u => `<option ${u === cur ? "selected" : ""}>${u}</option>`).join(""); })()}
-              </select>` : `<span class="rec-input-unit-label">${item.unit || "جم"}</span>`}
+              </select>` : `<select class="tom-pan-select" ${ro} onchange="onTomorrowPanChange('${item.id}', this.value)" title="وحدة الطلب">
+                ${(() => { const cur = entry.unit || item.unit || "جرام"; return [...new Set([cur, item.unit, "جرام", ...PAN_SIZES].filter(Boolean))].map(u => `<option ${u === cur ? "selected" : ""}>${escHtml(u)}</option>`).join(""); })()}
+              </select>`}
           </div>
 
           <div class="rec-inline-btns">
@@ -473,7 +476,7 @@ function exportTomorrowOrderWhatsApp() {
     .map(it => ({
       name: it.name,
       category: it.category || "عام",
-      unit: it.unit || "جرام",
+      unit: tomorrowOrderUnit(it),
       qty: currentTomorrowOrder[it.id].qty,
       notes: currentTomorrowOrder[it.id].notes || ""
     }));
@@ -489,7 +492,7 @@ function exportTomorrowOrderWhatsApp() {
   orderedItems.forEach(it => {
     if (!byCat[it.category]) byCat[it.category] = [];
     byCat[it.category].push(it);
-    if (isMealCategory(it.category) || it.unit.includes("جرام") || it.unit.includes("جم")) {
+    if (tomIsWeightUnit(it.unit) || (isMealCategory(it.category) && !tomIsPanUnit(it.unit))) {
       totalProteinGrams += Number(it.qty || 0);
     }
   });
@@ -519,6 +522,14 @@ function exportTomorrowOrderWhatsApp() {
   const encoded = encodeURIComponent(msg);
   const waUrl = `https://api.whatsapp.com/send?text=${encoded}`;
   window.open(waUrl, "_blank");
+}
+
+// وحدة الطلب: اللي اختارها الموظف من القائمة، وإلا وحدة الصنف الأصلية
+const tomIsWeightUnit = (u) => /جرام|جم|كجم|كيلو/.test(String(u || ""));
+const tomIsPanUnit = (u) => /\d\/\d|طاسة|صينية|حبة/.test(String(u || ""));
+function tomorrowOrderUnit(it) {
+  const o = currentTomorrowOrder[it.id] || {};
+  return o.unit || it.unit || "جرام";
 }
 
 function onTomorrowPanChange(id, unit) {
@@ -667,7 +678,7 @@ function saveTomorrowNow(showStatus) {
     .map(it => ({ 
       itemId: it.id, 
       itemName: it.name, 
-      unit: isPanOrderBranch(branch) ? (currentTomorrowOrder[it.id].unit || itemPanSize(it) || it.unit || "") : (it.unit || "جرام"),
+      unit: isPanOrderBranch(branch) ? (currentTomorrowOrder[it.id].unit || itemPanSize(it) || it.unit || "") : tomorrowOrderUnit(it),
       category: it.category || "عام",
       isCustom: !!it.isCustom,
       qty: currentTomorrowOrder[it.id].qty, 
