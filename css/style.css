@@ -3505,3 +3505,9 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .rec-input-wrapper:has(.tom-pan-select){ display:flex; align-items:center; gap:6px; }
 .rec-input-wrapper:has(.tom-pan-select) .rec-main-input{ flex:1; min-width:0; padding:0 8px; }
 .rec-input-wrapper .tom-pan-select{ flex:0 0 auto; max-width:112px; height:48px; font-size:13.5px; color:var(--ink, #111); }
+/* تقارير عبداللطيف جميل اليومية */
+.alj-list{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.alj-day{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:var(--shadow); }
+.alj-day b{ display:block; font-size:14px; font-weight:900; margin-bottom:8px; }
+.alj-files{ display:flex; flex-wrap:wrap; gap:8px; }
+.alj-file{ border:1.5px solid var(--line-strong); background:var(--canvas); border-radius:12px; padding:9px 12px; font-family:inherit; font-size:13.5px; font-weight:800; cursor:pointer; color:var(--ink); direction:ltr; }

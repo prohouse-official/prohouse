@@ -1000,6 +1000,14 @@ const SupaEngine = (() => {
     });
   }
 
+  // تقارير عبداللطيف جميل اليومية (مخزن خاص) — قائمة الشهر ورابط تنزيل مؤقت
+  async function aljReports(body) {
+    const res = await fetch(SUPABASE_URL + "/functions/v1/alj-reports", { method: "POST", headers: fnHeaders(), body: JSON.stringify(body) });
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || `alj-reports [${res.status}]`);
+    return out;
+  }
+
   // صورة فاتورة مصروف → مخزن خاص (receipts). بترجع المسار بس؛ العرض برابط مؤقت
   async function uploadReceipt(date, branch, dataUrl) {
     return (await photosFn({ action: "receipt", date, branch, dataUrl })).path;
@@ -1094,6 +1102,7 @@ const SupaEngine = (() => {
     getCustody,
     saveCustody,
     uploadReceipt,
+    aljReports,
     receiptUrl,
     getPayments,
     getCustodyRange,

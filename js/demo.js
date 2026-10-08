@@ -231,6 +231,13 @@
       } else out = { moved: 0 };
       return new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } });
     }
+    if (/supabase\.co\/functions\/v1\/alj-reports/.test(url)) {
+      let body = {}; try { body = JSON.parse(init.body || "{}"); } catch (e) {}
+      const mk = (off) => { const d = riyadh(off), [, m, dd] = d.split("-"); const l = `${Number(dd)} ${["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"][Number(m) - 1]}`;
+        return { date: d, files: [{ name: `Summary ${l}.pdf`, path: `${d.slice(0, 7)}/${d}/Summary ${l}.pdf` }, { name: `Orders (${l}).xlsx`, path: `${d.slice(0, 7)}/${d}/Orders (${l}).xlsx` }] }; };
+      const out = body.action === "url" ? { url: "about:blank" } : { days: [mk(-2), mk(-1)].filter(x => x.date.slice(0, 7) === body.month) };
+      return new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     if (/supabase\.co\/functions\/v1\/forms/.test(url)) {
       let body = {}; try { body = JSON.parse(init.body || "{}"); } catch (e) {}
       const { form, date, branch, ...payload } = body;
