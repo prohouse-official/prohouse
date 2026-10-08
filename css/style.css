@@ -3510,4 +3510,9 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .alj-day{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:12px; box-shadow:var(--shadow); }
 .alj-day b{ display:block; font-size:14px; font-weight:900; margin-bottom:8px; }
 .alj-files{ display:flex; flex-wrap:wrap; gap:8px; }
-.alj-file{ border:1.5px solid var(--line-strong); background:var(--canvas); border-radius:12px; padding:9px 12px; font-family:inherit; font-size:13.5px; font-weight:800; cursor:pointer; color:var(--ink); direction:ltr; }
+.alj-file{ flex:1 1 140px; display:flex; flex-direction:column; align-items:center; gap:4px; border:1.5px solid var(--line-strong); background:var(--canvas); border-radius:14px; padding:12px; font-family:inherit; font-size:14px; font-weight:800; cursor:pointer; color:var(--ink); }
+.alj-file span{ direction:ltr; }
+.alj-file small{ font-size:12px; color:var(--muted); font-weight:800; }
+.alj-file:disabled, .alj-share:disabled{ opacity:.6; }
+.alj-share{ width:100%; min-height:52px; margin-top:12px; border:none; border-radius:14px; background:var(--ink); color:var(--yellow); font-family:inherit; font-size:15.5px; font-weight:900; cursor:pointer; }
+#aljReportDateBar{ margin-bottom:10px; }

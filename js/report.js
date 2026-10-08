@@ -47,11 +47,8 @@ function initReportTab() {
   });
   initTomorrowReportControls();
   initDailyReportControls();
-  const aljMonth = document.getElementById("aljReportMonth");
-  if (aljMonth) {
-    aljMonth.value = todayStr().slice(0, 7);
-    aljMonth.addEventListener("change", loadAljReports);
-  }
+  const aljDate = document.getElementById("aljReportDate");
+  if (aljDate) aljDate.addEventListener("change", () => loadAljReports(aljDate.value));
 
   const modeSel = document.getElementById("reportMode");
   const dayInput = document.getElementById("reportDayInput");
@@ -1170,35 +1167,112 @@ function filterTsProducts(q) {
 
 
 // ==================== تقارير عبداللطيف جميل اليومية ====================
-// نفس ملفي تابسنس بالضبط (ملخص PDF + طلبات Excel) — تنسحب كل يوم ٦:١٥ مساءً وتنحفظ بمخزن خاص.
+// نفس ملفي تابسنس بالضبط (ملخص PDF + طلبات Excel مع سطر المجموع) — تنسحب كل يوم ٦:١٥ مساءً.
+// تختار اليوم من التاريخ، وتنزّل الملفين أو ترسلهم مع بعض (إيميل/واتساب) من زر المشاركة.
 let aljLoadSeq = 0;
-async function loadAljReports() {
-  const view = document.getElementById("aljReportView");
-  if (!view) return;
-  const month = (document.getElementById("aljReportMonth") || {}).value || todayStr().slice(0, 7);
-  const seq = ++aljLoadSeq;
-  view.innerHTML = '<div class="loader">جاري التحميل…</div>';
-  let days;
-  try { days = await SupaEngine.aljReports({ action: "list", month }); }
-  catch (e) { if (seq === aljLoadSeq) view.innerHTML = `<div class="empty-state">⚠ ${escHtml(e.message || String(e))}</div>`; return; }
-  if (seq !== aljLoadSeq) return;
-  const list = (days && days.days) || [];
-  if (!list.length) { view.innerHTML = '<div class="empty-state">ما فيه تقارير لهالشهر للحين.<br>التقرير ينسحب كل يوم الساعة ٦:١٥ مساءً.</div>'; return; }
-  view.innerHTML = `<div class="alj-list">${list.slice().reverse().map(d => {
-    const label = new Date(d.date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "numeric", timeZone: "UTC" });
-    return `<div class="alj-day"><b>${escHtml(label)}</b><div class="alj-files">${d.files.map(f =>
-      `<button type="button" class="alj-file" data-path="${escHtml(f.path)}">${/\.pdf$/i.test(f.name) ? "📄" : "📊"} ${escHtml(f.name)}</button>`).join("")}</div></div>`;
-  }).join("")}</div>`;
-  view.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => openAljFile(b.dataset.path)));
+const aljMonthCache = new Map();
+async function aljMonthDays(month) {
+  if (!aljMonthCache.has(month)) {
+    const out = await SupaEngine.aljReports({ action: "list", month });
+    aljMonthCache.set(month, (out && out.days) || []);
+  }
+  return aljMonthCache.get(month);
 }
 
-async function openAljFile(path) {
-  const win = window.open("", "_blank");
+// بدون تاريخ: آخر يوم انسحب (هالشهر، وإلا الشهر اللي قبله)
+async function loadAljReports(date) {
+  const view = document.getElementById("aljReportView");
+  const inp = document.getElementById("aljReportDate");
+  if (!view) return;
+  const seq = ++aljLoadSeq;
+  view.innerHTML = '<div class="loader">جاري التحميل…</div>';
   try {
-    const out = await SupaEngine.aljReports({ action: "url", path });
-    if (win) win.location = out.url; else window.location.href = out.url;
+    if (typeof date !== "string" || !date) {
+      aljMonthCache.clear();
+      const m = todayStr().slice(0, 7);
+      const prev = addDaysStr(m + "-01", -1).slice(0, 7);
+      const days = [...(await aljMonthDays(m)), ...(await aljMonthDays(prev))].map(d => d.date).sort();
+      date = days.pop() || addDaysStr(todayStr(), -1);
+      if (inp) { inp.value = date; if (inp._phRefresh) inp._phRefresh(); }
+    }
+    const day = (await aljMonthDays(date.slice(0, 7))).find(d => d.date === date);
+    if (seq !== aljLoadSeq) return;
+    renderAljDay(date, day ? day.files : []);
   } catch (e) {
-    if (win) win.close();
-    showToast("⚠ ما قدرنا نفتح الملف — " + (e.message || e));
+    if (seq === aljLoadSeq) view.innerHTML = `<div class="empty-state">⚠ ${escHtml(e.message || String(e))}</div>`;
   }
+}
+
+function renderAljDay(date, files) {
+  const view = document.getElementById("aljReportView");
+  const label = new Date(date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  if (!files.length) {
+    view.innerHTML = `<div class="empty-state">ما فيه تقرير ليوم ${escHtml(label)}.<br>التقرير ينسحب كل يوم الساعة ٦:١٥ مساءً.</div>`;
+    return;
+  }
+  const sorted = files.slice().sort((a, b) => (/\.pdf$/i.test(a.name) ? -1 : 1) - (/\.pdf$/i.test(b.name) ? -1 : 1));
+  view.innerHTML = `<div class="alj-day">
+    <b>${escHtml(label)}</b>
+    <div class="alj-files">${sorted.map(f => `<button type="button" class="alj-file" data-path="${escHtml(f.path)}">
+      ${/\.pdf$/i.test(f.name) ? "📄" : "📊"} <span>${escHtml(f.name)}</span><small>تنزيل</small></button>`).join("")}</div>
+    <button type="button" class="alj-share" id="aljShareBoth">📤 أرسل الملفين (إيميل / واتساب)</button>
+  </div>`;
+  view.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => saveAljFiles([files.find(f => f.path === b.dataset.path)], b)));
+  document.getElementById("aljShareBoth").addEventListener("click", (e) => shareAljFiles(sorted, e.currentTarget));
+}
+
+async function aljFileBlobs(files) {
+  return Promise.all(files.map(async f => {
+    const { url } = await SupaEngine.aljReports({ action: "url", path: f.path });
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("ما قدرنا ننزّل " + f.name);
+    const type = /\.pdf$/i.test(f.name) ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    return new File([await res.blob()], f.name, { type });
+  }));
+}
+
+function aljBusy(btn, on, text) {
+  if (!btn) return;
+  if (on) { btn.dataset.label = btn.innerHTML; btn.disabled = true; btn.textContent = text; }
+  else { btn.disabled = false; if (btn.dataset.label) btn.innerHTML = btn.dataset.label; }
+}
+
+// تنزيل على الجهاز (بالجوال ينفتح الملف ومنه حفظ/مشاركة)
+async function saveAljFiles(files, btn) {
+  aljBusy(btn, true, "⏳ جاري التنزيل…");
+  try {
+    const list = await aljFileBlobs(files);
+    for (const file of list) {
+      const url = URL.createObjectURL(file);
+      const a = document.createElement("a");
+      a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+  } catch (e) {
+    showToast("⚠ " + (e.message || e));
+  } finally { aljBusy(btn, false); }
+}
+
+// الملفين مع بعض بنافذة المشاركة (إيميل، واتساب…) — وإذا الجهاز ما يدعمها ينزلون
+async function shareAljFiles(files, btn) {
+  aljBusy(btn, true, "⏳ جاري التجهيز…");
+  try {
+    const list = await aljFileBlobs(files);
+    if (navigator.canShare && navigator.canShare({ files: list })) {
+      try { await navigator.share({ files: list, title: "تقارير عبداللطيف جميل" }); }
+      catch (e) { if (!e || e.name !== "AbortError") throw e; }
+    } else {
+      for (const file of list) {
+        const url = URL.createObjectURL(file);
+        const a = document.createElement("a");
+        a.href = url; a.download = file.name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      }
+      showToast("✅ نزلوا الملفين");
+    }
+  } catch (e) {
+    showToast("⚠ " + (e.message || e));
+  } finally { aljBusy(btn, false); }
 }

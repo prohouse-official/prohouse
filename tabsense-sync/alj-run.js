@@ -61,6 +61,9 @@ async function uploadFile(storagePath, filePath) {
     for (const iso of days) {
       try {
         const r = await downloadAljReports(page, iso, dir);
+        // سطر المجموع تحت ملف الطلبات (إجمالي / صافي / خصم) — نفس اللي كان ينضاف باليد
+        const { execFileSync } = require("child_process");
+        console.log("ALJ_TOTALS", iso, mask(execFileSync("python3", ["-I", path.join(__dirname, "add_totals.py"), r.orders.path]).toString().trim()));
         const names = fileNames(iso);
         const folder = `${iso.slice(0, 7)}/${iso}`;
         await uploadFile(`${folder}/${names.summary}`, r.summary.path);
