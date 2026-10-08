@@ -63,5 +63,8 @@ jobs:
       - name: Explore TabSense pages (read-only, no numbers)
         if: github.ref_name != 'main'
         working-directory: ./tabsense-sync
+        env:
+          ALJ_DATE: "2026-09-15"
+          ALJ_EXPECT_ROWS: "128"
         run: |
-          node explore-exports.js
+          node alj-reports.js
