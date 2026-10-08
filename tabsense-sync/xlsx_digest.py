@@ -43,6 +43,14 @@ def main(path):
         "formulas": [r for r, _, f, _ in c if f],
         "byCol": {col: [h([(r, v) for r, v, f, _ in c if re.match(col + r"\d", r) and not f]), sorted(set(t for r, _, f, t in c if re.match(col + r"\d", r) and not f))]
                   for col in "ABCDEFGHIJKLMNO"},
+        "G_ws": {
+            "norm": h([(r, re.sub(r"\s+", " ", v).strip()) for r, v, f, _ in c if re.match(r"G\d", r)]),
+            "lf": sum(v.count("\n") for r, v, f, _ in c if re.match(r"G\d", r)),
+            "cr": sum(v.count("\r") for r, v, f, _ in c if re.match(r"G\d", r)),
+            "x000": sum(v.count("_x000") for r, v, f, _ in c if re.match(r"G\d", r)),
+            "trail": sum(1 for r, v, f, _ in c if re.match(r"G\d", r) and v != v.strip()),
+            "amp": sum(v.count("&") for r, v, f, _ in c if re.match(r"G\d", r)),
+        },
         "header": h([(r, v) for r, v, _, _ in c if re.match(r"[A-Z]+1$", r)]),
         "cols": h(cols.group(0) if cols else ""),
         "fonts": len(re.findall(r"<font>|<font ", styles)),
