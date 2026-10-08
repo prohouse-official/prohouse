@@ -66,6 +66,7 @@ jobs:
         env:
           ALJ_DATE: "2026-09-15"
           ALJ_EXPECT_ROWS: "128"
+          ALJ_DIAG: "filters"
         run: |
           pip install --quiet pymupdf
           node alj-reports.js

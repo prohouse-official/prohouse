@@ -150,6 +150,21 @@ if (require.main === module) {
       await Promise.all([page.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
         page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')]);
       const dir = path.join(__dirname, "alj-out");
+      if (process.env.ALJ_DIAG === "filters") {
+        await page.goto(SUMMARY_URL, { waitUntil: "networkidle" }); await page.waitForTimeout(2500); await useArabic(page); await setDate(page, iso);
+        const f = await page.evaluate(() => {
+          const sel = (q) => [...document.querySelectorAll(q)].map(s => ({ id: s.id, name: s.name, multiple: s.multiple,
+            options: [...s.options].map(o => ({ v: o.value, t: o.textContent.trim(), sel: o.selected })) }));
+          return {
+            selects: sel("select"),
+            checks: [...document.querySelectorAll('.summary-report-checkbox-filter input[type="checkbox"]')].map(c => ({ v: c.value, id: c.id, name: c.getAttribute("name") || c.getAttribute("data-report") || "", checked: c.checked, label: (c.closest("label") || c.parentElement || {}).innerText })),
+            branchFn: typeof getSelectedBranchIds === "function" ? String(getSelectedBranchIds).slice(0, 400) : null,
+            branchIds: typeof getSelectedBranchIds === "function" ? getSelectedBranchIds() : null
+          };
+        });
+        console.log("ALJ_FILTERS", mask(JSON.stringify(f)).slice(0, 6000));
+        return;
+      }
       if (process.env.ALJ_DIAG === "1") {
         await page.goto(SUMMARY_URL, { waitUntil: "networkidle" }); await page.waitForTimeout(2500); await useArabic(page); await setDate(page, iso);
         console.log("ALJ_DIAG_SUMMARY", JSON.stringify(await diagnose(page, "#downloadPdfDaily")));
