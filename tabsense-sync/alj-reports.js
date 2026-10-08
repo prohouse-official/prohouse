@@ -185,6 +185,18 @@ if (require.main === module) {
       try { sheetSha = crypto.createHash("sha256").update(execFileSync("unzip", ["-p", xlsx, "xl/worksheets/sheet1.xml"])).digest("hex").slice(0, 16); } catch (e) {}
       const [yy, mm, dd] = iso.split("-");
       const pdfHasDate = pdf.toString("latin1").includes(`${dd}-${mm}-${yy}`);
+      let dates = [];
+      try {
+        const strs = execFileSync("unzip", ["-p", xlsx, "xl/sharedStrings.xml"]).toString("utf8");
+        const sheet = execFileSync("unzip", ["-p", xlsx, "xl/worksheets/sheet1.xml"]).toString("utf8");
+        const all = [...(strs + sheet).matchAll(/(20\d\d-\d\d-\d\d)[ T]\d\d:/g)].map(m => m[1]);
+        dates = [...new Set(all)].slice(0, 10);
+      } catch (e) {}
+      const filterInfo = await page.evaluate(() => {
+        const inp = document.querySelector('input[name="datefilter"]');
+        return { val: inp ? inp.value : "", cls: inp ? inp.className : "", others: [...document.querySelectorAll("input")].filter(i => /date|from|to|start|end/i.test(i.name + i.id + i.className)).map(i => (i.name || i.id) + "=" + i.value).slice(0, 8) };
+      });
+      console.log("ALJ_DATES", JSON.stringify({ dates, rowsDelta: expect ? Math.sign(rows - expect) : null, filterInfo }));
       console.log("ALJ_TEST", JSON.stringify({
         summary: { name: mask(r.summary.name), bytes: pdf.length, isPdf: pdf.slice(0, 4).toString() === "%PDF", pages: pdfPages, pdfHasDate },
         orders: { name: mask(r.orders.name), bytes: fs.statSync(xlsx).size, rowsMatchExpected: expect ? rows === expect : null, sheetSha, headers: headers.map(mask) }
