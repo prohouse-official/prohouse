@@ -1,0 +1,49 @@
+name: ALJ Daily Reports
+
+# تقريرين عبداللطيف جميل اليوميين من تابسنس (ملخص PDF + طلبات Excel) — نفس الملفات بدون تعديل.
+# كل يوم ٦:١٥ مساءً بتوقيت الرياض (بعد إغلاق الفرع)، وتقدر تشغّله يدوي لأيام قديمة.
+# المستودع عام: الملفات تروح للمخزن الخاص بالموقع بس — ما تنرفع كـ artifacts وما تنطبع أرقام.
+on:
+  schedule:
+    - cron: '15 15 * * *'
+  workflow_dispatch:
+    inputs:
+      start:
+        description: "From date YYYY-MM-DD (empty = today)"
+        required: false
+        default: ""
+      end:
+        description: "To date YYYY-MM-DD (empty = same as start)"
+        required: false
+        default: ""
+
+jobs:
+  alj-reports:
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install
+        working-directory: ./tabsense-sync
+        run: |
+          npm ci || npm install
+          npx playwright install --with-deps chromium
+      - name: Create config.json from GitHub Secret
+        working-directory: ./tabsense-sync
+        env:
+          TABSENSE_CONFIG: ${{ secrets.TABSENSE_CONFIG_JSON }}
+        run: |
+          if [ -z "$TABSENSE_CONFIG" ]; then echo "TABSENSE_CONFIG_JSON secret is not set"; exit 1; fi
+          echo "$TABSENSE_CONFIG" > config.json
+      - name: Download and store ALJ reports
+        working-directory: ./tabsense-sync
+        env:
+          ALJ_START: ${{ github.event.inputs.start }}
+          ALJ_END: ${{ github.event.inputs.end }}
+        run: node alj-run.js

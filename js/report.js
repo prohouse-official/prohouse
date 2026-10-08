@@ -37,14 +37,21 @@ function initReportTab() {
     const type = e.target.value;
     const isTomorrow = type === "tomorrow";
     document.getElementById("dailyReportControls").classList.toggle("hidden", type !== "daily");
-    document.getElementById("entriesReportControls").classList.toggle("hidden", type === "daily" || isTomorrow);
+    document.getElementById("entriesReportControls").classList.toggle("hidden", type === "daily" || isTomorrow || type === "alj");
     document.getElementById("tomorrowReportControls").classList.toggle("hidden", !isTomorrow);
+    document.getElementById("aljReportControls").classList.toggle("hidden", type !== "alj");
+    if (type === "alj") loadAljReports();
     if (isTomorrow) runTomorrowReport();
     if (type === "daily") runDailyReport();
     if (type === "entries") runReport();
   });
   initTomorrowReportControls();
   initDailyReportControls();
+  const aljMonth = document.getElementById("aljReportMonth");
+  if (aljMonth) {
+    aljMonth.value = todayStr().slice(0, 7);
+    aljMonth.addEventListener("change", loadAljReports);
+  }
 
   const modeSel = document.getElementById("reportMode");
   const dayInput = document.getElementById("reportDayInput");
@@ -1159,4 +1166,39 @@ function filterTsProducts(q) {
   document.querySelectorAll("#tsProductsTable tbody tr").forEach(tr => {
     tr.style.display = !needle || tr.dataset.name.includes(needle) ? "" : "none";
   });
+}
+
+
+// ==================== تقارير عبداللطيف جميل اليومية ====================
+// نفس ملفي تابسنس بالضبط (ملخص PDF + طلبات Excel) — تنسحب كل يوم ٦:١٥ مساءً وتنحفظ بمخزن خاص.
+let aljLoadSeq = 0;
+async function loadAljReports() {
+  const view = document.getElementById("aljReportView");
+  if (!view) return;
+  const month = (document.getElementById("aljReportMonth") || {}).value || todayStr().slice(0, 7);
+  const seq = ++aljLoadSeq;
+  view.innerHTML = '<div class="loader">جاري التحميل…</div>';
+  let days;
+  try { days = await SupaEngine.aljReports({ action: "list", month }); }
+  catch (e) { if (seq === aljLoadSeq) view.innerHTML = `<div class="empty-state">⚠ ${escHtml(e.message || String(e))}</div>`; return; }
+  if (seq !== aljLoadSeq) return;
+  const list = (days && days.days) || [];
+  if (!list.length) { view.innerHTML = '<div class="empty-state">ما فيه تقارير لهالشهر للحين.<br>التقرير ينسحب كل يوم الساعة ٦:١٥ مساءً.</div>'; return; }
+  view.innerHTML = `<div class="alj-list">${list.slice().reverse().map(d => {
+    const label = new Date(d.date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "numeric", timeZone: "UTC" });
+    return `<div class="alj-day"><b>${escHtml(label)}</b><div class="alj-files">${d.files.map(f =>
+      `<button type="button" class="alj-file" data-path="${escHtml(f.path)}">${/\.pdf$/i.test(f.name) ? "📄" : "📊"} ${escHtml(f.name)}</button>`).join("")}</div></div>`;
+  }).join("")}</div>`;
+  view.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => openAljFile(b.dataset.path)));
+}
+
+async function openAljFile(path) {
+  const win = window.open("", "_blank");
+  try {
+    const out = await SupaEngine.aljReports({ action: "url", path });
+    if (win) win.location = out.url; else window.location.href = out.url;
+  } catch (e) {
+    if (win) win.close();
+    showToast("⚠ ما قدرنا نفتح الملف — " + (e.message || e));
+  }
 }
