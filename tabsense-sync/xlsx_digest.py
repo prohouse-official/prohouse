@@ -14,6 +14,7 @@ def cells(path):
         v = re.search(r"<v>(.*?)</v>", inner or "", re.S)
         f = re.search(r"<f\b", inner or "")
         t = re.search(r'\bt="(\w+)"', attrs)
+        typ = t.group(1) if t else "n"
         if t and t.group(1) == "s" and v:
             val = strings[int(v.group(1))]
         elif t and t.group(1) == "inlineStr":
@@ -27,7 +28,7 @@ def cells(path):
             val = ""
         if val == "" and not f:
             continue
-        out.append((ref, val, "F" if f else ""))
+        out.append((ref, val, "F" if f else "", typ))
     return sorted(out), sheet, z
 
 
@@ -37,9 +38,12 @@ def main(path):
     cols = re.search(r"<cols>.*?</cols>", sheet, re.S)
     styles = z.read("xl/styles.xml").decode("utf-8")
     print(json.dumps({
-        "values": h([(r, v) for r, v, _ in c]),
-        "values_no_last_row": h([(r, v) for r, v, f in c if not f]),
-        "formulas": [r for r, _, f in c if f],
+        "values": h([(r, v) for r, v, _, _ in c]),
+        "values_no_last_row": h([(r, v) for r, v, f, _ in c if not f]),
+        "formulas": [r for r, _, f, _ in c if f],
+        "byCol": {col: [h([(r, v) for r, v, f, _ in c if re.match(col + r"\d", r) and not f]), sorted(set(t for r, _, f, t in c if re.match(col + r"\d", r) and not f))]
+                  for col in "ABCDEFGHIJKLMNO"},
+        "header": h([(r, v) for r, v, _, _ in c if re.match(r"[A-Z]+1$", r)]),
         "cols": h(cols.group(0) if cols else ""),
         "fonts": len(re.findall(r"<font>|<font ", styles)),
         "xfs": re.search(r'<cellXfs count="(\d+)"', styles).group(1) if re.search(r'<cellXfs count="(\d+)"', styles) else "?",

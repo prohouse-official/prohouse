@@ -58,6 +58,7 @@ function initReceivingModule() {
 
 let receivingLoadSeq = 0;
 let receivingLoadOk = true;
+let receivingOrderedIds = new Set();
 async function loadReceivingData(date, branch) {
   const seq = ++receivingLoadSeq; // تنقّل سريع بين الأيام: الطلب القديم ما يعرض أرقامه تحت تاريخ جديد
   await receivingAutosave.flush(); // أرقام اليوم اللي كان مفتوح بتنحفظ عيومها قبل ما نفتح يوم تاني
@@ -75,6 +76,8 @@ async function loadReceivingData(date, branch) {
   const requested = await loadRequestedOrder(currentReceivingDate, currentReceivingBranch);
   if (seq !== receivingLoadSeq) return;
   currentReceivingOrdered = requested.qty || {};
+  // الأصناف اللي انطلبت فعلاً لهاليوم (كمية أكبر من صفر) — إذا فيه طلبية، الاستلام يعرض اللي انطلب بس
+  receivingOrderedIds = new Set(Object.keys(currentReceivingOrdered).filter(id => Number(currentReceivingOrdered[id]) > 0));
   // فرع يطلب بالسفنديشات ويستلم بالجرام: الطلب ينعرض «1/3 × 2» بدون مقارنة زائد/ناقص
   receivingPanMode = isPanOrderBranch(currentReceivingBranch);
   receivingOrderLabel = {};
@@ -173,6 +176,13 @@ function getAllReceivingActiveItems() {
       const d = currentReceivingData[it.id];
       const hasReceived = d && d.received !== "" && Number(d.received) > 0;
       return hasReceived || currentReceivingOrdered[it.id] !== undefined || currentReceivingAddedIds.has(it.id);
+    }
+    // فيه طلبية لهاليوم: الصنف الثابت يطلع بس إذا انطلب، أو انسجل له استلام، أو انضاف يدوي
+    // (اللي انشال من طلبية الغد ما ينطلب، فما يطلع بالاستلام)
+    if (receivingOrderedIds.size) {
+      const d = currentReceivingData[it.id];
+      const touched = d && d.received !== "" && d.received != null;
+      return touched || receivingOrderedIds.has(it.id) || currentReceivingAddedIds.has(it.id);
     }
     return true;
   }).map(it => {
