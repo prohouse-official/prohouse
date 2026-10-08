@@ -136,6 +136,19 @@ if (require.main === module) {
         console.log("ALJ_DIAG_SUMMARY", JSON.stringify(await diagnose(page, "#downloadPdfDaily")));
         await page.goto(ORDERS_URL, { waitUntil: "networkidle" }); await page.waitForTimeout(2500); await useArabic(page); await setDate(page, iso);
         console.log("ALJ_DIAG_ORDERS", JSON.stringify(await diagnose(page, "button.buttons-excel")));
+        await page.waitForTimeout(15000);
+        await page.goto(`${BASE}/reports/export-history`, { waitUntil: "networkidle" }); await page.waitForTimeout(3000);
+        const hist = await page.evaluate(() => {
+          const t = document.querySelector("table");
+          return {
+            headers: t ? [...t.querySelectorAll("thead th")].map(x => x.innerText.trim()) : [],
+            rows: t ? [...t.querySelectorAll("tbody tr")].slice(0, 6).map(tr => [...tr.querySelectorAll("td")].map(td => {
+              const a = td.querySelector("a, button");
+              return td.innerText.trim().slice(0, 60) + (a ? " [" + a.tagName + " " + (a.getAttribute("href") || "") + " " + (a.className || "") + "]" : "");
+            })) : []
+          };
+        });
+        console.log("ALJ_DIAG_HISTORY", mask(JSON.stringify(hist)));
         return;
       }
       const r = await downloadAljReports(page, iso, dir);
