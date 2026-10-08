@@ -183,7 +183,7 @@ if (require.main === module) {
       } catch (e) { headers = ["(unzip failed) " + mask(e.message)]; }
       execFileSync("python3", ["-I", path.join(__dirname, "add_totals.py"), r.orders.path]);
       console.log("ALJ_DIGEST", execFileSync("python3", ["-I", path.join(__dirname, "xlsx_digest.py"), r.orders.path]).toString().trim());
-      try { console.log("ALJ_PDF_DIGEST", execFileSync("python3", ["-I", path.join(__dirname, "pdf_digest.py"), r.summary.path]).toString().trim()); }
+      try { console.log("ALJ_PDF_DIGEST", execFileSync("python3", [path.join(__dirname, "pdf_digest.py"), r.summary.path]).toString().trim()); }
       catch (e) { console.log("ALJ_PDF_DIGEST_FAILED", mask(e.message).slice(0, 100)); }
       const expect = Number(process.env.ALJ_EXPECT_ROWS || 0);
       const crypto = require("crypto");
