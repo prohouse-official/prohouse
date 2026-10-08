@@ -59,6 +59,7 @@ async function uploadFile(storagePath, filePath) {
       page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')]);
     const dir = path.join(__dirname, "alj-out");
     for (const iso of days) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const r = await downloadAljReports(page, iso, dir);
         // سطر المجموع تحت ملف الطلبات (إجمالي / صافي / خصم) — نفس اللي كان ينضاف باليد
@@ -69,11 +70,14 @@ async function uploadFile(storagePath, filePath) {
         await uploadFile(`${folder}/${names.summary}`, r.summary.path);
         await uploadFile(`${folder}/${names.orders}`, r.orders.path);
         console.log("ALJ_OK", iso);
+        break;
       } catch (e) {
-        failed++;
-        console.error("ALJ_FAIL", iso, mask(e.message));
+        // محاولة ثانية مرة وحدة — تابسنس أحياناً يتأخر
+        if (attempt === 2) { failed++; console.error("ALJ_FAIL", iso, mask(e.message)); }
+        else console.error("ALJ_RETRY", iso, mask(e.message).slice(0, 80));
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
+      }
       }
     }
   } finally {

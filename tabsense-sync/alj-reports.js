@@ -40,7 +40,9 @@ async function setDate(page, iso) {
 const HISTORY_URL = `${BASE}/reports/export-history`;
 
 async function readHistory(page) {
-  await page.goto(HISTORY_URL, { waitUntil: "networkidle" });
+  // "load" بدل "networkidle": صفحة السجل أحياناً تضل تحمّل أشياء جانبية وتعلّق الانتظار
+  await page.goto(HISTORY_URL, { waitUntil: "load", timeout: 60000 });
+  await page.waitForSelector("table tbody tr", { timeout: 20000 }).catch(() => {});
   await page.waitForTimeout(1500);
   return page.evaluate(() => [...document.querySelectorAll("table tbody tr")].map(tr => {
     const tds = [...tr.querySelectorAll("td")].map(td => td.innerText.trim());
