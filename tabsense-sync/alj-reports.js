@@ -117,6 +117,16 @@ async function downloadSummaryPdf(page, iso, dir) {
   await setDate(page, iso);
   const out = path.join(dir, `summary-${iso}.pdf`);
   const name = await exportViaHistory(page, () => page.click("#downloadPdfDaily"), /ملخص|summary/i, out);
+  // تابسنس يحفظ اختيار الفروع ويطبقه على صفحة الطلبات — نرجّعه فاضي (= الكل) بعد التصدير
+  await page.goto(SUMMARY_URL, { waitUntil: "networkidle" }).catch(() => {});
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    const el = window.$ && $("#filter-branches");
+    if (el && el.length) el.val([]).trigger("change");
+    const btn = document.querySelector("#applyChartFilter") || document.querySelector("#applyChartFilterBlur") || document.querySelector(".applyBtn");
+    if (btn) btn.click();
+  });
+  await page.waitForTimeout(2000);
   return { path: out, name };
 }
 
@@ -138,8 +148,9 @@ async function downloadOrdersExcel(page, iso, dir) {
 
 async function downloadAljReports(page, iso, dir) {
   fs.mkdirSync(dir, { recursive: true });
-  const summary = await downloadSummaryPdf(page, iso, dir);
+  // الطلبات أول (بالإعداد الافتراضي = كل الفروع)، وبعدين الملخص بالفرعين مختارين
   const orders = await downloadOrdersExcel(page, iso, dir);
+  const summary = await downloadSummaryPdf(page, iso, dir);
   return { summary, orders };
 }
 
