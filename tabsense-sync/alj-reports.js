@@ -99,10 +99,21 @@ async function diagnose(page, selector) {
   return { selector, ...info, handlers: (info.handlers || []).map(mask), requests: reqs.slice(0, 25), pages: page.context().pages().map(p => mask(p.url()).slice(0, 120)) };
 }
 
+// نفس إعدادات الملف اللي كان ينرسل: الفرعين (Prohouse و Prohouse 2) مختارين بالاسم، وكل الأجهزة
+async function selectAllBranches(page) {
+  await page.evaluate(() => {
+    const el = window.$ && $("#filter-branches");
+    if (!el || !el.length) return;
+    el.val([...el[0].options].map(o => o.value)).trigger("change");
+  });
+  await page.waitForTimeout(800);
+}
+
 async function downloadSummaryPdf(page, iso, dir) {
   await page.goto(SUMMARY_URL, { waitUntil: "networkidle" });
   await page.waitForTimeout(2500);
   await useArabic(page);
+  await selectAllBranches(page);
   await setDate(page, iso);
   const out = path.join(dir, `summary-${iso}.pdf`);
   const name = await exportViaHistory(page, () => page.click("#downloadPdfDaily"), /ملخص|summary/i, out);
