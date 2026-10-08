@@ -148,9 +148,10 @@ async function downloadOrdersExcel(page, iso, dir) {
 
 async function downloadAljReports(page, iso, dir) {
   fs.mkdirSync(dir, { recursive: true });
-  // الطلبات أول (بالإعداد الافتراضي = كل الفروع)، وبعدين الملخص بالفرعين مختارين
-  const orders = await downloadOrdersExcel(page, iso, dir);
+  // الملخص أول (الفرعين مختارين — نفس الملف المرسل)، وبعد التصدير يرجع اختيار الفروع فاضي،
+  // وبعدين الطلبات بالإعداد الافتراضي (كل الفروع)
   const summary = await downloadSummaryPdf(page, iso, dir);
+  const orders = await downloadOrdersExcel(page, iso, dir);
   return { summary, orders };
 }
 
