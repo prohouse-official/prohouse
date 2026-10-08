@@ -84,7 +84,7 @@ async function loadBranchStatus(branch, dash) {
   const orderedToday = new Set();
   try {
     const ord = await Sync.get("getTomorrowOrder", { date: today, branch }, "tomorrow:" + today + ":" + branch);
-    (ord || []).forEach(o => orderedToday.add(o.itemId));
+    (ord || []).forEach(o => { if (Number(o.qty) > 0) orderedToday.add(o.itemId); });
   } catch (e) { /* بدون طلبية: نعدّ الثابت بس */ }
   const receivedPositive = new Set(items.filter(it => it.received !== "" && it.received != null && Number(it.received) > 0).map(it => it.itemId));
   const recIds = Items.current.filter(it => {
@@ -92,6 +92,8 @@ async function loadBranchStatus(branch, dash) {
     const b = itemBranches(it);
     if (b.length && !b.includes(branch)) return false;
     if (isOptionalItem(it)) return receivedPositive.has(it.id) || orderedToday.has(it.id);
+    // نفس شاشة الاستلام: إذا فيه طلبية لهاليوم، الثابت يطلع بس إذا انطلب أو انسجل له استلام
+    if (orderedToday.size) return orderedToday.has(it.id) || touchedIds.has(it.id);
     return true;
   }).map(it => it.id);
   const catalog = new Set(Items.current.map(it => it.id));

@@ -181,6 +181,8 @@ if (require.main === module) {
         const strings = execFileSync("unzip", ["-p", xlsx, "xl/sharedStrings.xml"]).toString("utf8");
         headers = [...strings.matchAll(/<t[^>]*>([^<]*)<\/t>/g)].slice(0, 15).map(m => m[1]);
       } catch (e) { headers = ["(unzip failed) " + mask(e.message)]; }
+      execFileSync("python3", ["-I", path.join(__dirname, "add_totals.py"), r.orders.path]);
+      console.log("ALJ_DIGEST", execFileSync("python3", ["-I", path.join(__dirname, "xlsx_digest.py"), r.orders.path]).toString().trim());
       const expect = Number(process.env.ALJ_EXPECT_ROWS || 0);
       const crypto = require("crypto");
       let sheetSha = "";
