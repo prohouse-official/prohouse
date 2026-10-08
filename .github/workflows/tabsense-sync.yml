@@ -66,6 +66,5 @@ jobs:
         env:
           ALJ_DATE: "2026-09-15"
           ALJ_EXPECT_ROWS: "128"
-          ALJ_DIAG: "1"
         run: |
           node alj-reports.js

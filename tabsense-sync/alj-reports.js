@@ -35,30 +35,41 @@ async function setDate(page, iso) {
   await page.waitForTimeout(4000);
 }
 
-// زر التنزيل: إما ينزّل الملف مباشرة، أو يفتح تبويب فيه الملف — نتعامل مع الحالتين
-async function captureDownload(page, click, outPath) {
-  const ctx = page.context();
-  const dl = page.waitForEvent("download", { timeout: 60000 }).then(d => ({ d })).catch(() => null);
-  const pop = ctx.waitForEvent("page", { timeout: 60000 }).then(p => ({ p })).catch(() => null);
-  await click();
-  const first = await Promise.race([dl, pop]);
-  if (first && first.d) {
-    await first.d.saveAs(outPath);
-    return first.d.suggestedFilename();
+// التصدير بتابسنس ما ينزّل الملف مباشرة: يجهّزه بصفحة "سجل التصدير" وينزل من هناك.
+// فنطلب التصدير، وننتظر لين يطلع سطر جديد (رقم أكبر من آخر سطر قبل الطلب) جاهز، وننزّله زي ما هو.
+const HISTORY_URL = `${BASE}/reports/export-history`;
+
+async function readHistory(page) {
+  await page.goto(HISTORY_URL, { waitUntil: "networkidle" });
+  await page.waitForTimeout(1500);
+  return page.evaluate(() => [...document.querySelectorAll("table tbody tr")].map(tr => {
+    const tds = [...tr.querySelectorAll("td")].map(td => td.innerText.trim());
+    const a = tr.querySelector('a[href*="/export-history/"][href$="/download"]');
+    const m = a && a.getAttribute("href").match(/export-history\/(\d+)\/download/);
+    return { id: m ? Number(m[1]) : 0, href: a ? a.href : "", text: tds.join(" | ") };
+  }).filter(r => r.id));
+}
+
+async function exportViaHistory(page, trigger, nameRe, outPath) {
+  const before = Math.max(0, ...(await readHistory(page)).map(r => r.id));
+  await trigger();
+  // الزر يفتح سجل التصدير بتبويب جديد — نسكّره
+  await page.waitForTimeout(3000);
+  for (const p of page.context().pages()) if (p !== page) await p.close().catch(() => {});
+  for (let i = 0; i < 30; i++) {
+    const row = (await readHistory(page)).find(r => r.id > before && nameRe.test(r.text));
+    if (row && /جاهز|ready|completed/i.test(row.text)) {
+      const res = await page.context().request.get(row.href);
+      if (!res.ok()) throw new Error("تنزيل من سجل التصدير فشل [" + res.status() + "]");
+      fs.writeFileSync(outPath, await res.body());
+      const cd = res.headers()["content-disposition"] || "";
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
+      return m ? decodeURIComponent(m[1]) : path.basename(outPath);
+    }
+    if (row && /فشل|failed|error/i.test(row.text)) throw new Error("التصدير فشل بتابسنس");
+    await page.waitForTimeout(5000);
   }
-  if (first && first.p) {
-    const p = first.p;
-    const inner = await Promise.race([p.waitForEvent("download", { timeout: 60000 }).then(d => ({ d })).catch(() => null), p.waitForLoadState("load").then(() => null).catch(() => null)]);
-    if (inner && inner.d) { await inner.d.saveAs(outPath); await p.close().catch(() => {}); return inner.d.suggestedFilename(); }
-    const url = p.url();
-    const res = await ctx.request.get(url);
-    fs.writeFileSync(outPath, await res.body());
-    await p.close().catch(() => {});
-    return decodeURIComponent(url.split("/").pop().split("?")[0] || "file");
-  }
-  const late = await dl;
-  if (late && late.d) { await late.d.saveAs(outPath); return late.d.suggestedFilename(); }
-  throw new Error("ما نزل ملف");
+  throw new Error("التصدير ما جهز خلال دقيقتين ونص");
 }
 
 // تشخيص (تجربة بس): وش بيصير لما ينضغط الزر — روابط الطلبات ونوعها، بدون أرقام
@@ -86,7 +97,7 @@ async function downloadSummaryPdf(page, iso, dir) {
   await useArabic(page);
   await setDate(page, iso);
   const out = path.join(dir, `summary-${iso}.pdf`);
-  const name = await captureDownload(page, () => page.click("#downloadPdfDaily"), out);
+  const name = await exportViaHistory(page, () => page.click("#downloadPdfDaily"), /ملخص|summary/i, out);
   return { path: out, name };
 }
 
@@ -102,7 +113,7 @@ async function downloadOrdersExcel(page, iso, dir) {
   });
   await page.waitForTimeout(3000);
   const out = path.join(dir, `orders-${iso}.xlsx`);
-  const name = await captureDownload(page, () => page.locator("button.buttons-excel").first().click(), out);
+  const name = await exportViaHistory(page, () => page.locator("button.buttons-excel").first().click(), /الطلبات|orders/i, out);
   return { path: out, name };
 }
 
@@ -163,9 +174,14 @@ if (require.main === module) {
         headers = [...strings.matchAll(/<t[^>]*>([^<]*)<\/t>/g)].slice(0, 15).map(m => m[1]);
       } catch (e) { headers = ["(unzip failed) " + mask(e.message)]; }
       const expect = Number(process.env.ALJ_EXPECT_ROWS || 0);
+      const crypto = require("crypto");
+      let sheetSha = "";
+      try { sheetSha = crypto.createHash("sha256").update(execFileSync("unzip", ["-p", xlsx, "xl/worksheets/sheet1.xml"])).digest("hex").slice(0, 16); } catch (e) {}
+      const [yy, mm, dd] = iso.split("-");
+      const pdfHasDate = pdf.toString("latin1").includes(`${dd}-${mm}-${yy}`);
       console.log("ALJ_TEST", JSON.stringify({
-        summary: { name: mask(r.summary.name), bytes: pdf.length, isPdf: pdf.slice(0, 4).toString() === "%PDF", pages: pdfPages },
-        orders: { name: mask(r.orders.name), bytes: fs.statSync(xlsx).size, rowsMatchExpected: expect ? rows === expect : null, headers: headers.map(mask) }
+        summary: { name: mask(r.summary.name), bytes: pdf.length, isPdf: pdf.slice(0, 4).toString() === "%PDF", pages: pdfPages, pdfHasDate },
+        orders: { name: mask(r.orders.name), bytes: fs.statSync(xlsx).size, rowsMatchExpected: expect ? rows === expect : null, sheetSha, headers: headers.map(mask) }
       }));
     } catch (e) {
       console.error("ALJ_TEST_FAILED", mask(e.message));
