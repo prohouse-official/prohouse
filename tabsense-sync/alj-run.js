@@ -49,18 +49,25 @@ async function uploadFile(storagePath, filePath) {
   const days = dateList(start, end);
   if (!days.length || days.length > 40) throw new Error("فترة غلط");
   const browser = await chromium.launch({ headless: true });
-  const page = await (await browser.newContext({ viewport: { width: 1600, height: 900 }, acceptDownloads: true })).newPage();
-  let failed = 0;
-  try {
+  // كل يوم بجلسة جديدة (دخول من جديد): الملخص يطلع بنفس الإعدادات اللي اتجرّبت وطلعت مطابقة للملف المرسل
+  async function freshPage() {
+    const ctx = await browser.newContext({ viewport: { width: 1600, height: 900 }, acceptDownloads: true });
+    const page = await ctx.newPage();
     await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
     await page.fill('input[type="email"], input[name="email"]', config.email);
     await page.fill('input[type="password"], input[name="password"]', config.password);
     await Promise.all([page.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
       page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')]);
+    return page;
+  }
+  let failed = 0;
+  try {
     const dir = path.join(__dirname, "alj-out");
     for (const iso of days) {
       for (let attempt = 1; attempt <= 2; attempt++) {
+      let page = null;
       try {
+        page = await freshPage();
         const r = await downloadAljReports(page, iso, dir);
         // سطر المجموع تحت ملف الطلبات (إجمالي / صافي / خصم) — نفس اللي كان ينضاف باليد
         const { execFileSync } = require("child_process");
@@ -77,6 +84,7 @@ async function uploadFile(storagePath, filePath) {
         else console.error("ALJ_RETRY", iso, mask(e.message).slice(0, 80));
       } finally {
         fs.rmSync(dir, { recursive: true, force: true });
+        if (page) await page.context().close().catch(() => {});
       }
       }
     }
