@@ -61,6 +61,25 @@ async function captureDownload(page, click, outPath) {
   throw new Error("ما نزل ملف");
 }
 
+// تشخيص (تجربة بس): وش بيصير لما ينضغط الزر — روابط الطلبات ونوعها، بدون أرقام
+async function diagnose(page, selector) {
+  const reqs = [];
+  const onReq = (r) => reqs.push(r.method() + " " + mask(r.url()).slice(0, 160));
+  const onRes = async (r) => { const ct = r.headers()["content-type"] || ""; if (!/image|font|css/.test(ct)) reqs.push("RES " + r.status() + " " + ct.slice(0, 40) + " " + mask(r.url()).slice(0, 120)); };
+  page.on("request", onReq); page.on("response", onRes);
+  const info = await page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    if (!el) return { found: false };
+    const jq = window.$ && $._data ? ($._data(el, "events") || {}) : {};
+    const handlers = Object.values(jq).flat().map(h => String(h.handler).slice(0, 600));
+    return { found: true, visible: !!(el.offsetWidth || el.offsetHeight), onclick: String(el.getAttribute("onclick") || "").slice(0, 300), handlers };
+  }, selector);
+  try { await page.locator(selector).first().click({ force: true, timeout: 5000 }); } catch (e) { reqs.push("CLICK_ERR " + mask(e.message).slice(0, 100)); }
+  await page.waitForTimeout(8000);
+  page.off("request", onReq); page.off("response", onRes);
+  return { selector, ...info, handlers: (info.handlers || []).map(mask), requests: reqs.slice(0, 25), pages: page.context().pages().map(p => mask(p.url()).slice(0, 120)) };
+}
+
 async function downloadSummaryPdf(page, iso, dir) {
   await page.goto(SUMMARY_URL, { waitUntil: "networkidle" });
   await page.waitForTimeout(2500);
@@ -112,6 +131,13 @@ if (require.main === module) {
       await Promise.all([page.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
         page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')]);
       const dir = path.join(__dirname, "alj-out");
+      if (process.env.ALJ_DIAG === "1") {
+        await page.goto(SUMMARY_URL, { waitUntil: "networkidle" }); await page.waitForTimeout(2500); await useArabic(page); await setDate(page, iso);
+        console.log("ALJ_DIAG_SUMMARY", JSON.stringify(await diagnose(page, "#downloadPdfDaily")));
+        await page.goto(ORDERS_URL, { waitUntil: "networkidle" }); await page.waitForTimeout(2500); await useArabic(page); await setDate(page, iso);
+        console.log("ALJ_DIAG_ORDERS", JSON.stringify(await diagnose(page, "button.buttons-excel")));
+        return;
+      }
       const r = await downloadAljReports(page, iso, dir);
       const pdf = fs.readFileSync(r.summary.path);
       const pdfPages = (pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) || []).length;
