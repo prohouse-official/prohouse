@@ -99,13 +99,34 @@ async function diagnose(page, selector) {
   return { selector, ...info, handlers: (info.handlers || []).map(mask), requests: reqs.slice(0, 25), pages: page.context().pages().map(p => mask(p.url()).slice(0, 120)) };
 }
 
+// نفس إعدادات الملف اللي كان ينرسل: الفرعين (Prohouse و Prohouse 2) مختارين بالاسم، وكل الأجهزة
+async function selectAllBranches(page) {
+  await page.evaluate(() => {
+    const el = window.$ && $("#filter-branches");
+    if (!el || !el.length) return;
+    el.val([...el[0].options].map(o => o.value)).trigger("change");
+  });
+  await page.waitForTimeout(800);
+}
+
 async function downloadSummaryPdf(page, iso, dir) {
   await page.goto(SUMMARY_URL, { waitUntil: "networkidle" });
   await page.waitForTimeout(2500);
   await useArabic(page);
+  await selectAllBranches(page);
   await setDate(page, iso);
   const out = path.join(dir, `summary-${iso}.pdf`);
   const name = await exportViaHistory(page, () => page.click("#downloadPdfDaily"), /ملخص|summary/i, out);
+  // تابسنس يحفظ اختيار الفروع ويطبقه على صفحة الطلبات — نرجّعه فاضي (= الكل) بعد التصدير
+  await page.goto(SUMMARY_URL, { waitUntil: "networkidle" }).catch(() => {});
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    const el = window.$ && $("#filter-branches");
+    if (el && el.length) el.val([]).trigger("change");
+    const btn = document.querySelector("#applyChartFilter") || document.querySelector("#applyChartFilterBlur") || document.querySelector(".applyBtn");
+    if (btn) btn.click();
+  });
+  await page.waitForTimeout(2000);
   return { path: out, name };
 }
 
@@ -127,6 +148,8 @@ async function downloadOrdersExcel(page, iso, dir) {
 
 async function downloadAljReports(page, iso, dir) {
   fs.mkdirSync(dir, { recursive: true });
+  // الملخص أول (الفرعين مختارين — نفس الملف المرسل)، وبعد التصدير يرجع اختيار الفروع فاضي،
+  // وبعدين الطلبات بالإعداد الافتراضي (كل الفروع)
   const summary = await downloadSummaryPdf(page, iso, dir);
   const orders = await downloadOrdersExcel(page, iso, dir);
   return { summary, orders };
@@ -150,6 +173,21 @@ if (require.main === module) {
       await Promise.all([page.waitForNavigation({ waitUntil: "networkidle" }).catch(() => {}),
         page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')]);
       const dir = path.join(__dirname, "alj-out");
+      if (process.env.ALJ_DIAG === "filters") {
+        await page.goto(SUMMARY_URL, { waitUntil: "networkidle" }); await page.waitForTimeout(2500); await useArabic(page); await setDate(page, iso);
+        const f = await page.evaluate(() => {
+          const sel = (q) => [...document.querySelectorAll(q)].map(s => ({ id: s.id, name: s.name, multiple: s.multiple,
+            options: [...s.options].map(o => ({ v: o.value, t: o.textContent.trim(), sel: o.selected })) }));
+          return {
+            selects: sel("select"),
+            checks: [...document.querySelectorAll('.summary-report-checkbox-filter input[type="checkbox"]')].map(c => ({ v: c.value, id: c.id, name: c.getAttribute("name") || c.getAttribute("data-report") || "", checked: c.checked, label: (c.closest("label") || c.parentElement || {}).innerText })),
+            branchFn: typeof getSelectedBranchIds === "function" ? String(getSelectedBranchIds).slice(0, 400) : null,
+            branchIds: typeof getSelectedBranchIds === "function" ? getSelectedBranchIds() : null
+          };
+        });
+        console.log("ALJ_FILTERS", mask(JSON.stringify(f)).slice(0, 6000));
+        return;
+      }
       if (process.env.ALJ_DIAG === "1") {
         await page.goto(SUMMARY_URL, { waitUntil: "networkidle" }); await page.waitForTimeout(2500); await useArabic(page); await setDate(page, iso);
         console.log("ALJ_DIAG_SUMMARY", JSON.stringify(await diagnose(page, "#downloadPdfDaily")));
@@ -183,6 +221,8 @@ if (require.main === module) {
       } catch (e) { headers = ["(unzip failed) " + mask(e.message)]; }
       execFileSync("python3", ["-I", path.join(__dirname, "add_totals.py"), r.orders.path]);
       console.log("ALJ_DIGEST", execFileSync("python3", ["-I", path.join(__dirname, "xlsx_digest.py"), r.orders.path]).toString().trim());
+      try { console.log("ALJ_PDF_DIGEST", execFileSync("python3", [path.join(__dirname, "pdf_digest.py"), r.summary.path]).toString().trim()); }
+      catch (e) { console.log("ALJ_PDF_DIGEST_FAILED", mask(e.message).slice(0, 100)); }
       const expect = Number(process.env.ALJ_EXPECT_ROWS || 0);
       const crypto = require("crypto");
       let sheetSha = "";
