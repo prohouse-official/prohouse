@@ -51,25 +51,31 @@ async function readHistory(page) {
 }
 
 async function exportViaHistory(page, trigger, nameRe, outPath) {
-  const before = Math.max(0, ...(await readHistory(page)).map(r => r.id));
-  await trigger();
-  // الزر يفتح سجل التصدير بتبويب جديد — نسكّره
-  await page.waitForTimeout(3000);
-  for (const p of page.context().pages()) if (p !== page) await p.close().catch(() => {});
-  for (let i = 0; i < 30; i++) {
-    const row = (await readHistory(page)).find(r => r.id > before && nameRe.test(r.text));
-    if (row && /جاهز|ready|completed/i.test(row.text)) {
-      const res = await page.context().request.get(row.href);
-      if (!res.ok()) throw new Error("تنزيل من سجل التصدير فشل [" + res.status() + "]");
-      fs.writeFileSync(outPath, await res.body());
-      const cd = res.headers()["content-disposition"] || "";
-      const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
-      return m ? decodeURIComponent(m[1]) : path.basename(outPath);
+  // سجل التصدير نقراه بتبويب لحاله — صفحة التقرير تضل زي ما هي عشان نضغط زرها
+  const hp = await page.context().newPage();
+  try {
+    const before = Math.max(0, ...(await readHistory(hp)).map(r => r.id));
+    await trigger();
+    // الزر يفتح سجل التصدير بتبويب جديد — نسكّره
+    await page.waitForTimeout(3000);
+    for (const p of page.context().pages()) if (p !== page && p !== hp) await p.close().catch(() => {});
+    for (let i = 0; i < 30; i++) {
+      const row = (await readHistory(hp)).find(r => r.id > before && nameRe.test(r.text));
+      if (row && /جاهز|ready|completed/i.test(row.text)) {
+        const res = await page.context().request.get(row.href);
+        if (!res.ok()) throw new Error("تنزيل من سجل التصدير فشل [" + res.status() + "]");
+        fs.writeFileSync(outPath, await res.body());
+        const cd = res.headers()["content-disposition"] || "";
+        const m = cd.match(/filename\*=UTF-8''([^;]+)/i) || cd.match(/filename="?([^";]+)"?/i);
+        return m ? decodeURIComponent(m[1]) : path.basename(outPath);
+      }
+      if (row && /فشل|failed|error/i.test(row.text)) throw new Error("التصدير فشل بتابسنس");
+      await hp.waitForTimeout(5000);
     }
-    if (row && /فشل|failed|error/i.test(row.text)) throw new Error("التصدير فشل بتابسنس");
-    await page.waitForTimeout(5000);
+    throw new Error("التصدير ما جهز خلال دقيقتين ونص");
+  } finally {
+    await hp.close().catch(() => {});
   }
-  throw new Error("التصدير ما جهز خلال دقيقتين ونص");
 }
 
 // تشخيص (تجربة بس): وش بيصير لما ينضغط الزر — روابط الطلبات ونوعها، بدون أرقام
