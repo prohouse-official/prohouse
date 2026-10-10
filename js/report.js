@@ -661,7 +661,7 @@ function initTomorrowReportControls() {
   }));
 }
 
-// موظف (مدير فرع) مسموح له يشوف تقرير الشيف بس — لفروعه، عشان يبعث PDF الطلبية للشيف.
+// موظف (مدير فرع) مسموح له يشوف تقرير الشيف بس — لكل الفروع، عشان يطبع الورقة المجمعة للشيف.
 // من الإعدادات: chef_report_employees (أرقام الموظفين مفصولة بفاصلة، مثل emp_5)
 function isChefReportOnlyUser() {
   if (typeof Auth === "undefined" || Auth.role() === "owner") return false;
@@ -669,18 +669,20 @@ function isChefReportOnlyUser() {
   const raw = (typeof currentSettings !== "undefined" && currentSettings.chef_report_employees) || "";
   return !!e && raw.split(",").map(x => x.trim()).includes(e.id);
 }
-// المالك يشوف كل التقارير؛ صاحب «تقرير الشيف بس» يشوف طلبية الشيف لفروعه وبس
+// المالك يشوف كل التقارير؛ صاحب «تقرير الشيف بس» يشوف طلبية الشيف لكل الفروع وبس
 function applyReportRoleView() {
   const limited = isChefReportOnlyUser();
   const type = document.getElementById("reportType");
   const pills = type && type.nextElementSibling;
   if (pills && pills.classList.contains("ph-tab-pills")) pills.classList.toggle("hidden", limited);
   if (!limited) return false;
+  // يشوف طلبية كل الفروع (يطبع الورقة المجمعة للشيف) — قراءة بس، ما يقدر يعدّل طلبية فرع مو فرعه
   const brSel = document.getElementById("tomorrowReportBranch");
-  const mine = allowedBranchList();
-  if (brSel && brSel.dataset.limited !== mine.join(",")) {
-    brSel.innerHTML = mine.map(b => `<option value="${escHtml(b)}">${escHtml(b)}</option>`).join("");
-    brSel.dataset.limited = mine.join(",");
+  const all = branchList();
+  if (brSel && brSel.dataset.limited !== all.join(",")) {
+    brSel.innerHTML = `<option value="">كل الفروع</option>` + all.map(b => `<option value="${escHtml(b)}">${escHtml(b)}</option>`).join("");
+    brSel.dataset.limited = all.join(",");
+    if (all.length > 1) tomorrowReportCombined = true; // يفتح على الورقة المجمعة مباشرة
   }
   if (type.value !== "tomorrow") {
     type.value = "tomorrow";
@@ -710,7 +712,7 @@ async function runTomorrowReport() {
 
   const date = document.getElementById("tomorrowReportDate").value || addDaysStr(todayStr(), 1);
   const branchFilter = document.getElementById("tomorrowReportBranch").value;
-  const branches = branchFilter ? [branchFilter] : (isChefReportOnlyUser() ? allowedBranchList() : branchList());
+  const branches = branchFilter ? [branchFilter] : branchList();
   lastTomorrowReportDate = date;
 
   const [perBranch, perDay] = await Promise.all([
@@ -765,7 +767,7 @@ async function runTomorrowReport() {
 
   const cBtn = document.getElementById("tomorrowReportCombinedBtn");
   if (cBtn) {
-    const can = !branchFilter ? branches.length > 1 : (isChefReportOnlyUser() ? allowedBranchList() : branchList()).length > 1;
+    const can = !branchFilter ? branches.length > 1 : branchList().length > 1;
     cBtn.classList.toggle("hidden", !can);
     cBtn.classList.toggle("active", tomorrowReportCombined && !branchFilter);
     cBtn.textContent = tomorrowReportCombined && !branchFilter ? "✓ ورقة مجمعة — اضغط لأوراق الفروع" : "📋 ورقة مجمعة لكل الفروع";
