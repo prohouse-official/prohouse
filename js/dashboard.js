@@ -197,6 +197,9 @@ function dayStepsFor(s) {
     }
   }
   steps.push({ tab: "remaining", icon: "📊", title: "جرد المتبقي", state: state(s.remainingCounted, s.remainingTotal), note: fraction(s.remainingCounted, s.remainingTotal) });
+  if (tabAllowed("tomorrow")) {
+    steps.push({ tab: "tomorrow", icon: "📝", title: "طلبية الغد", state: s.tomorrowSaved ? "done" : "todo", note: s.tomorrowSaved ? "تم" : "باقي" });
+  }
   if (tabAllowed("custody")) {
     steps.push({ tab: "custody", icon: "💰", title: "العهدة والمصروفات", state: s.custodyClosed ? "done" : s.custodyOpened ? "partial" : "todo",
       note: s.custodyClosed ? "تقفّلت" : s.custodyOpened ? "باقي الإغلاق" : "باقي" });
@@ -345,6 +348,8 @@ function openScreensOnDay(day) {
   currentRemainingDate = day; setInput("remainingDateInput", day);
   if (typeof currentCustodyDate !== "undefined") { currentCustodyDate = day; setInput("custodyDateInput", day); }
   if (typeof currentOpeningDate !== "undefined") { currentOpeningDate = day; setInput("openingDateInput", day); }
+  // طلبية الغد = اليوم اللي بعد يوم الرئيسية
+  if (typeof currentTomorrowDate !== "undefined") { currentTomorrowDate = addDaysStr(day, 1); setInput("tomorrowDateInput", currentTomorrowDate); }
 }
 
 // ==================== تنبيهات الشهر (للمالك) ====================
