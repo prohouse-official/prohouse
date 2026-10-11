@@ -90,6 +90,18 @@ function getTargetDates() {
       return [{ display: customDate, iso: `${yyyy}-${mm}-${dd}` }];
     }
   }
+  // فترة محددة: BACKFILL_FROM / BACKFILL_TO (YYYY-MM-DD) — لسحب مبيعات قديمة على دفعات (حد أقصى ٧٥ يوم بالمرة)
+  const from = process.env.BACKFILL_FROM || "", to = process.env.BACKFILL_TO || "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+    const end = /^\d{4}-\d{2}-\d{2}$/.test(to) ? to : riyadhDateObj(1).iso;
+    const days = [];
+    for (let t = Date.parse(from + "T00:00:00Z"); t <= Date.parse(end + "T00:00:00Z") && days.length < 75; t += 86400000) {
+      const iso = new Date(t).toISOString().slice(0, 10);
+      const [yyyy, mm, dd] = iso.split("-");
+      days.push({ display: `${mm}/${dd}/${yyyy}`, iso });
+    }
+    return days;
+  }
   const backfill = parseInt(process.env.BACKFILL_DAYS || "", 10);
   if (backfill > 0) {
     const days = [];

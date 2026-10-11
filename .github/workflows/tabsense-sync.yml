@@ -10,6 +10,14 @@ on:
         description: "Pull this many past days (e.g. 14). Empty = yesterday + today"
         required: false
         default: ""
+      backfill_from:
+        description: "Pull a date range: from YYYY-MM-DD (max 75 days per run)"
+        required: false
+        default: ""
+      backfill_to:
+        description: "Range end YYYY-MM-DD (empty = yesterday)"
+        required: false
+        default: ""
 
 jobs:
   tabsense-sync:
@@ -56,6 +64,8 @@ jobs:
         env:
           TABSENSE_BRANCH: "عبداللطيف جميل"
           BACKFILL_DAYS: ${{ github.event.inputs.backfill_days }}
+          BACKFILL_FROM: ${{ github.event.inputs.backfill_from }}
+          BACKFILL_TO: ${{ github.event.inputs.backfill_to }}
         run: |
           node pull-tabsense.js
 
