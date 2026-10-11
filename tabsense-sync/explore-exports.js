@@ -6,7 +6,7 @@ const path = require("path");
 
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"));
 const BASE = "https://app.tabsense.ai/prohouse/dashboard";
-const WANT = /order|summary|invoice|receipt|z-?report|طلب|ملخص|فاتور|فواتير/i;
+const WANT = /refund|return|void|cancel|credit|مرتجع|مسترد|استرجاع|مردود|ملغ|إلغاء|order|summary|invoice|receipt|z-?report|طلب|ملخص|فاتور|فواتير/i;
 const EXPORT = /export|download|excel|xlsx|csv|pdf|print|تصدير|تحميل|تنزيل|طباعة|اكسل|إكسل/i;
 const clean = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/\d/g, "#").slice(0, 60);
 
@@ -31,7 +31,7 @@ const clean = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/\d/g, 
     }
     console.log("EXPLORE_LINKS", JSON.stringify([...links.entries()].map(([h, t]) => [h.replace(/\d{4,}/g, "#"), clean(t)])));
 
-    const targets = [...links.entries()].filter(([h, t]) => WANT.test(h) || WANT.test(t)).slice(0, 10);
+    const targets = [...links.entries()].filter(([h, t]) => WANT.test(h) || WANT.test(t)).slice(0, 16);
     for (const [href, text] of targets) {
       await page.goto(href, { waitUntil: "networkidle" }).catch(() => {});
       await page.waitForTimeout(2500);
@@ -43,13 +43,14 @@ const clean = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/\d/g, 
           hasDate: !!document.querySelector('input[name="datefilter"]'),
           exports: els.filter(e => re.test((e.innerText || e.value || "") + " " + (e.getAttribute("href") || "") + " " + (e.className || "") + " " + (e.id || "")))
             .map(e => ({ tag: e.tagName, text: e.innerText || e.value || "", href: e.getAttribute("href") || "", id: e.id || "", cls: String(e.className || "").slice(0, 80) })),
-          buttons: els.filter(e => e.tagName === "BUTTON").map(e => e.innerText || e.id || "").filter(Boolean).slice(0, 30)
+          buttons: els.filter(e => e.tagName === "BUTTON").map(e => e.innerText || e.id || "").filter(Boolean).slice(0, 30),
+          tables: Array.from(document.querySelectorAll("table")).map(t => Array.from(t.querySelectorAll("thead th")).map(th => th.innerText.trim()).slice(0, 20))
         };
       }, EXPORT.source);
       console.log("EXPLORE_PAGE", JSON.stringify({
         href: href.replace(/\d{4,}/g, "#"), text: clean(text), title: clean(info.title), hasDate: info.hasDate,
         exports: info.exports.map(e => ({ ...e, text: clean(e.text), href: clean(e.href), cls: clean(e.cls) })),
-        buttons: info.buttons.map(clean)
+        buttons: info.buttons.map(clean), tables: info.tables.map(h => h.map(clean))
       }));
     }
   } catch (e) {

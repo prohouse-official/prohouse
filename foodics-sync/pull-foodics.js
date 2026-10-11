@@ -384,6 +384,20 @@ async function exploreFoodics(page) {
     console.log(`EXPLORE[${label}] ` + JSON.stringify(info));
   };
   const today = riyadhDateObj(0).iso;
+  const lastMonth = riyadhDateObj(30).iso;
+  // وين المردودات؟ صفحة التقارير كلها + العناوين المحتملة + أعمدة تقرير طرق الدفع (يمكن فيه عمود مرتجع)
+  await page.goto("https://console.foodics.com/reports", { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+  await page.waitForTimeout(3000);
+  await describe("/reports");
+  for (const h of ["/reports/returns", "/reports/sales-returns", "/reports/returned-orders", "/reports/return-orders", "/reports/void-and-returns",
+                   "/reports/voids", "/reports/sales", "/reports/payments", "/reports/orders"]) {
+    await page.goto(`https://console.foodics.com${h}?date=${lastMonth}+-+${today}`, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+    await describe("RET " + h);
+  }
+  await page.goto(`https://console.foodics.com/orders?status=returned`, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
+  await page.waitForTimeout(3000);
+  await describe("RET /orders?status=returned");
   // وين تقرير الإضافات (+50 دجاج)؟ نجرب العناوين المحتملة ونطبع العنوان والأعمدة بس
   for (const h of ["/reports/sales-by-modifier-option", "/reports/sales-by-modifier-options", "/reports/sales-by-modifiers",
                    "/reports/modifiers", "/reports/sales-by-option", "/reports/product-modifiers", "/reports/sales-by-product-modifier"]) {
