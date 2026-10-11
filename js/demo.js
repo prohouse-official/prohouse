@@ -69,6 +69,8 @@
         { date: riyadh(-2), branch: AJL, opening_float: 300, opened_by: "محمد البلول", expenses: [{ id: "e3", amount: 35, note: "ليمون ونعناع", receipt: "", by: "محمد البلول", at: new Date().toISOString() }] }
       ],
       purchase_invoices: demoPurchases(),
+      purchase_suppliers: ["مؤسسة اللحوم الطازجة", "سوق الخضار المركزي", "مستودع البهارات", "شركة التغليف الحديثة", "النظافة المثالية", "بقالة الحي"]
+        .map((name, i) => ({ name, aliases: [], default_category: ["لحوم", "خضراوات", "بهارات", "بلاستيك وتغليف", "منظفات", "بقالة"][i], active: true })),
       push_subscriptions: [], reminder_settings: []
     };
   }
@@ -98,7 +100,7 @@
 
   const KEYS = {
     daily_entries: ["date", "branch", "item_id"], day_meta: ["date", "branch"], items: ["id"], settings: ["key"], juices: ["id"],
-    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], purchase_invoices: ["id"],
+    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], purchase_invoices: ["id"], purchase_suppliers: ["name"],
     push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"], tabsense_payments: ["date", "branch", "channel"]
   };
 
