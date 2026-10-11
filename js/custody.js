@@ -275,7 +275,7 @@ async function addCustodyExpense(payments) {
   const d = custodyDraftExpense;
   const amount = toNum(d.amount);
   if (amount === null || amount <= 0) { showToast("⚠ اكتب مبلغ المصروف"); return; }
-  if (!d.photo && !d.noReceipt) { showToast("⚠ صوّر الفاتورة، أو اختر «ما في فاتورة»"); return; }
+  // بدون صورة ينحفظ عادي (بدون فاتورة) — ما نوقف الموظف
   const btn = document.getElementById("custExpAdd");
   if (btn) { btn.disabled = true; btn.textContent = "⏳ جاري الحفظ…"; }
   let receipt = "";
