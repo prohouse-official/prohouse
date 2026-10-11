@@ -25,6 +25,7 @@ let purBusy = false;
 let purLoadSeq = 0;
 let purSuppliers = []; // [{name, aliases, default_category, ...}]
 let purShowSuppliers = false;
+let purSales = []; // [{date, branch, amount}] مبيعات الفترة
 
 function purchasesEnabled() {
   return PURCHASES_LIVE || !!window.PH_DEMO;
@@ -38,6 +39,28 @@ const purSign = (inv) => (inv.kind === "return" ? -1 : 1);
 
 function purLinesTotal(inv) {
   return purRound((inv.lines || []).reduce((s, l) => s + (Number(l.total) || 0), 0));
+}
+// صافي السطر بعد نصيبه من خصم الفاتورة
+const purLineNet = (l) => purRound((Number(l.total) || 0) - (Number(l.discount) || 0));
+
+// خصم الفاتورة (قبل الضريبة): إذا محدد على صنف ينحط عليه كامل، وإذا لا يتوزع على الأصناف حسب مبلغ كل صنف
+function purApplyDiscount(inv) {
+  const lines = inv.lines || [];
+  const disc = purNum(inv.discount) || 0;
+  lines.forEach(l => { delete l.discount; });
+  if (!(disc > 0) || !lines.length) return inv;
+  const idx = Number.isInteger(inv.discount_line) ? inv.discount_line : null;
+  if (idx !== null && lines[idx]) { lines[idx].discount = purRound(disc); return inv; }
+  const base = lines.reduce((s, l) => s + Math.max(0, Number(l.total) || 0), 0);
+  if (!(base > 0)) { lines[0].discount = purRound(disc); return inv; }
+  let given = 0, biggest = 0;
+  lines.forEach((l, i) => {
+    l.discount = purRound(disc * Math.max(0, Number(l.total) || 0) / base);
+    given += l.discount;
+    if ((Number(l.total) || 0) > (Number(lines[biggest].total) || 0)) biggest = i;
+  });
+  lines[biggest].discount = purRound(lines[biggest].discount + disc - given); // فرق التقريب على أكبر صنف
+  return inv;
 }
 
 // مبلغ الفاتورة بعد الضريبة (لو الإجمالي ناقص: قبل الضريبة + الضريبة، أو مجموع الأصناف)
@@ -67,11 +90,11 @@ function purchaseChecks(inv, all) {
   const lines = inv.lines || [];
   if (!lines.length) out.push("ما فيه أصناف — لازم صنف واحد على الأقل عشان التصنيف");
   if (lines.length) {
-    const linesSum = purLinesTotal(inv);
+    const linesSum = purRound(purLinesTotal(inv) - (purNum(inv.discount) || 0));
     const target = sub !== null ? sub : total;
     const alt = total; // بعض الفواتير أسعار الأصناف فيها شامل الضريبة
     if (target !== null && Math.abs(linesSum - target) > 1 && !(alt !== null && Math.abs(linesSum - alt) <= 1)) {
-      out.push(`مجموع الأصناف ${purSar(linesSum)} مو مطابق للفاتورة (${purSar(target)})`);
+      out.push(`مجموع الأصناف${purNum(inv.discount) ? " بعد الخصم" : ""} ${purSar(linesSum)} مو مطابق للفاتورة (${purSar(target)})`);
     }
   }
   lines.forEach((l, i) => {
@@ -109,7 +132,7 @@ function purchaseSummary(invoices) {
     if (!lines.length) { s.byCategory["غير مصنّف"] = (s.byCategory["غير مصنّف"] || 0) + total; return; }
     lines.forEach(l => {
       const c = l.category || "غير مصنّف";
-      s.byCategory[c] = (s.byCategory[c] || 0) + (Number(l.total) || 0) * sign;
+      s.byCategory[c] = (s.byCategory[c] || 0) + purLineNet(l) * sign;
     });
   });
   s.total = purRound(s.total); s.vat = purRound(s.vat); s.pendingTotal = purRound(s.pendingTotal);
@@ -143,10 +166,11 @@ async function loadPurchases() {
   const start = purStart, end = purEnd;
   let rows, closings;
   try {
-    let sups;
-    [rows, closings, sups] = await Promise.all([SupaEngine.getPurchases(start, end), SupaEngine.getCustodyExpensesRange(start, end),
-      SupaEngine.getPurchaseSuppliers().catch(() => purSuppliers)]);
+    let sups, sales;
+    [rows, closings, sups, sales] = await Promise.all([SupaEngine.getPurchases(start, end), SupaEngine.getCustodyExpensesRange(start, end),
+      SupaEngine.getPurchaseSuppliers().catch(() => purSuppliers), SupaEngine.getSalesRange(start, end).catch(() => [])]);
     purSuppliers = sups || [];
+    purSales = sales || [];
   } catch (e) {
     if (seq !== purLoadSeq) return;
     view.innerHTML = `<div class="empty-state">⚠ تعذّر جلب المشتريات — ${escHtml(e.message || String(e))}</div>`;
@@ -176,6 +200,7 @@ function renderPurchasesView() {
   if (!view) return;
   const scoped = purInvoices.filter(i => !purBranch || i.branch === purBranch);
   const s = purchaseSummary(scoped);
+  const sales = purSalesSummary();
   const counts = { pending: 0, approved: 0, rejected: 0 };
   scoped.forEach(i => { counts[i.status] = (counts[i.status] || 0) + 1; });
   const cats = Object.entries(s.byCategory).sort((a, b) => b[1] - a[1]);
@@ -217,11 +242,15 @@ function renderPurchasesView() {
         <div><span>الإجمالي</span><b>${purSar(s.total)}</b></div>
         <div><span>الضريبة</span><b>${purSar(s.vat)}</b></div>
         <div><span>عدد الفواتير</span><b>${s.count}</b></div>
+        <div><span>من المبيعات</span><b>${sales.total > 0 ? purPct(s.total, sales.total) : "—"}</b></div>
       </div>
+      ${sales.total > 0 ? `<div class="pur-sales-note">المبيعات بالفترة ${purSar(sales.total)}${purBranch ? ` (${escHtml(purBranch)})` : " (كل الفروع)"}${sales.missing.length ? ` — ⚠ ناقصة: ${sales.missing.map(escHtml).join("، ")}` : ""}</div>`
+        : `<div class="pur-sales-note">⚠ ما فيه مبيعات مسجلة بهالفترة عشان نحسب النسبة</div>`}
       ${s.pendingCount ? `<div class="pur-pending-note">⏳ ${s.pendingCount} بانتظار المراجعة (${purSar(s.pendingTotal)}) — محسوبة بالإجمالي</div>` : ""}
       ${cats.length ? `<div class="pur-sec-title">حسب التصنيف</div>
         ${cats.map(([c, v]) => `<div class="pur-bar"><span class="pur-bar-name">${escHtml(c)}</span>
-          <span class="pur-bar-track"><i style="width:${Math.round(Math.abs(v) / maxCat * 100)}%"></i></span><b>${purSar(v)}</b></div>`).join("")}` : ""}
+          <span class="pur-bar-track"><i style="width:${Math.round(Math.abs(v) / maxCat * 100)}%"></i></span><b>${purSar(v)}</b>
+          <small class="pur-bar-pct">${purPct(v, s.total)} من المشتريات${sales.total > 0 ? ` · ${purPct(v, sales.total)} من المبيعات` : ""}</small></div>`).join("")}` : ""}
       ${sups.length ? `<div class="pur-sec-title">أكثر الموردين</div>
         ${sups.map(([n, v]) => `<div class="cust-row"><span>${escHtml(n)}</span><b>${purSar(v)}</b></div>`).join("")}` : ""}
     </div>
@@ -289,6 +318,12 @@ function purDetailHtml() {
           <input type="text" list="purSupplierList" data-f="supplier" value="${escHtml(d.supplier || "")}" ${dis}></label>
         <label class="pur-field"><span>الفرع</span>
           <select data-f="branch" ${dis}>${branchList().map(b => `<option ${b === d.branch ? "selected" : ""}>${escHtml(b)}</option>`).join("")}</select></label>
+        ${field("discount", "الخصم (قبل الضريبة)", "number")}
+        <label class="pur-field"><span>الخصم على</span>
+          <select data-f="discount_line" ${dis}>
+            <option value="">يتوزع على كل الأصناف</option>
+            ${(d.lines || []).map((l, i) => `<option value="${i}" ${d.discount_line === i ? "selected" : ""}>${escHtml(l.name || "سطر " + (i + 1))}</option>`).join("")}
+          </select></label>
         ${field("subtotal", "قبل الضريبة", "number")}
         ${field("vat", "الضريبة", "number")}
         ${field("total", "الإجمالي بعد الضريبة", "number")}
@@ -306,6 +341,7 @@ function purDetailHtml() {
               <label><small>سعر الوحدة</small><input type="number" inputmode="decimal" step="any" data-l="unit_price" value="${l.unit_price ?? ""}" ${dis}></label>
               <label><small>المجموع</small><input type="number" inputmode="decimal" step="any" data-l="total" value="${l.total ?? ""}" ${dis}></label>
             </div>
+            ${l.discount ? `<small class="pur-line-disc">خصم ${purSar(l.discount)} ← الصافي ${purSar(purLineNet(l))}</small>` : ""}
             <div class="pur-line-cat">
               <select data-l="category" ${dis}>${opt(PUR_CATEGORIES, l.category).replace('<option value="">—</option>', '<option value="">— التصنيف —</option>')}</select>
               ${canEdit ? `<button type="button" class="cust-exp-del" data-del-line="${i}" aria-label="حذف السطر">✕</button>` : ""}
@@ -313,7 +349,7 @@ function purDetailHtml() {
           </div>`).join("") || `<div class="cust-hint">ما فيه أصناف.</div>`}
       </div>
       ${canEdit ? `<button type="button" class="cust-add" id="purAddLine">➕ أضف صنف</button>` : ""}
-      <div class="pur-lines-sum">مجموع الأصناف: <b>${purSar(purLinesTotal(d))}</b></div>
+      <div class="pur-lines-sum">مجموع الأصناف: <b>${purSar(purLinesTotal(d))}</b>${purNum(d.discount) ? ` − خصم ${purSar(d.discount)} = <b>${purSar(purLinesTotal(d) - purNum(d.discount))}</b>` : ""}</div>
 
       ${warnings.length ? `<div class="pur-warnings"><b>⚠ انتبه قبل الاعتماد:</b><ul>${warnings.map(w => `<li>${escHtml(w)}</li>`).join("")}</ul></div>`
         : `<div class="pur-ok">✓ الأرقام متطابقة</div>`}
@@ -382,18 +418,24 @@ function bindPurchasesView() {
     const w = purchaseChecks(purDraft, purInvoices);
     const old = box.querySelector(".pur-warnings, .pur-ok");
     if (old) old.outerHTML = w.length ? `<div class="pur-warnings"><b>⚠ انتبه قبل الاعتماد:</b><ul>${w.map(x => `<li>${escHtml(x)}</li>`).join("")}</ul></div>` : `<div class="pur-ok">✓ الأرقام متطابقة</div>`;
-    const sum = box.querySelector(".pur-lines-sum b");
-    if (sum) sum.textContent = purSar(purLinesTotal(purDraft));
+    const sum = box.querySelector(".pur-lines-sum");
+    if (sum) sum.innerHTML = `مجموع الأصناف: <b>${purSar(purLinesTotal(purDraft))}</b>${purNum(purDraft.discount) ? ` − خصم ${purSar(purDraft.discount)} = <b>${purSar(purLinesTotal(purDraft) - purNum(purDraft.discount))}</b>` : ""}`;
   };
   view.querySelectorAll("[data-f]").forEach(inp => inp.addEventListener(inp.tagName === "SELECT" ? "change" : "input", () => {
     const k = inp.dataset.f;
     purDraft[k] = inp.type === "number" ? purNum(inp.value) : inp.value;
+    if (k === "discount_line") purDraft[k] = inp.value === "" ? null : Number(inp.value);
+    if (k === "discount" || k === "discount_line") purApplyDiscount(purDraft);
+    if (k === "discount_line") { renderPurchasesView(); return; }
     if (k === "supplier") {
       const sup = purFindSupplier(inp.value);
       if (sup && sup.default_category) (purDraft.lines || []).forEach(l => { if (!l.category) l.category = sup.default_category; });
     }
     refreshChecks();
   }));
+  // بعد ما يخلص كتابة الخصم (change) نعيد الرسم عشان يبين نصيب كل صنف
+  const discInp = view.querySelector('.pur-detail [data-f="discount"]');
+  if (discInp) discInp.addEventListener("change", () => renderPurchasesView());
   view.querySelectorAll("[data-line]").forEach(row => {
     const i = Number(row.dataset.line);
     row.querySelectorAll("[data-l]").forEach(inp => inp.addEventListener(inp.tagName === "SELECT" ? "change" : "input", () => {
@@ -405,6 +447,7 @@ function bindPurchasesView() {
         if (tot && (tot.value === "" || tot.dataset.auto === "1")) { line.total = purRound(line.qty * line.unit_price); tot.value = line.total; tot.dataset.auto = "1"; }
       }
       if (k === "total") inp.dataset.auto = "";
+      if (k === "total" || k === "qty" || k === "unit_price") purApplyDiscount(purDraft);
       refreshChecks();
     }));
   });
@@ -456,6 +499,8 @@ async function savePurchaseReview(status) {
   row.reviewed_by = emp ? emp.name : "";
   row.reviewed_at = new Date().toISOString();
   row.lines = (row.lines || []).filter(l => String(l.name || "").trim() || purNum(l.total) !== null);
+  if (Number.isInteger(row.discount_line) && !row.lines[row.discount_line]) row.discount_line = null;
+  purApplyDiscount(row);
   purBusy = true;
   try {
     await SupaEngine.savePurchase(row);
@@ -581,4 +626,26 @@ function purDayGroups(list) {
     if (inv.status !== "rejected") g.total = purRound(g.total + purInvoiceTotal(inv) * purSign(inv));
   });
   return groups.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+const purPct = (part, whole) => (whole ? `${(Math.round(part / whole * 1000) / 10).toLocaleString("en-US")}٪` : "—");
+
+// مبيعات الفترة (كل الفروع أو الفرع المختار) + الفروع اللي مبيعاتها ناقصة بالفترة
+function purSalesSummary() {
+  const today = todayStr();
+  const end = purEnd < today ? purEnd : today;
+  let days = 0;
+  for (let d = purStart; d <= end; d = addDaysStr(d, 1)) days++;
+  const branches = purBranch ? [purBranch] : branchList();
+  const byBranch = {};
+  let total = 0;
+  purSales.forEach(r => {
+    if (purBranch && r.branch !== purBranch) return;
+    total += Number(r.amount) || 0;
+    (byBranch[r.branch] = byBranch[r.branch] || new Set()).add(r.date);
+  });
+  // فرع ما له ولا يوم مبيعات = ناقص (أيام الإجازة الطبيعية ما تنحسب نقص)
+  const missing = branches.filter(b => !(byBranch[b] && byBranch[b].size)).concat(
+    branches.filter(b => byBranch[b] && byBranch[b].size && days > 6 && byBranch[b].size < days / 2).map(b => `${b} (${byBranch[b].size} يوم من ${days})`));
+  return { total: purRound(total), missing };
 }

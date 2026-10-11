@@ -61,6 +61,16 @@ assert.strictEqual(sum.total, 172.5);          // 115 − 57.5 + 115 (المرج
 assert.strictEqual(sum.vat, 22.5);
 assert.strictEqual(sum.byCategory["لحوم"], 150);
 assert.strictEqual(sum.pendingCount, 1);
+// خصم الفاتورة: يتوزع على الأصناف حسب المبلغ، أو كامل على الصنف المحدد، والتصنيف ينحسب بالصافي
+const dsc = pur(`purApplyDiscount({ discount: 10, lines: [{ total: 60, category: "لحوم" }, { total: 40, category: "بقالة" }] })`);
+assert.strictEqual(JSON.stringify(dsc.lines.map(l => l.discount)), "[6,4]");
+const dsc1 = pur(`purApplyDiscount({ discount: 10, discount_line: 1, lines: [{ total: 60 }, { total: 40 }] })`);
+assert.strictEqual(JSON.stringify(dsc1.lines.map(l => l.discount || 0)), "[0,10]");
+const dsc3 = pur(`purApplyDiscount({ discount: 10, lines: [{ total: 1 }, { total: 1 }, { total: 1 }] })`);
+assert.strictEqual(Math.round(dsc3.lines.reduce((a, l) => a + l.discount, 0) * 100), 1000);
+assert.strictEqual(JSON.stringify(pur(`purchaseChecks({ ...__inv, subtotal: 90, vat: 13.5, total: 103.5, discount: 10 }, [])`)), "[]");
+const sumD = pur(`purchaseSummary([purApplyDiscount({ ...__inv, subtotal: 90, vat: 13.5, total: 103.5, discount: 10, lines: [{ ...__inv.lines[0] }] })])`);
+assert.strictEqual(sumD.byCategory["لحوم"], 90);
 // مصروف عهدة → فاتورة بانتظار التصنيف بمرجع ثابت (ما يتكرر)
 const ci = pur(`custodyExpenseToInvoice({ date: "2026-10-01", branch: "الشاطئ" }, { id: "e1", amount: 46, note: "خبز" })`);
 assert.strictEqual(ci.source_ref, "2026-10-01|الشاطئ|e1");

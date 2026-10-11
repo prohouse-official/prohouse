@@ -1024,6 +1024,10 @@ const SupaEngine = (() => {
   async function savePurchase(row) {
     return rpc("purchase_save", { p_row: row });
   }
+  // مبيعات كل الفروع بفترة (طرق الدفع من تابسنس وفوديكس) — لنسبة المشتريات من المبيعات
+  async function getSalesRange(start, end) {
+    return (await queryAll(`tabsense_payments?select=date,branch,amount&date=gte.${start}&date=lte.${end}`, "date,branch").catch(() => [])) || [];
+  }
   // الموردين (من شيت يزيد + اللي يضيفهم المالك)
   async function getPurchaseSuppliers() {
     return (await queryAll("purchase_suppliers?select=*", "name")) || [];
@@ -1118,6 +1122,7 @@ const SupaEngine = (() => {
     getPurchases,
     savePurchase,
     getPurchaseSuppliers,
+    getSalesRange,
     savePurchaseSupplier,
     getCustodyExpensesRange,
     migratePhotosToStorage,
