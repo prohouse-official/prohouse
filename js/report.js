@@ -37,7 +37,9 @@ function initReportTab() {
     const type = e.target.value;
     const isTomorrow = type === "tomorrow";
     document.getElementById("dailyReportControls").classList.toggle("hidden", type !== "daily");
-    document.getElementById("entriesReportControls").classList.toggle("hidden", type === "daily" || isTomorrow || type === "alj");
+    document.getElementById("entriesReportControls").classList.toggle("hidden", type === "daily" || isTomorrow || type === "alj" || type === "acct");
+    document.getElementById("acctReportControls").classList.toggle("hidden", type !== "acct");
+    if (type === "acct") loadAcctReport();
     document.getElementById("tomorrowReportControls").classList.toggle("hidden", !isTomorrow);
     document.getElementById("aljReportControls").classList.toggle("hidden", type !== "alj");
     if (type === "alj") loadAljReports();
@@ -46,6 +48,7 @@ function initReportTab() {
     if (type === "entries") runReport();
   });
   initTomorrowReportControls();
+  if (typeof initAcctReportControls === "function") initAcctReportControls();
   initDailyReportControls();
   const aljDate = document.getElementById("aljReportDate");
   if (aljDate) aljDate.addEventListener("change", () => loadAljReports(aljDate.value));
