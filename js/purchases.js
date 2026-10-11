@@ -13,7 +13,9 @@ const PUR_VAT_RATE = 0.15;
 const PUR_SOURCES = { google_form: "قوقل فورم", custody: "العهدة", site: "الموقع" };
 const PUR_STATUS = { pending: "بانتظار المراجعة", approved: "معتمدة", rejected: "مرجّعة ليزيد" };
 
-let purMonth = "";
+let purStart = "";  // الفترة: من تاريخ لين تاريخ
+let purEnd = "";
+let purPreset = "month";
 let purBranch = "";
 let purStatusFilter = "pending";
 let purInvoices = [];
@@ -135,10 +137,10 @@ function purMonthRange(month) {
 async function loadPurchases() {
   const view = document.getElementById("purchasesView");
   if (!view) return;
-  if (!purMonth) purMonth = todayStr().slice(0, 7);
+  if (!purStart || !purEnd) purSetPreset(purPreset);
   const seq = ++purLoadSeq;
   view.innerHTML = '<div class="loader">جاري التحميل…</div>';
-  const { start, end } = purMonthRange(purMonth);
+  const start = purStart, end = purEnd;
   let rows, closings;
   try {
     let sups;
@@ -192,9 +194,16 @@ function renderPurchasesView() {
         ${Auth.isOwner() ? `<button type="button" class="cust-btn primary pur-new" id="purNew">➕ فاتورة</button>` : ""}
       </div>
       ${window.PH_DEMO ? `<div class="pur-trial">🧪 نسخة معاينة — الفواتير هنا وهمية</div>`
-        : `<div class="pur-trial">🧪 تجربة — الفواتير منسوخة من شيت يزيد وتتحدث كل ساعة. الفورم لسا هو الأساس.</div>`}
+        : `<div class="pur-trial">🧪 تجربة — الفواتير منسوخة من شيت يزيد وتتحدث تلقائياً. الفورم لسا هو الأساس.</div>`}
       <div class="pur-filters">
-        <input type="month" id="purMonthInput" value="${purMonth}">
+        <div class="pur-presets">
+          ${[["today", "اليوم"], ["yesterday", "أمس"], ["week", "آخر ٧ أيام"], ["month", "هالشهر"], ["lastmonth", "الشهر الماضي"]].map(([k, label]) =>
+            `<button type="button" class="pur-chip ${purPreset === k ? "active" : ""}" data-preset="${k}">${label}</button>`).join("")}
+        </div>
+        <div class="pur-range">
+          <label><small>من</small><input type="date" id="purStartInput" value="${purStart}" max="${purEnd}"></label>
+          <label><small>إلى</small><input type="date" id="purEndInput" value="${purEnd}" min="${purStart}"></label>
+        </div>
         <select id="purBranchSelect">
           <option value="">كل الفروع</option>
           ${branches.map(b => `<option value="${escHtml(b)}" ${b === purBranch ? "selected" : ""}>${escHtml(b)}${b === PUR_CENTRAL_BRANCH ? " (المطبخ المركزي)" : ""}</option>`).join("")}
@@ -203,7 +212,7 @@ function renderPurchasesView() {
     </div>
 
     <div class="cust-owner pur-summary">
-      <div class="cust-owner-title">📊 ملخص الشهر</div>
+      <div class="cust-owner-title">📊 ملخص الفترة</div>
       <div class="pur-kpis">
         <div><span>الإجمالي</span><b>${purSar(s.total)}</b></div>
         <div><span>الضريبة</span><b>${purSar(s.vat)}</b></div>
@@ -225,7 +234,9 @@ function renderPurchasesView() {
     </div>
 
     <div class="pur-list">
-      ${list.length ? list.map(purRowHtml).join("") : `<div class="cust-hint pur-empty">ما فيه فواتير هنا.</div>`}
+      ${list.length ? purDayGroups(list).map(g => `
+        <div class="pur-day-head"><b>${escHtml(g.label)}</b><span>${g.items.length} فاتورة · ${purSar(g.total)}</span></div>
+        ${g.items.map(purRowHtml).join("")}`).join("") : `<div class="cust-hint pur-empty">ما فيه فواتير هنا.</div>`}
     </div>
     <datalist id="purSupplierList">${purSuppliers.filter(x => x.active !== false).map(x => `<option value="${escHtml(x.name)}">`).join("")}</datalist>
   `;
@@ -325,10 +336,13 @@ function purDetailHtml() {
 function bindPurchasesView() {
   const view = document.getElementById("purchasesView");
   const $ = (id) => document.getElementById(id);
-  if ($("purMonthInput")) $("purMonthInput").addEventListener("change", (e) => {
-    if (!/^\d{4}-\d{2}$/.test(e.target.value)) return;
-    purMonth = e.target.value; purOpenId = ""; purDraft = null; loadPurchases();
-  });
+  const reload = () => { purOpenId = ""; purDraft = null; loadPurchases(); };
+  view.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => { purSetPreset(b.dataset.preset); reload(); }));
+  ["purStartInput", "purEndInput"].forEach(id => { if ($(id)) $(id).addEventListener("change", () => {
+    const a = $("purStartInput").value, z = $("purEndInput").value;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(z)) return;
+    purStart = a <= z ? a : z; purEnd = a <= z ? z : a; purPreset = ""; reload();
+  }); });
   if ($("purBranchSelect")) $("purBranchSelect").addEventListener("change", (e) => { purBranch = e.target.value; renderPurchasesView(); });
   view.querySelectorAll("[data-status]").forEach(b => b.addEventListener("click", () => { purStatusFilter = b.dataset.status; renderPurchasesView(); }));
   view.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => {
@@ -517,7 +531,7 @@ function purExtraHtml(d) {
   </div>`;
 }
 
-// قائمة الموردين: كل الموردين بأسمائهم + كم فاتورة لكل واحد بالشهر، والمالك يضيف مورد جديد
+// قائمة الموردين: كل الموردين بأسمائهم + كم فاتورة لكل واحد بالفترة، والمالك يضيف مورد جديد
 function purSuppliersHtml(scoped) {
   const counts = {};
   scoped.forEach(i => { const n = String(i.supplier || "").trim(); if (n) counts[n] = (counts[n] || 0) + 1; });
@@ -536,4 +550,35 @@ function purSuppliersHtml(scoped) {
           <button type="button" class="cust-btn primary" id="purSupAdd">➕ أضف</button>
         </div>` : ""}` : ""}
     </div>`;
+}
+
+// أزرار الفترة السريعة
+function purSetPreset(k) {
+  const t = todayStr();
+  purPreset = k;
+  if (k === "today") { purStart = purEnd = t; }
+  else if (k === "yesterday") { purStart = purEnd = addDaysStr(t, -1); }
+  else if (k === "week") { purStart = addDaysStr(t, -6); purEnd = t; }
+  else if (k === "lastmonth") {
+    const [y, m] = t.split("-").map(Number);
+    const pm = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+    ({ start: purStart, end: purEnd } = purMonthRange(pm));
+  } else { purPreset = "month"; ({ start: purStart, end: purEnd } = purMonthRange(t.slice(0, 7))); }
+}
+
+// ترتيب يومي: كل يوم لحاله (الأحدث فوق) مع عدد فواتيره ومجموعه
+function purDayGroups(list) {
+  const groups = [];
+  list.forEach(inv => {
+    const d = inv.invoice_date || "";
+    let g = groups.find(x => x.date === d);
+    if (!g) {
+      const label = d ? new Date(d + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "numeric", timeZone: "UTC" }) : "بدون تاريخ";
+      g = { date: d, label, items: [], total: 0 };
+      groups.push(g);
+    }
+    g.items.push(inv);
+    if (inv.status !== "rejected") g.total = purRound(g.total + purInvoiceTotal(inv) * purSign(inv));
+  });
+  return groups.sort((a, b) => String(b.date).localeCompare(String(a.date)));
 }
