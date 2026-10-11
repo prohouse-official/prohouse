@@ -3592,3 +3592,4 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .dscan-adjust-stage{ flex:1; min-height:0; position:relative; }
 .dscan-adjust-stage canvas{ position:absolute; inset:0; touch-action:none; }
 .dscan-adjust-hint{ text-align:center; font-size:14px; color:#ddd; }
+.cust-clear-btn{ display:block; width:100%; margin-top:8px; min-height:44px; border:1.5px solid #f1c4c4; background:#fff5f5; color:#b42318; border-radius:14px; font-family:inherit; font-weight:800; font-size:14px; cursor:pointer; }

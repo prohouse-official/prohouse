@@ -156,6 +156,7 @@ function renderCustodyView(payments) {
         </button>
         ${d.qr ? `<div class="cust-qr">🔎 من رمز الفاتورة: <b>${escHtml(d.qr.seller)}</b>${d.qr.vat !== null ? ` · ضريبة ${d.qr.vat.toFixed(2)}` : ""}${d.qr.vatNo ? ` · ر.ض ${escHtml(d.qr.vatNo)}` : ""}</div>` : ""}
         ${d.photo ? `<input type="text" inputmode="numeric" class="cust-invno" placeholder="رقم الفاتورة (اختياري)" id="custExpInvNo" value="${escHtml(d.invoice_no)}">` : ""}
+        ${d.photo || String(d.amount).trim() || String(d.note).trim() ? `<button type="button" class="cust-clear-btn" id="custExpClear">🗑️ مسح — ما بدي أضيفها</button>` : ""}
         <label class="cust-check"><input type="checkbox" id="custNoReceipt" ${d.noReceipt ? "checked" : ""}> ما في فاتورة</label>
         <button type="button" class="cust-btn gold" id="custExpAdd">➕ أضف المصروف</button>
       </div>` : ""}
@@ -205,6 +206,7 @@ function renderCustodyView(payments) {
     renderCustodyView(payments);
   } });
   if ($("custPhotoBtn")) $("custPhotoBtn").addEventListener("click", openScan);
+  if ($("custExpClear")) $("custExpClear").addEventListener("click", () => { custodyDraftExpense = custodyEmptyDraft(); renderCustodyView(payments); });
   if ($("custExpAdd")) $("custExpAdd").addEventListener("click", () => addCustodyExpense(payments));
   // زر السكان فوق: ينزل لنموذج المصروف ويفتح الكاميرا مباشرة
   if ($("custScanTop")) $("custScanTop").addEventListener("click", () => {

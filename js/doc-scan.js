@@ -122,7 +122,9 @@ const DocScan = (() => {
   function detect(imgData) {
     const { width: w, height: h, data } = imgData;
     const N = w * h;
-    const g = grayOf(data, N);
+    // "بياض الورقة" = أصغر قناة لون: الورق أبيض بكل القنوات، والخشب والطاولات الملونة تنزل بقناة وحدة على الأقل
+    const g = new Uint8ClampedArray(N);
+    for (let i = 0, j = 0; i < N; i++, j += 4) g[i] = Math.min(data[j], data[j + 1], data[j + 2]);
     const hist = histogram(g);
     const o = otsu(hist, N);
     const thrs = [...new Set([o, ...[0.45, 0.55, 0.65, 0.75, 0.84, 0.9].map(p => percentile(hist, N, p))])]
@@ -145,6 +147,71 @@ const DocScan = (() => {
     }
     return best ? orderQuad(best.q) : null;
   }
+
+  // ---------- كشف الحواف بـ OpenCV (نفس طريقة تطبيقات السكان) — ينحمّل مرة وحدة ويضل بالكاش ----------
+  const CV_URL = "https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js";
+  let cvReady = null, CV = null;
+  function loadCV() {
+    if (!cvReady) cvReady = new Promise((res) => {
+      const done = (m) => { CV = m && m.Mat ? m : null; res(!!CV); };
+      if (window.cv && window.cv.Mat) return done(window.cv);
+      const s = document.createElement("script"); s.src = CV_URL; s.async = true;
+      s.onload = () => {
+        const c = window.cv;
+        if (!c) return done(null);
+        if (c.Mat) return done(c);
+        if (typeof c.then === "function") c.then((m) => done(m));
+        else c.onRuntimeInitialized = () => done(window.cv);
+      };
+      s.onerror = () => { cvReady = null; res(false); };
+      document.head.appendChild(s);
+    });
+    return cvReady;
+  }
+
+  function detectCV(imgData) {
+    if (!CV) return null;
+    const w = imgData.width, h = imgData.height, N = w * h;
+    const mats = [];
+    const M = (m) => { mats.push(m); return m; };
+    try {
+      const src = M(CV.matFromImageData(imgData));
+      const ch = new CV.MatVector(); mats.push(ch);
+      CV.split(src, ch);
+      const mn = M(new CV.Mat());
+      CV.min(ch.get(0), ch.get(1), mn); CV.min(mn, ch.get(2), mn);
+      const gray = M(new CV.Mat());
+      CV.cvtColor(src, gray, CV.COLOR_RGBA2GRAY);
+      const edges = M(new CV.Mat()), e2 = M(new CV.Mat());
+      const ks = new CV.Size(5, 5);
+      CV.GaussianBlur(mn, mn, ks, 0); CV.GaussianBlur(gray, gray, ks, 0);
+      CV.Canny(mn, edges, 25, 75); CV.Canny(gray, e2, 25, 75);
+      CV.bitwise_or(edges, e2, edges);
+      const kernel = M(CV.getStructuringElement(CV.MORPH_RECT, new CV.Size(3, 3)));
+      CV.dilate(edges, edges, kernel, new CV.Point(-1, -1), 2);
+      const contours = new CV.MatVector(); mats.push(contours);
+      const hier = M(new CV.Mat());
+      CV.findContours(edges, contours, hier, CV.RETR_LIST, CV.CHAIN_APPROX_SIMPLE);
+      let best = null, bestA = 0;
+      for (let i = 0; i < contours.size(); i++) {
+        const c = contours.get(i);
+        const area = CV.contourArea(c);
+        if (area < N * 0.08 || area > N * 0.98) { c.delete(); continue; }
+        const approx = new CV.Mat();
+        CV.approxPolyDP(c, approx, 0.02 * CV.arcLength(c, true), true);
+        if (approx.rows === 4 && CV.isContourConvex(approx) && area > bestA) {
+          bestA = area;
+          best = [0, 1, 2, 3].map(k => [approx.data32S[k * 2], approx.data32S[k * 2 + 1]]);
+        }
+        approx.delete(); c.delete();
+      }
+      return best ? orderQuad(best) : null;
+    } catch (e) { return null; }
+    finally { mats.forEach(m => { try { m.delete(); } catch (e) {} }); }
+  }
+
+  // OpenCV أول (حواف حقيقية)، وإذا ما لقى نرجع للطريقة الخفيفة
+  const detectBest = (imgData) => detectCV(imgData) || detect(imgData);
 
   // ---------- تعديل الميلان (Perspective) ----------
   function solve(A, b) {
@@ -284,7 +351,7 @@ const DocScan = (() => {
 
   function findQuad(full) {
     const { k, data } = smallFrame(full);
-    const q = detect(data);
+    const q = detectBest(data);
     return q ? inset(q.map(p => [p[0] / k, p[1] / k]), 0.008) : null;
   }
 
@@ -472,7 +539,7 @@ const DocScan = (() => {
     const ctx = cv.getContext("2d", { willReadFrequently: true });
     ctx.filter = "blur(1px)";
     ctx.drawImage(video, 0, 0, cv.width, cv.height);
-    const q = detect(ctx.getImageData(0, 0, cv.width, cv.height));
+    const q = detectBest(ctx.getImageData(0, 0, cv.width, cv.height));
     const full = q ? q.map(p => [p[0] / k, p[1] / k]) : null;
     drawQuad(full, vw, vh);
     if (!full) { stableCount = 0; lastQuad = null; hint("وجّه الكاميرا على الفاتورة"); return; }
@@ -678,7 +745,7 @@ const DocScan = (() => {
     opts = o || {};
     auto = true;
     ui();
-    loadZX(); loadJsQR();
+    loadZX(); loadJsQR(); loadCV();
     document.addEventListener("visibilitychange", onHidden);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("no camera api");
@@ -703,5 +770,5 @@ const DocScan = (() => {
     }
   }
 
-  return { open, close, _test: { detect, processCanvas, parseZatca, readQr, enhance, warp } };
+  return { open, close, _test: { detect, detectCV, loadCV, processCanvas, parseZatca, readQr, enhance, warp } };
 })();

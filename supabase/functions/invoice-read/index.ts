@@ -15,7 +15,24 @@ const json = (body: unknown, status = 200) =>
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
 const GKEY = Deno.env.get("GEMINI_API_KEY") || "";
-const MODEL = KEY ? (Deno.env.get("INVOICE_AI_MODEL") || "claude-sonnet-5-5") : (Deno.env.get("INVOICE_GEMINI_MODEL") || "gemini-2.5-flash");
+const MODEL = KEY ? (Deno.env.get("INVOICE_AI_MODEL") || "claude-sonnet-5-5") : (Deno.env.get("INVOICE_GEMINI_MODEL") || "gemini-flash-latest");
+const GL = "https://generativelanguage.googleapis.com/v1beta";
+let gModel = "";
+// أحدث نموذج Flash متاح لهالمفتاح (Google توقف نماذج قديمة للحسابات الجديدة)
+async function pickGeminiModel(): Promise<string> {
+  try {
+    const r = await fetch(`${GL}/models?pageSize=200`, { headers: { "x-goog-api-key": GKEY } });
+    // deno-lint-ignore no-explicit-any
+    const out: any = await r.json();
+    const names: string[] = (out?.models || [])
+      .filter((m: { supportedGenerationMethods?: string[] }) => (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map((m: { name: string }) => m.name.replace(/^models\//, ""))
+      .filter((n: string) => /flash/.test(n) && !/lite|image|tts|live|audio|embedding|thinking|exp/.test(n));
+    const ver = (n: string) => Number((/gemini-(\d+(?:\.\d+)?)/.exec(n) || [])[1] || 0);
+    names.sort((a, b) => ver(b) - ver(a) || Number(/preview/.test(a)) - Number(/preview/.test(b)));
+    return names[0] || "";
+  } catch { return ""; }
+}
 const DAILY_LIMIT = 80;
 
 const PROMPT = `This is a photo of a purchase invoice or receipt (Saudi Arabia, Arabic and/or English).
@@ -74,28 +91,29 @@ Deno.serve(async (req) => {
       contents: [{ role: "user", parts: [{ inlineData: { mimeType: m[1], data: m[3] } }, { text: PROMPT }] }],
       generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json" },
     });
-    // مفاتيح AI Studio العادية (AIza…) على generativelanguage، ومفاتيح Vertex السريعة (AQ.…) على aiplatform
-    const urls = [
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
-      `https://aiplatform.googleapis.com/v1/publishers/google/models/${MODEL}:generateContent`,
-    ];
-    if (GKEY.startsWith("AQ.")) urls.reverse();
     const errs: string[] = [];
-    for (const url of urls) {
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": GKEY }, body });
+    const call = async (model: string) => {
+      const res = await fetch(`${GL}/models/${model}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": GKEY }, body });
       // deno-lint-ignore no-explicit-any
       const out: any = await res.json().catch(() => ({}));
-      text = (out?.candidates?.[0]?.content?.parts || []).map((p: { text?: string }) => p.text || "").filter((t: string) => t).join("");
-      if (res.ok && text) { ok = true; break; }
-      errs.push(`${new URL(url).host} ${res.status} ${out?.error?.status || ""} ${out?.error?.message || ""} ${out?.candidates?.[0]?.finishReason || ""}`.slice(0, 140));
+      text = (out?.candidates?.[0]?.content?.parts || []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text || "").join("");
+      if (res.ok && text) return true;
+      errs.push(`${model} ${res.status} ${out?.error?.status || ""} ${out?.error?.message || ""} ${out?.candidates?.[0]?.finishReason || ""}`.slice(0, 140));
+      return res.status === 404 ? null : false;
+    };
+    let r = await call(gModel || MODEL);
+    if (r === null) {
+      gModel = await pickGeminiModel();
+      if (gModel) r = await call(gModel);
     }
+    ok = r === true;
     if (!ok) err = errs.join(" | ");
   }
   // deno-lint-ignore no-explicit-any
   let invoice: any = null;
   try { const s = text.indexOf("{"), e = text.lastIndexOf("}"); invoice = JSON.parse(text.slice(s, e + 1)); } catch { invoice = null; }
   if (ok && !invoice && !err) err = "bad json: " + text.slice(0, 120);
-  await admin.from("invoice_ai_log").insert({ employee_id: sess.employee_id, ok: !!invoice, model: MODEL, err: err.slice(0, 300) || null });
+  await admin.from("invoice_ai_log").insert({ employee_id: sess.employee_id, ok: !!invoice, model: KEY ? MODEL : (gModel || MODEL), err: err.slice(0, 300) || null });
   if (!ok || !invoice) return json({ error: "ai_failed" }, 502);
   return json({ invoice });
 });
