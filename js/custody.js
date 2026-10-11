@@ -80,7 +80,8 @@ async function loadCustody(date, branch) {
 
 // ---- الصفحة على ٣ خطوات: ① العهدة أول ما يوصل ② المصروفات مع صورة الفاتورة ③ الإغلاق آخر اليوم ----
 // كل خطوة تنحفظ لحالها فوراً (ما في شي يضيع لو سكّر الجوال بالنص)
-let custodyDraftExpense = { amount: "", note: "", photo: "", noReceipt: false };
+const custodyEmptyDraft = () => ({ amount: "", note: "", photo: "", noReceipt: false, qr: null, invoice_no: "" });
+let custodyDraftExpense = custodyEmptyDraft();
 let custodyBusy = false;
 let custodyScanRequested = false; // جاي من زر «سكان فاتورة» بالرئيسية
 
@@ -139,7 +140,8 @@ function renderCustodyView(payments) {
           <div class="cust-exp-row">
             <div class="cust-exp-main"><b>${sar(e.amount)}</b><span>${escHtml(e.note || "")}</span>
               <small>${escHtml(e.by || "")}${e.at ? " · " + custodyTime(e.at) : ""}</small></div>
-            ${e.receipt ? `<button type="button" class="cust-receipt-btn" data-receipt="${escHtml(e.receipt)}">📄 الفاتورة</button>` : `<span class="cust-noreceipt">بدون فاتورة</span>`}
+            ${e.receipt ? `<button type="button" class="cust-receipt-btn" data-receipt="${escHtml(e.receipt)}">📄 الفاتورة</button>`
+              : canEdit ? `<button type="button" class="cust-receipt-btn add" data-attach="${i}">📷 أضف الفاتورة</button>` : `<span class="cust-noreceipt">بدون فاتورة</span>`}
             ${canEdit ? `<button type="button" class="cust-exp-del" data-del="${i}" aria-label="حذف">✕</button>` : ""}
           </div>`).join("")}
       </div>` : `<div class="cust-hint">ما فيه مصروفات للحين.</div>`}
@@ -149,10 +151,11 @@ function renderCustodyView(payments) {
           <input type="number" inputmode="decimal" step="any" min="0" placeholder="المبلغ" id="custExpAmount" value="${escHtml(d.amount)}">
           <input type="text" placeholder="على إيش؟ (اختياري)" id="custExpNote" value="${escHtml(d.note)}">
         </div>
-        <label class="cust-photo-btn ${d.photo ? "has" : ""}" id="custPhotoLabel">
-          <input type="file" accept="image/*" capture="environment" id="custExpPhoto" hidden>
-          ${d.photo ? `<img src="${d.photo}" alt="الفاتورة"> <span>✓ الفاتورة جاهزة — اضغط لإعادة التصوير</span>` : `<span>📷 صوّر الفاتورة (سكان)</span>`}
-        </label>
+        <button type="button" class="cust-photo-btn ${d.photo ? "has" : ""}" id="custPhotoBtn">
+          ${d.photo ? `<img src="${d.photo}" alt="الفاتورة"> <span>✓ الفاتورة جاهزة — اضغط لإعادة السكان</span>` : `<span>📷 سكان الفاتورة</span>`}
+        </button>
+        ${d.qr ? `<div class="cust-qr">🔎 من رمز الفاتورة: <b>${escHtml(d.qr.seller)}</b>${d.qr.vat !== null ? ` · ضريبة ${d.qr.vat.toFixed(2)}` : ""}${d.qr.vatNo ? ` · ر.ض ${escHtml(d.qr.vatNo)}` : ""}</div>` : ""}
+        ${d.photo ? `<input type="text" inputmode="numeric" class="cust-invno" placeholder="رقم الفاتورة (اختياري)" id="custExpInvNo" value="${escHtml(d.invoice_no)}">` : ""}
         <label class="cust-check"><input type="checkbox" id="custNoReceipt" ${d.noReceipt ? "checked" : ""}> ما في فاتورة</label>
         <button type="button" class="cust-btn gold" id="custExpAdd">➕ أضف المصروف</button>
       </div>` : ""}
@@ -189,18 +192,22 @@ function renderCustodyView(payments) {
   if ($("custExpAmount")) $("custExpAmount").addEventListener("input", (e) => { d.amount = e.target.value; });
   if ($("custExpNote")) $("custExpNote").addEventListener("input", (e) => { d.note = e.target.value; });
   if ($("custNoReceipt")) $("custNoReceipt").addEventListener("change", (e) => { d.noReceipt = e.target.checked; });
-  if ($("custExpPhoto")) $("custExpPhoto").addEventListener("change", async (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    try { d.photo = await receiptImageDataUrl(f); d.noReceipt = false; renderCustodyView(payments); }
-    catch (err) { showToast("⚠ ما قدرنا نقرأ الصورة — جرّب مرة ثانية"); }
-  });
+  if ($("custExpInvNo")) $("custExpInvNo").addEventListener("input", (e) => { d.invoice_no = e.target.value; });
+  const openScan = () => DocScan.open({ onDone: ({ dataUrl, qr }) => {
+    d.photo = dataUrl; d.noReceipt = false; d.qr = qr || null;
+    if (qr) {
+      if (!String(d.amount).trim() && qr.total !== null) d.amount = String(qr.total);
+      if (!String(d.note).trim()) d.note = qr.seller;
+    }
+    renderCustodyView(payments);
+  } });
+  if ($("custPhotoBtn")) $("custPhotoBtn").addEventListener("click", openScan);
   if ($("custExpAdd")) $("custExpAdd").addEventListener("click", () => addCustodyExpense(payments));
   // زر السكان فوق: ينزل لنموذج المصروف ويفتح الكاميرا مباشرة
   if ($("custScanTop")) $("custScanTop").addEventListener("click", () => {
     const form = $("custExpForm");
     if (form) form.scrollIntoView({ behavior: "smooth", block: "center" });
-    if ($("custExpPhoto")) $("custExpPhoto").click();
+    openScan();
   });
   if (custodyScanRequested && $("custExpForm")) {
     custodyScanRequested = false;
@@ -208,32 +215,13 @@ function renderCustodyView(payments) {
   }
   view.querySelectorAll("[data-del]").forEach(btn => btn.addEventListener("click", () => deleteCustodyExpense(Number(btn.dataset.del), payments)));
   view.querySelectorAll("[data-receipt]").forEach(btn => btn.addEventListener("click", () => openCustodyReceipt(btn.dataset.receipt)));
+  view.querySelectorAll("[data-attach]").forEach(btn => btn.addEventListener("click", () => attachCustodyReceipt(Number(btn.dataset.attach), payments)));
   const branchSelect = $("custodyBranchSelect");
   if (branchSelect) branchSelect.addEventListener("change", () => {
     Branch.set(branchSelect.value);
     loadCustody(currentCustodyDate, branchSelect.value);
   });
   if ($("custodyCloseBtn")) $("custodyCloseBtn").addEventListener("click", () => saveCustody(payments));
-}
-
-// صورة الفاتورة: نصغّرها (أطول ضلع ١٦٠٠) ونضغطها JPEG — واضحة للقراءة وخفيفة على النت
-function receiptImageDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const max = 1600, k = Math.min(1, max / Math.max(img.width, img.height));
-      const cv = document.createElement("canvas");
-      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
-      const ctx = cv.getContext("2d");
-      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
-      ctx.drawImage(img, 0, 0, cv.width, cv.height);
-      URL.revokeObjectURL(url);
-      resolve(cv.toDataURL("image/jpeg", 0.72));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image")); };
-    img.src = url;
-  });
 }
 
 // الحفظ دايماً على آخر نسخة بالسيرفر (جهازين ممكن يسجّلوا بنفس اليوم) — ونكتب بس الأعمدة اللي تغيّرت
@@ -288,10 +276,45 @@ async function addCustodyExpense(payments) {
     }
   }
   const emp = Auth.getEmployee();
-  const exp = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), amount, note: String(d.note).trim(), receipt, by: emp ? emp.name : "", at: new Date().toISOString() };
+  const exp = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), amount, note: String(d.note).trim(), receipt, by: emp ? emp.name : "", at: new Date().toISOString(),
+    ...custodyInvoiceFields(d.qr, d.invoice_no) };
   const ok = await custodyPatch((fresh) => ({ expenses: [...fresh.expenses, exp] }), payments, "✅ انضاف المصروف");
-  if (ok) { custodyDraftExpense = { amount: "", note: "", photo: "", noReceipt: false }; renderCustodyView(payments); }
+  if (ok) { custodyDraftExpense = custodyEmptyDraft(); renderCustodyView(payments); }
   else if (btn) { btn.disabled = false; btn.textContent = "➕ أضف المصروف"; }
+}
+
+// بيانات الفاتورة من رمز QR (تروح للمشتريات وتقرير المحاسب)
+function custodyInvoiceFields(qr, invoiceNo) {
+  const f = {};
+  if (qr && qr.seller) {
+    f.supplier = qr.seller;
+    if (qr.vatNo) f.supplier_vat = qr.vatNo;
+    if (qr.vat !== null && qr.vat !== undefined) f.vat = qr.vat;
+    if (qr.date) f.invoice_date = qr.date;
+  }
+  if (String(invoiceNo || "").trim()) f.invoice_no = String(invoiceNo).trim();
+  return f;
+}
+
+// مصروف انسجّل بدون فاتورة → نضيف صورتها بعدين
+async function attachCustodyReceipt(i, payments) {
+  const target = currentCustody.expenses[i];
+  if (!target) return;
+  DocScan.open({ onDone: async ({ dataUrl, qr }) => {
+    let receipt = "";
+    try {
+      showToast("⏳ جاري رفع الفاتورة…");
+      receipt = await SupaEngine.uploadReceipt(currentCustodyDate, currentCustodyBranch, dataUrl);
+    } catch (e) { showToast("⚠ ما انرفعت الفاتورة — تأكد من النت وجرب مرة ثانية"); return; }
+    await custodyPatch((fresh) => {
+      const idx = fresh.expenses.findIndex(e => (target.id && e.id === target.id) || (!target.id && e.amount === target.amount && e.note === target.note));
+      if (idx < 0) return null;
+      const old = fresh.expenses[idx];
+      const extra = custodyInvoiceFields(qr, "");
+      Object.keys(extra).forEach(k => { if (old[k] !== undefined && old[k] !== "") delete extra[k]; });
+      return { expenses: fresh.expenses.map((e, k) => k === idx ? { ...e, ...extra, receipt } : e) };
+    }, payments, "✅ انضافت الفاتورة");
+  } });
 }
 
 async function deleteCustodyExpense(i, payments) {

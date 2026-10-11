@@ -146,8 +146,10 @@ function custodyExpenseToInvoice(closing, exp) {
   const ref = `${closing.date}|${closing.branch}|${exp.id || exp.at || exp.amount}`;
   return {
     id: "cust_" + ref, source: "custody", source_ref: ref, kind: "invoice",
-    invoice_date: closing.date, invoice_no: "", supplier: String(exp.note || "").trim(), branch: closing.branch,
-    subtotal: null, vat: null, total: Number(exp.amount) || 0, lines: [], receipt: exp.receipt || "",
+    invoice_date: exp.invoice_date || closing.date, invoice_no: exp.invoice_no || "", supplier: String(exp.supplier || exp.note || "").trim(), branch: closing.branch,
+    subtotal: exp.vat !== undefined && exp.vat !== null ? purRound((Number(exp.amount) || 0) - Number(exp.vat)) : null,
+    vat: exp.vat !== undefined && exp.vat !== null ? Number(exp.vat) : null, total: Number(exp.amount) || 0, lines: [], receipt: exp.receipt || "",
+    extra: { ...(exp.supplier_vat ? { supplier_vat: exp.supplier_vat } : {}), ...(exp.note && exp.supplier ? { note: exp.note } : {}) },
     status: "pending", created_by: exp.by || "", created_at: exp.at || "", _virtual: true
   };
 }
@@ -306,7 +308,7 @@ function purDetailHtml() {
       <div class="pur-detail-top">
         <span class="pur-status st-${d.status}">${PUR_STATUS[d.status] || ""}</span>
         ${d.receipt ? `<button type="button" class="cust-receipt-btn" data-receipt="${escHtml(d.receipt)}">📄 صورة الفاتورة</button>` : `<span class="cust-noreceipt">بدون صورة</span>`}
-        ${canEdit && Auth.isOwner() ? `<label class="pur-mini pur-photo"><input type="file" accept="image/*" capture="environment" id="purPhoto" hidden>📷 ${d.receipt ? "غيّر الصورة" : "أرفق صورة"}</label>` : ""}
+        ${canEdit && Auth.isOwner() ? `<button type="button" class="pur-mini pur-photo" id="purPhoto">📷 ${d.receipt ? "سكان جديد" : "سكان الفاتورة"}</button>` : ""}
       </div>
       ${purExtraHtml(d)}
       ${d.kind === "return" ? `<div class="pur-hint">↩ مرتجع ${original ? `من فاتورة ${escHtml(original.supplier || "")} #${escHtml(original.invoice_no || "")}` : ""} — ينقص من المشتريات</div>` : ""}
@@ -474,21 +476,34 @@ function bindPurchasesView() {
   });
   view.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => savePurchaseReview(b.dataset.act)));
   if ($("purReturn")) $("purReturn").addEventListener("click", newPurchaseReturn);
-  if ($("purPhoto")) $("purPhoto").addEventListener("change", async (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f || !purDraft) return;
+  if ($("purPhoto")) $("purPhoto").addEventListener("click", () => {
     const draft = purDraft;
-    try {
-      showToast("⏳ جاري رفع الصورة…");
-      const dataUrl = await receiptImageDataUrl(f);
-      draft.receipt = await SupaEngine.uploadReceipt(draft.invoice_date || todayStr(), draft.branch || PUR_CENTRAL_BRANCH, dataUrl);
-      if (purDraft === draft) renderPurchasesView();
-      showToast("✅ انرفعت الصورة — لا تنسى تحفظ");
-    } catch (err) {
-      showToast("⚠ ما انرفعت الصورة — " + (err.message || err));
-    }
+    if (!draft) return;
+    DocScan.open({ onDone: async ({ dataUrl, qr }) => {
+      try {
+        showToast("⏳ جاري رفع الصورة…");
+        draft.receipt = await SupaEngine.uploadReceipt(draft.invoice_date || todayStr(), draft.branch || PUR_CENTRAL_BRANCH, dataUrl);
+        purFillFromQr(draft, qr);
+        if (purDraft === draft) renderPurchasesView();
+        showToast(qr ? "✅ انرفعت وانقرت بيانات الفاتورة — راجعها واحفظ" : "✅ انرفعت الصورة — لا تنسى تحفظ");
+      } catch (err) {
+        showToast("⚠ ما انرفعت الصورة — " + (err.message || err));
+      }
+    } });
   });
   view.querySelectorAll(".pur-detail [data-receipt]").forEach(btn => btn.addEventListener("click", () => openCustodyReceipt(btn.dataset.receipt)));
+}
+
+// رمز QR الفاتورة الضريبية → نعبّي الفاضي بس (ما نغيّر شي كتبه أحد)
+function purFillFromQr(d, qr) {
+  if (!qr || !qr.seller) return;
+  const empty = (v) => v === null || v === undefined || String(v).trim() === "";
+  if (empty(d.supplier)) d.supplier = qr.seller;
+  if (empty(d.invoice_date) && qr.date) d.invoice_date = qr.date;
+  if (empty(d.total) && qr.total !== null) d.total = qr.total;
+  if (empty(d.vat) && qr.vat !== null) d.vat = qr.vat;
+  if (empty(d.subtotal) && qr.total !== null && qr.vat !== null) d.subtotal = purRound(qr.total - qr.vat);
+  if (qr.vatNo) d.extra = { ...(d.extra || {}), supplier_vat: (d.extra && d.extra.supplier_vat) || qr.vatNo };
 }
 
 async function savePurchaseReview(status) {

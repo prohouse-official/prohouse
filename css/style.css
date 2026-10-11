@@ -3559,3 +3559,28 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .pur-sup-vat{ width:150px; min-height:34px; padding:4px 8px; border-radius:10px; border:1.5px solid var(--line-strong); font-family:inherit; font-size:12px; font-weight:800; }
 #acctReportControls > *, #acctReportView, .acct-sec{ min-width:0; max-width:100%; }
 .acct-scroll{ max-width:100%; }
+
+/* ===== سكان الفواتير (مثل المسح الضوئي بالملاحظات) ===== */
+.dscan{ position:fixed; inset:0; z-index:9999; background:#000; color:#fff; display:flex; flex-direction:column; }
+.dscan-top, .dscan-bottom{ display:flex; align-items:center; justify-content:space-between; padding:12px 18px; padding-top:max(12px, env(safe-area-inset-top)); background:rgba(40,40,40,.85); }
+.dscan-bottom{ padding-bottom:max(18px, env(safe-area-inset-bottom)); }
+.dscan-txt{ background:none; border:0; color:#fff; font-size:17px; font-weight:700; cursor:pointer; min-width:56px; padding:6px; }
+.dscan-stage{ position:relative; flex:1; overflow:hidden; }
+.dscan-stage video, .dscan-overlay{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.dscan-hint{ position:absolute; left:50%; bottom:18px; transform:translateX(-50%); background:rgba(30,30,30,.75); padding:8px 16px; border-radius:10px; font-size:15px; white-space:nowrap; }
+.dscan-shutter{ width:72px; height:72px; border-radius:50%; border:4px solid #fff; background:#fff; box-shadow:inset 0 0 0 4px #000; cursor:pointer; }
+.dscan-spacer{ min-width:56px; }
+.dscan-gallery{ font-size:24px; text-align:center; }
+.dscan-nocam .dscan-shutter{ visibility:hidden; }
+.dscan-review{ position:absolute; inset:0; background:#1b1b1b; display:flex; flex-direction:column; padding:14px; padding-top:max(14px, env(safe-area-inset-top)); gap:10px; }
+.dscan-review-img{ flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+.dscan-review-img img{ max-width:100%; max-height:100%; object-fit:contain; border-radius:6px; background:#fff; }
+.dscan-qr, .dscan-note{ font-size:14px; line-height:1.5; background:#2a2a2a; border-radius:10px; padding:8px 12px; }
+.dscan-note{ color:#ffd866; }
+.dscan-review-actions{ display:flex; gap:10px; padding-bottom:env(safe-area-inset-bottom); }
+.dscan-btn{ flex:1; min-height:52px; border-radius:14px; border:1px solid #555; background:#2a2a2a; color:#fff; font-size:16px; font-weight:800; cursor:pointer; }
+.dscan-btn.primary{ background:#f2be22; border-color:#f2be22; color:#111; }
+.cust-photo-btn{ width:100%; color:inherit; font-family:inherit; }
+.cust-qr{ margin-top:8px; font-size:13px; background:#EEF8F2; color:#137A50; border-radius:10px; padding:7px 10px; }
+.cust-invno{ margin-top:8px; width:100%; box-sizing:border-box; min-height:46px; padding:10px 12px; border-radius:14px; border:1.5px solid var(--line-strong); font-family:inherit; font-size:15px; font-weight:700; background:#fff; }
+.cust-receipt-btn.add{ background:#fff7dd; border-color:#f2be22; }
