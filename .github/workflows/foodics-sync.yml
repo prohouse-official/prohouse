@@ -10,13 +10,22 @@ on:
         description: "Pull this many past days (e.g. 14). Empty = yesterday + today"
         required: false
         default: ""
+      backfill_from:
+        description: "Pull a date range: from YYYY-MM-DD (max 75 days per run)"
+        required: false
+        default: ""
+      backfill_to:
+        description: "Range end YYYY-MM-DD (empty = yesterday)"
+        required: false
+        default: ""
       explore:
         description: "1 = only log the Foodics page layout (report links, table columns) without sending anything"
         required: false
         default: ""
 
 concurrency:
-  group: foodics-sync
+  # سحب فترة قديمة يمشي لحاله (ما يلغيه التشغيل الدوري كل نص ساعة)
+  group: foodics-sync-${{ github.event.inputs.backfill_from != '' && 'backfill' || 'main' }}
   cancel-in-progress: false
 
 jobs:
@@ -64,6 +73,8 @@ jobs:
         working-directory: ./foodics-sync
         env:
           BACKFILL_DAYS: ${{ github.event.inputs.backfill_days }}
+          BACKFILL_FROM: ${{ github.event.inputs.backfill_from }}
+          BACKFILL_TO: ${{ github.event.inputs.backfill_to }}
           FOODICS_EXPLORE: ${{ github.event.inputs.explore }}
           # أسماء الفروع هون (UTF-8 مضمون) — أسرار GitHub تخرّب العربي أحياناً لـ ????
           FOODICS_BRANCHES: "الروضة,الشاطئ"
