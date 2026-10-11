@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     .eq("employee_id", sess.employee_id).gte("at", since);
   if ((count || 0) >= DAILY_LIMIT) return json({ error: "limit" }, 429);
 
-  let ok = false, text = "";
+  let ok = false, text = "", err = "";
   if (KEY) {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -68,23 +68,34 @@ Deno.serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     const out: any = await res.json().catch(() => ({}));
     ok = res.ok; text = (out?.content || []).map((c: { text?: string }) => c.text || "").join("");
+    if (!res.ok) err = `${res.status} ${out?.error?.message || ""}`;
   } else {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": GKEY },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ inlineData: { mimeType: m[1], data: m[3] } }, { text: PROMPT }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json" },
-      }),
+    const body = JSON.stringify({
+      contents: [{ role: "user", parts: [{ inlineData: { mimeType: m[1], data: m[3] } }, { text: PROMPT }] }],
+      generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json" },
     });
-    // deno-lint-ignore no-explicit-any
-    const out: any = await res.json().catch(() => ({}));
-    ok = res.ok; text = (out?.candidates?.[0]?.content?.parts || []).map((p: { text?: string }) => p.text || "").join("");
+    // مفاتيح AI Studio العادية (AIza…) على generativelanguage، ومفاتيح Vertex السريعة (AQ.…) على aiplatform
+    const urls = [
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
+      `https://aiplatform.googleapis.com/v1/publishers/google/models/${MODEL}:generateContent`,
+    ];
+    if (GKEY.startsWith("AQ.")) urls.reverse();
+    const errs: string[] = [];
+    for (const url of urls) {
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": GKEY }, body });
+      // deno-lint-ignore no-explicit-any
+      const out: any = await res.json().catch(() => ({}));
+      text = (out?.candidates?.[0]?.content?.parts || []).map((p: { text?: string }) => p.text || "").filter((t: string) => t).join("");
+      if (res.ok && text) { ok = true; break; }
+      errs.push(`${new URL(url).host} ${res.status} ${out?.error?.status || ""} ${out?.error?.message || ""} ${out?.candidates?.[0]?.finishReason || ""}`.slice(0, 140));
+    }
+    if (!ok) err = errs.join(" | ");
   }
   // deno-lint-ignore no-explicit-any
   let invoice: any = null;
   try { const s = text.indexOf("{"), e = text.lastIndexOf("}"); invoice = JSON.parse(text.slice(s, e + 1)); } catch { invoice = null; }
-  await admin.from("invoice_ai_log").insert({ employee_id: sess.employee_id, ok: !!invoice, model: MODEL });
+  if (ok && !invoice && !err) err = "bad json: " + text.slice(0, 120);
+  await admin.from("invoice_ai_log").insert({ employee_id: sess.employee_id, ok: !!invoice, model: MODEL, err: err.slice(0, 300) || null });
   if (!ok || !invoice) return json({ error: "ai_failed" }, 502);
   return json({ invoice });
 });
