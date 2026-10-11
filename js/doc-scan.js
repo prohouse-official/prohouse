@@ -517,7 +517,8 @@ const DocScan = (() => {
   function review(still, quad) {
     const box = el.querySelector(".dscan-review");
     let q = quad || fullQuad(still);
-    let mode = "color", flat = null, out = null, readSeq = 0;
+    // الصورة الأصلية بس (مقصوصة ومعدولة) — بدون فلاتر ألوان
+    let mode = "original", flat = null, out = null, readSeq = 0;
     const state = { qr: null, ai: null, dataUrl: "" };
 
     const render = () => {
@@ -529,7 +530,6 @@ const DocScan = (() => {
         <div class="dscan-review-img"><img src="${state.dataUrl}" alt="الفاتورة"></div>
         ${quad ? "" : '<div class="dscan-note">ما لقطنا حدود الورقة تلقائياً — اضغط «✂️ الحواف» وحددها</div>'}
         <div class="dscan-modes">
-          ${[["color", "ملون"], ["gray", "رمادي"], ["original", "الأصلي"]].map(([m, t]) => `<button type="button" class="dscan-chip${m === mode ? " on" : ""}" data-mode="${m}">${t}</button>`).join("")}
           <button type="button" class="dscan-chip" data-act="crop">✂️ الحواف</button>
         </div>
         <div class="dscan-qr">🔎 جاري قراءة الفاتورة…</div>
@@ -537,7 +537,6 @@ const DocScan = (() => {
           <button type="button" class="dscan-btn" data-act="retake">↺ إعادة</button>
           <button type="button" class="dscan-btn primary" data-act="use">✓ استخدم</button>
         </div>`;
-      box.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => { mode = b.dataset.mode; render(); }));
       box.querySelector('[data-act="crop"]').addEventListener("click", () => adjust(still, q, (nq) => { q = nq; quad = nq; render(); }));
       box.querySelector('[data-act="retake"]').addEventListener("click", () => {
         box.classList.add("hidden"); box.innerHTML = ""; busy = false; stableCount = 0; lastQuad = null;
