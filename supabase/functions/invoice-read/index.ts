@@ -1,5 +1,6 @@
 // 🤖 قراءة فاتورة كاملة من صورتها: المورد، الرقم الضريبي، رقم الفاتورة، التاريخ، الأصناف، والمبالغ.
-// يشتغل بس إذا انحط مفتاح Claude بأسرار Supabase باسم ANTHROPIC_API_KEY (بدونه يرجّع 503 والموقع يكمل بالـ QR).
+// يشتغل إذا انحط مفتاح بأسرار Supabase: ANTHROPIC_API_KEY (Claude) أو GEMINI_API_KEY (Gemini المجاني).
+// بدون مفتاح يرجّع 503 والموقع يكمل بالـ QR.
 // الصورة ما تنحفظ هون — بس تنقرأ وترجع البيانات. لازم جلسة موقع صالحة، وفيه حد يومي لكل موظف.
 //   POST {image: "data:image/jpeg;base64,..."} → {invoice:{...}}
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -13,7 +14,8 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 const KEY = Deno.env.get("ANTHROPIC_API_KEY") || "";
-const MODEL = Deno.env.get("INVOICE_AI_MODEL") || "claude-sonnet-5-5";
+const GKEY = Deno.env.get("GEMINI_API_KEY") || "";
+const MODEL = KEY ? (Deno.env.get("INVOICE_AI_MODEL") || "claude-sonnet-5-5") : (Deno.env.get("INVOICE_GEMINI_MODEL") || "gemini-2.5-flash");
 const DAILY_LIMIT = 80;
 
 const PROMPT = `This is a photo of a purchase invoice or receipt (Saudi Arabia, Arabic and/or English).
@@ -28,7 +30,7 @@ Use null for anything you cannot read with confidence — never guess numbers. n
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  if (!KEY) return json({ error: "no_ai" }, 503);
+  if (!KEY && !GKEY) return json({ error: "no_ai" }, 503);
 
   const token = req.headers.get("x-session-token") || "";
   const { data: sess } = await admin.from("sessions")
@@ -50,24 +52,39 @@ Deno.serve(async (req) => {
     .eq("employee_id", sess.employee_id).gte("at", since);
   if ((count || 0) >= DAILY_LIMIT) return json({ error: "limit" }, 429);
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": KEY, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({
-      model: MODEL, max_tokens: 3000, temperature: 0,
-      messages: [{ role: "user", content: [
-        { type: "image", source: { type: "base64", media_type: m[1], data: m[3] } },
-        { type: "text", text: PROMPT },
-      ] }],
-    }),
-  });
-  // deno-lint-ignore no-explicit-any
-  const out: any = await res.json().catch(() => ({}));
-  const text = (out?.content || []).map((c: { text?: string }) => c.text || "").join("");
+  let ok = false, text = "";
+  if (KEY) {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({
+        model: MODEL, max_tokens: 3000, temperature: 0,
+        messages: [{ role: "user", content: [
+          { type: "image", source: { type: "base64", media_type: m[1], data: m[3] } },
+          { type: "text", text: PROMPT },
+        ] }],
+      }),
+    });
+    // deno-lint-ignore no-explicit-any
+    const out: any = await res.json().catch(() => ({}));
+    ok = res.ok; text = (out?.content || []).map((c: { text?: string }) => c.text || "").join("");
+  } else {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": GKEY },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ inlineData: { mimeType: m[1], data: m[3] } }, { text: PROMPT }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json" },
+      }),
+    });
+    // deno-lint-ignore no-explicit-any
+    const out: any = await res.json().catch(() => ({}));
+    ok = res.ok; text = (out?.candidates?.[0]?.content?.parts || []).map((p: { text?: string }) => p.text || "").join("");
+  }
   // deno-lint-ignore no-explicit-any
   let invoice: any = null;
   try { const s = text.indexOf("{"), e = text.lastIndexOf("}"); invoice = JSON.parse(text.slice(s, e + 1)); } catch { invoice = null; }
   await admin.from("invoice_ai_log").insert({ employee_id: sess.employee_id, ok: !!invoice, model: MODEL });
-  if (!res.ok || !invoice) return json({ error: "ai_failed" }, 502);
+  if (!ok || !invoice) return json({ error: "ai_failed" }, 502);
   return json({ invoice });
 });
