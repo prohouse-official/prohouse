@@ -976,6 +976,14 @@ const SupaEngine = (() => {
     const out = await res.json().catch(() => ({}));
     return out.answer || null;
   }
+  // 🤖 قراءة فاتورة كاملة بالذكاء الاصطناعي (بالسيرفر). {off:true} إذا مو مفعّلة
+  async function readInvoice(dataUrl) {
+    const res = await fetch(SUPABASE_URL + "/functions/v1/invoice-read", { method: "POST", headers: fnHeaders(), body: JSON.stringify({ image: dataUrl }) });
+    if (res.status === 503 || res.status === 404) return { off: true };
+    const out = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(out.error || `invoice-read [${res.status}]`);
+    return out;
+  }
   async function getLastFormSubmission(form, date, branch) {
     const rows = await query(`form_submissions?select=payload,ok,sent_at,sent_by&form=eq.${form}&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}&ok=is.true&order=sent_at.desc&limit=1`);
     return (rows && rows[0]) || null;
@@ -1125,6 +1133,7 @@ const SupaEngine = (() => {
     getSalesRange,
     savePurchaseSupplier,
     getCustodyExpensesRange,
+    readInvoice,
     migratePhotosToStorage,
     sendGoogleForm,
     askAssistant,

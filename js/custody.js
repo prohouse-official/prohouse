@@ -193,11 +193,14 @@ function renderCustodyView(payments) {
   if ($("custExpNote")) $("custExpNote").addEventListener("input", (e) => { d.note = e.target.value; });
   if ($("custNoReceipt")) $("custNoReceipt").addEventListener("change", (e) => { d.noReceipt = e.target.checked; });
   if ($("custExpInvNo")) $("custExpInvNo").addEventListener("input", (e) => { d.invoice_no = e.target.value; });
-  const openScan = () => DocScan.open({ onDone: ({ dataUrl, qr }) => {
-    d.photo = dataUrl; d.noReceipt = false; d.qr = qr || null;
-    if (qr) {
-      if (!String(d.amount).trim() && qr.total !== null) d.amount = String(qr.total);
-      if (!String(d.note).trim()) d.note = qr.seller;
+  const openScan = () => DocScan.open({ ai: true, onDone: ({ dataUrl, qr, ai }) => {
+    d.photo = dataUrl; d.noReceipt = false;
+    d.qr = custodyMergeInvoice(qr, ai);
+    const inv = d.qr;
+    if (inv) {
+      if (!String(d.amount).trim() && inv.total !== null && inv.total !== undefined) d.amount = String(inv.total);
+      if (!String(d.note).trim() && inv.seller) d.note = inv.seller;
+      if (!String(d.invoice_no).trim() && inv.invoiceNo) d.invoice_no = inv.invoiceNo;
     }
     renderCustodyView(payments);
   } });
@@ -283,7 +286,23 @@ async function addCustodyExpense(payments) {
   else if (btn) { btn.disabled = false; btn.textContent = "➕ أضف المصروف"; }
 }
 
-// بيانات الفاتورة من رمز QR (تروح للمشتريات وتقرير المحاسب)
+// رمز QR (موثوق للمبالغ) + قراءة الذكاء الاصطناعي (رقم الفاتورة والأصناف) → بيانات وحدة
+function custodyMergeInvoice(qr, ai) {
+  const a = ai && !ai.error ? ai : null;
+  if (!(qr && qr.seller) && !a) return null;
+  const num = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
+  return {
+    seller: (qr && qr.seller) || (a && a.supplier) || "",
+    vatNo: (qr && qr.vatNo) || (a && a.supplier_vat) || "",
+    date: (qr && qr.date) || (a && a.date) || "",
+    total: qr && qr.total !== null && qr.total !== undefined ? qr.total : num(a && a.total),
+    vat: qr && qr.vat !== null && qr.vat !== undefined ? qr.vat : num(a && a.vat),
+    invoiceNo: (a && a.invoice_no) || "",
+    lines: a && Array.isArray(a.lines) ? a.lines.slice(0, 60) : []
+  };
+}
+
+// بيانات الفاتورة (تروح للمشتريات وتقرير المحاسب)
 function custodyInvoiceFields(qr, invoiceNo) {
   const f = {};
   if (qr && qr.seller) {
@@ -291,8 +310,10 @@ function custodyInvoiceFields(qr, invoiceNo) {
     if (qr.vatNo) f.supplier_vat = qr.vatNo;
     if (qr.vat !== null && qr.vat !== undefined) f.vat = qr.vat;
     if (qr.date) f.invoice_date = qr.date;
+    if (qr.lines && qr.lines.length) f.lines = qr.lines;
   }
-  if (String(invoiceNo || "").trim()) f.invoice_no = String(invoiceNo).trim();
+  const no = String(invoiceNo || (qr && qr.invoiceNo) || "").trim();
+  if (no) f.invoice_no = no;
   return f;
 }
 
@@ -300,7 +321,8 @@ function custodyInvoiceFields(qr, invoiceNo) {
 async function attachCustodyReceipt(i, payments) {
   const target = currentCustody.expenses[i];
   if (!target) return;
-  DocScan.open({ onDone: async ({ dataUrl, qr }) => {
+  DocScan.open({ ai: true, onDone: async ({ dataUrl, qr: qrRaw, ai }) => {
+    const qr = custodyMergeInvoice(qrRaw, ai);
     let receipt = "";
     try {
       showToast("⏳ جاري رفع الفاتورة…");
