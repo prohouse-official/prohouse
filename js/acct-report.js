@@ -79,10 +79,18 @@ async function loadAcctReport() {
       const [date, branch, channel] = k.split("|");
       return { date, branch, channel, total: purRound(amt) };
     }).filter(r => r.total);
-    const byDay = {};
+    // فوديكس يعطينا الصافي بعد المرتجعات + مبلغ المرتجعات لحاله:
+    // المبيعات = الصافي + المرتجع (إجمالي قبل المرتجعات)، والمردودات صف لحاله، فالصافي للضريبة يضل صح
+    const byDay = {}, retByDay = {};
     (sales || []).forEach(r => {
-      const k = r.date + "|" + r.branch;
-      byDay[k] = (byDay[k] || 0) + (Number(r.amount) || 0);
+      const k = r.date + "|" + r.branch, ret = Math.abs(Number(r.returns_amount) || 0);
+      byDay[k] = (byDay[k] || 0) + (Number(r.amount) || 0) + ret;
+      if (ret) retByDay[k] = (retByDay[k] || 0) + ret;
+    });
+    const salesReturns = Object.entries(retByDay).sort((a, b) => a[0].localeCompare(b[0])).map(([k, amt]) => {
+      const [date, branch] = k.split("|");
+      const total = purRound(amt), sub = purRound(total / (1 + PUR_VAT_RATE));
+      return { date, no: `R${date.replace(/-/g, "")}-${branchCode(branch)}`, branch, customer: "مرتجع مبيعات (من نقطة البيع)", vatNo: "", sub, vat: purRound(total - sub), total };
     });
     const salesRows = Object.entries(byDay).sort((a, b) => a[0].localeCompare(b[0])).map(([k, amt]) => {
       const [date, branch] = k.split("|");
@@ -93,7 +101,7 @@ async function loadAcctReport() {
     acctData = {
       purchases: valid.filter(i => i.kind !== "return").map(i => acctPurchaseRow(i, sups || [])),
       returns: valid.filter(i => i.kind === "return").map(i => acctPurchaseRow(i, sups || [])),
-      sales: salesRows, salesReturns: [], salesByChannel
+      sales: salesRows, salesReturns, salesByChannel
     };
     renderAcctReport();
   } catch (err) {
@@ -162,7 +170,7 @@ function renderAcctReport() {
     ${acctShow("purchases") ? acctTable("↩ مرتجعات المشتريات", ACCT_PUR_HEAD, d.returns, ACCT_PUR_CELLS, "ما فيه مرتجعات مشتريات.") : ""}
     ${acctShow("sales") ? acctTable("💰 المبيعات", ACCT_SALE_HEAD, d.sales, ACCT_SALE_CELLS, "ما فيه مبيعات مسجلة بهالفترة.") : ""}
     ${acctShow("sales") ? acctChannelHtml(d.salesByChannel) : ""}
-    ${acctShow("sreturns") ? acctTable("↩ مردودات المبيعات", ACCT_SALE_HEAD, d.salesReturns, ACCT_SALE_CELLS, "ما فيه مردودات مبيعات — المردودات لسا ما تنسحب من فوديكس وتابسنس.") : ""}
+    ${acctShow("sreturns") ? acctTable("↩ مردودات المبيعات", ACCT_SALE_HEAD, d.salesReturns, ACCT_SALE_CELLS, "ما فيه مردودات مبيعات مسجلة بهالفترة (فوديكس: الروضة والشاطئ).") : ""}
     <div class="pur-sales-note">المبيعات: صف لكل فرع بكل يوم من طرق الدفع (تابسنس وفوديكس)، والمبالغ شاملة ضريبة ١٥٪.</div>`;
 }
 

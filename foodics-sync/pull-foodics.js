@@ -453,7 +453,8 @@ async function readGroupedReport(page, path, iso, nameLabel, valueLabel) {
 }
 
 // valueLabel: عمود الرقم (افتراضياً «صافي الكمية»؛ لطرق الدفع عمود المبلغ)
-async function readGroupedReportOnce(page, path, iso, nameLabel, valueLabel) {
+// extra: أعمدة إضافية {مفتاح: بداية اسم العمود} — مثلاً مبلغ الإرجاع بتقرير المدفوعات
+async function readGroupedReportOnce(page, path, iso, nameLabel, valueLabel, extra) {
   const url = `https://console.foodics.com${path}?date=${iso}+-+${iso}`;
   await page.goto(url, { waitUntil: "networkidle", timeout: 45000 }).catch(() => {});
   await page.waitForSelector("table", { timeout: 15000 }).catch(() => {});
@@ -474,7 +475,7 @@ async function readGroupedReportOnce(page, path, iso, nameLabel, valueLabel) {
 
   const all = [];
   for (let pageNo = 0; pageNo < 20; pageNo++) {
-    const part = await page.evaluate(([nameLabel, valueLabel]) => {
+    const part = await page.evaluate(([nameLabel, valueLabel, extra]) => {
       const first = (el) => (el.innerText || "").split("\n")[0].trim();
       const table = document.querySelector("table");
       if (!table) return { error: "ما فيه جدول" };
@@ -492,10 +493,12 @@ async function readGroupedReportOnce(page, path, iso, nameLabel, valueLabel) {
         if (tds.length && (tds.length < headers.length / 2 || tds.some(td => td.colSpan > 1)) && texts[0]) { groupBranch = texts[0]; return; }
         const name = nameIdx >= 0 ? texts[nameIdx] : "";
         if (!name || /لا يوجد|no data|الإجمالي|المجموع|total/i.test(name)) return;
-        rows.push({ branch: branchIdx >= 0 ? texts[branchIdx] : groupBranch, name, qty: qtyIdx >= 0 ? texts[qtyIdx] : "" });
+        const ex = {};
+        Object.entries(extra || {}).forEach(([k, label]) => { const i = idx(new RegExp("^" + label)); ex[k] = i >= 0 ? texts[i] : ""; });
+        rows.push({ branch: branchIdx >= 0 ? texts[branchIdx] : groupBranch, name, qty: qtyIdx >= 0 ? texts[qtyIdx] : "", ex });
       });
       return { headers: headers.map(h => h.slice(0, 20)), nameIdx, branchIdx, qtyIdx, rows };
-    }, [nameLabel, valueLabel]).catch(e => ({ error: e.message }));
+    }, [nameLabel, valueLabel, extra || {}]).catch(e => ({ error: e.message }));
     if (part.error) return { ok: false, reason: part.error, rows: [] };
     if (pageNo === 0) {
       const branchesSeen = Array.from(new Set(part.rows.map(r => r.branch).filter(Boolean)));
@@ -503,7 +506,11 @@ async function readGroupedReportOnce(page, path, iso, nameLabel, valueLabel) {
       if (part.nameIdx < 0 || part.qtyIdx < 0) return { ok: false, reason: "أعمدة الاسم/الكمية مو موجودة", rows: [] };
       if (part.rows.length && !branchesSeen.length) return { ok: false, reason: "ما بان اسم الفرع بالصفوف", rows: [] };
     }
-    part.rows.forEach(r => all.push({ branch: r.branch, name: r.name, qty: toNum(r.qty) }));
+    part.rows.forEach(r => {
+      const row = { branch: r.branch, name: r.name, qty: toNum(r.qty) };
+      Object.entries(r.ex || {}).forEach(([k, v]) => { row[k] = toNum(v); });
+      all.push(row);
+    });
     // الصفحة الجاية إذا فيه
     const next = page.locator('button[aria-label*="next" i], button[aria-label*="التالي"], a[rel="next"], li.next:not(.disabled) a').first();
     if (!(await next.isVisible().catch(() => false)) || !(await next.isEnabled().catch(() => false))) break;
@@ -520,7 +527,9 @@ async function readPaymentsReport(page, iso) {
   if (paymentsUnavailable) return { ok: false, rows: [] }; // ما لقيناه باليوم الأول — ما نضيّع وقت بباقي الأيام
   const paths = paymentPathFound ? [paymentPathFound] : PAYMENT_PATHS;
   for (const p of paths) {
-    const res = await readGroupedReportOnce(page, p, iso, "(طريقة الدفع|طرق الدفع|الدفع|وسيلة الدفع)", "(صافي المبلغ|المبلغ|صافي المبيعات|الإجمالي|المجموع)");
+    // المبلغ = الصافي بعد المرتجعات، ومعه مبلغ وعدد المرتجعات لتقرير مردودات المبيعات
+    const res = await readGroupedReportOnce(page, p, iso, "(طريقة الدفع|طرق الدفع|الدفع|وسيلة الدفع)", "(صافي المبلغ|المبلغ الصافي|المبلغ|صافي المبيعات|الإجمالي|المجموع)",
+      { ret: "مبلغ الإرجاع", retCount: "عدد المرتجعات" });
     if (res.ok) { paymentPathFound = p; return res; }
     console.log(`ℹ️ طرق الدفع: ${p} — ${res.reason}`);
   }
@@ -641,7 +650,7 @@ async function run() {
           catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ مبيعات المنتجات:`, e.message); }
         }
         // طرق الدفع (كاش/شبكة) لمطابقة إغلاق العهدة
-        const payRows = pays.ok ? mine(pays.rows).filter(r => r.name && r.qty != null).map(r => ({ channel: r.name, transactions: 0, amount: r.qty })) : [];
+        const payRows = pays.ok ? mine(pays.rows).filter(r => r.name && r.qty != null).map(r => ({ channel: r.name, transactions: 0, amount: r.qty, returns_amount: r.ret || 0, returns_count: r.retCount || 0 })) : [];
         if (payRows.length) {
           try { await sendToSupabase("import_payments", iso, branch, payRows); console.log(`💳 ${branch}: انحفظت طرق الدفع (${payRows.length} طريقة)`); }
           catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ طرق الدفع:`, e.message); }
