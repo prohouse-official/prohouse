@@ -38,12 +38,18 @@ const DAILY_LIMIT = 80;
 const PROMPT = `This is a photo of a purchase invoice or receipt (Saudi Arabia, Arabic and/or English).
 Read it carefully and return ONLY a JSON object, no other text:
 {"supplier": string, "supplier_vat": string, "invoice_no": string, "date": "YYYY-MM-DD",
- "lines": [{"name": string, "qty": number|null, "unit": string, "unit_price": number|null, "total": number|null}],
+ "lines": [{"name": string, "qty": number|null, "unit": string, "unit_price": number|null, "total": number|null, "category": string, "category_sure": boolean}],
  "subtotal": number|null, "discount": number|null, "vat": number|null, "total": number|null,
  "payment": string, "notes": string}
 Rules: supplier = the SELLER (not the customer). supplier_vat = the seller's 15-digit VAT number.
 Line names exactly as written (keep Arabic). Line totals as printed. total = final amount after VAT.
-Use null for anything you cannot read with confidence — never guess numbers. notes: anything unclear, in Arabic.`;
+Use null for anything you cannot read with confidence — never guess numbers. notes: anything unclear, in Arabic.
+category = exactly one of these restaurant purchase categories (Arabic):
+"لحوم" (meat, chicken, fish, seafood), "خضراوات" (vegetables, fruits, herbs), "بهارات" (spices, salt, seasonings),
+"بقالة" (dry goods, rice, flour, oil, dairy, sauces, bread, coffee beans), "مشروبات" (drinks, water, juices, soft drinks),
+"بلاستيك وتغليف" (cups, containers, bags, foil, packaging, disposables), "منظفات" (cleaning products, tissues, gloves),
+"أدوات طبخ" (kitchen tools, pans, trays, utensils, equipment), "أخرى" (anything else).
+category_sure = false if the item could reasonably belong to another category or the name is unclear.`;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });

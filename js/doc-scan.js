@@ -611,7 +611,8 @@ const DocScan = (() => {
       });
       box.querySelector('[data-act="use"]').addEventListener("click", () => {
         const cb = opts.onDone;
-        const res = { dataUrl: state.dataUrl, qr: state.qr, ai: state.ai };
+        // القراءة الآلية لسا ما خلصت؟ نكمّل بالخلفية وتتعبّى البيانات لما توصل
+        const res = { dataUrl: state.dataUrl, qr: state.qr, ai: state.ai, aiLater: !state.ai && state.aiPromise ? state.aiPromise : null };
         close();
         if (cb) cb(res);
       });
@@ -634,7 +635,8 @@ const DocScan = (() => {
         const live = () => seq === readSeq && qrBox.isConnected ? box.querySelector(".dscan-qr") : null;
         let tgt = live(); if (tgt) tgt.innerHTML = summaryHtml(state, opts.ai && aiAvailable());
         if (opts.ai && aiAvailable()) {
-          state.ai = await readWithAi(outNow);
+          state.aiPromise = readWithAi(outNow);
+          state.ai = await state.aiPromise;
           if (seq !== readSeq) return;
           tgt = live(); if (tgt) tgt.innerHTML = summaryHtml(state);
         }

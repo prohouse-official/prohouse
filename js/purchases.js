@@ -99,6 +99,7 @@ function purchaseChecks(inv, all) {
   }
   lines.forEach((l, i) => {
     const n = `سطر ${i + 1}${l.name ? " (" + l.name + ")" : ""}`;
+    if (l.cat_check) out.push(`${n}: التصنيف «${l.category || "—"}» يحتاج تأكيد من المحاسب`);
     if (!String(l.name || "").trim()) out.push(`${n}: اسم الصنف ناقص`);
     if (purNum(l.qty) === null || purNum(l.qty) <= 0) out.push(`${n}: الكمية ناقصة`);
     if (!l.unit) out.push(`${n}: الوحدة ناقصة`);
@@ -149,7 +150,9 @@ function custodyExpenseToInvoice(closing, exp) {
     invoice_date: exp.invoice_date || closing.date, invoice_no: exp.invoice_no || "", supplier: String(exp.supplier || exp.note || "").trim(), branch: closing.branch,
     subtotal: exp.vat !== undefined && exp.vat !== null ? purRound((Number(exp.amount) || 0) - Number(exp.vat)) : null,
     vat: exp.vat !== undefined && exp.vat !== null ? Number(exp.vat) : null, total: Number(exp.amount) || 0,
-    lines: Array.isArray(exp.lines) ? exp.lines.map(l => ({ name: l.name || "", qty: l.qty ?? null, unit: l.unit || "", unit_price: l.unit_price ?? null, total: l.total ?? null, category: "" })) : [],
+    // أصناف من القراءة الآلية (فيها category_sure) → نفس قواعد التصنيف والعلامة للمحاسب
+    lines: Array.isArray(exp.lines) ? exp.lines.map(l => ("category_sure" in l) ? purAiLine(l, null)
+      : { name: l.name || "", qty: l.qty ?? null, unit: l.unit || "", unit_price: l.unit_price ?? null, total: l.total ?? null, category: l.category || "", ...(l.cat_check ? { cat_check: true } : {}) }) : [],
     receipt: exp.receipt || "",
     extra: { ...(exp.supplier_vat ? { supplier_vat: exp.supplier_vat } : {}), ...(exp.note && exp.supplier ? { note: exp.note } : {}) },
     status: "pending", created_by: exp.by || "", created_at: exp.at || "", _virtual: true
@@ -348,6 +351,7 @@ function purDetailHtml() {
             ${l.discount ? `<small class="pur-line-disc">خصم ${purSar(l.discount)} ← الصافي ${purSar(purLineNet(l))}</small>` : ""}
             <div class="pur-line-cat">
               <select data-l="category" ${dis}>${opt(PUR_CATEGORIES, l.category).replace('<option value="">—</option>', '<option value="">— التصنيف —</option>')}</select>
+              ${l.cat_check ? `<span class="pur-cat-check" title="القراءة الآلية مو متأكدة — المحاسب يتأكد">⚠ تأكد من التصنيف</span>` : ""}
               ${canEdit ? `<button type="button" class="cust-exp-del" data-del-line="${i}" aria-label="حذف السطر">✕</button>` : ""}
             </div>
           </div>`).join("") || `<div class="cust-hint">ما فيه أصناف.</div>`}
@@ -453,6 +457,7 @@ function bindPurchasesView() {
     row.querySelectorAll("[data-l]").forEach(inp => inp.addEventListener(inp.tagName === "SELECT" ? "change" : "input", () => {
       const k = inp.dataset.l, line = purDraft.lines[i];
       line[k] = inp.type === "number" ? purNum(inp.value) : inp.value;
+      if (k === "category") { delete line.cat_check; renderPurchasesView(); return; }
       // الكمية × السعر يعبّي المجموع لحاله إذا المجموع فاضي
       if ((k === "qty" || k === "unit_price") && purNum(line.qty) !== null && purNum(line.unit_price) !== null) {
         const tot = row.querySelector('[data-l="total"]');
@@ -510,6 +515,15 @@ function purFillFromQr(d, qr) {
   if (qr.vatNo) d.extra = { ...(d.extra || {}), supplier_vat: (d.extra && d.extra.supplier_vat) || qr.vatNo };
 }
 
+// سطر من القراءة الآلية: التصنيف من قائمة المشتريات، وإذا مو متأكد نعلّمه للمحاسب
+function purAiLine(l, sup) {
+  const num = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
+  const cat = PUR_CATEGORIES.includes(l.category) ? l.category : ((sup && sup.default_category) || "");
+  const line = { name: String(l.name || "").trim(), qty: num(l.qty), unit: String(l.unit || "").trim(), unit_price: num(l.unit_price), total: num(l.total), category: cat };
+  if (!cat || l.category_sure === false || !PUR_CATEGORIES.includes(l.category)) line.cat_check = true;
+  return line;
+}
+
 // قراءة الذكاء الاصطناعي → رقم الفاتورة والأصناف وأي خانة فاضية (المبالغ من الـ QR أولى)
 function purFillFromAi(d, a) {
   if (!a || a.error) return;
@@ -526,10 +540,7 @@ function purFillFromAi(d, a) {
   const hasLines = (d.lines || []).some(l => String(l.name || "").trim());
   if (!hasLines && Array.isArray(a.lines) && a.lines.length) {
     const sup = purFindSupplier(d.supplier || "");
-    d.lines = a.lines.slice(0, 60).map(l => ({
-      name: String(l.name || "").trim(), qty: num(l.qty), unit: String(l.unit || "").trim(),
-      unit_price: num(l.unit_price), total: num(l.total), category: (sup && sup.default_category) || ""
-    }));
+    d.lines = a.lines.slice(0, 60).map(l => purAiLine(l, sup));
   }
 }
 

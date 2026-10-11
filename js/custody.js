@@ -154,7 +154,7 @@ function renderCustodyView(payments) {
         <button type="button" class="cust-photo-btn ${d.photo ? "has" : ""}" id="custPhotoBtn">
           ${d.photo ? `<img src="${d.photo}" alt="الفاتورة"> <span>✓ الفاتورة جاهزة — اضغط لإعادة السكان</span>` : `<span>📷 سكان الفاتورة</span>`}
         </button>
-        ${d.qr ? `<div class="cust-qr">🔎 من رمز الفاتورة: <b>${escHtml(d.qr.seller)}</b>${d.qr.vat !== null ? ` · ضريبة ${d.qr.vat.toFixed(2)}` : ""}${d.qr.vatNo ? ` · ر.ض ${escHtml(d.qr.vatNo)}` : ""}</div>` : ""}
+        ${d.qr ? `<div class="cust-qr">🔎 من الفاتورة: <b>${escHtml(d.qr.seller)}</b>${d.qr.vat !== null && d.qr.vat !== undefined ? ` · ضريبة ${Number(d.qr.vat).toFixed(2)}` : ""}${d.qr.vatNo ? ` · ر.ض ${escHtml(d.qr.vatNo)}` : ""}${d.qr.lines && d.qr.lines.length ? `<br>📦 ${d.qr.lines.length} صنف${d.qr.lines.filter(l => l.category_sure === false || !l.category).length ? ` · ⚠ ${d.qr.lines.filter(l => l.category_sure === false || !l.category).length} تصنيف يحتاج تأكيد من المحاسب` : " · التصنيف جاهز"}` : ""}</div>` : ""}
         ${d.photo ? `<input type="text" inputmode="numeric" class="cust-invno" placeholder="رقم الفاتورة (اختياري)" id="custExpInvNo" value="${escHtml(d.invoice_no)}">` : ""}
         ${d.photo || String(d.amount).trim() || String(d.note).trim() ? `<button type="button" class="cust-clear-btn" id="custExpClear">🗑️ مسح — ما بدي أضيفها</button>` : ""}
         <label class="cust-check"><input type="checkbox" id="custNoReceipt" ${d.noReceipt ? "checked" : ""}> ما في فاتورة</label>
@@ -194,8 +194,7 @@ function renderCustodyView(payments) {
   if ($("custExpNote")) $("custExpNote").addEventListener("input", (e) => { d.note = e.target.value; });
   if ($("custNoReceipt")) $("custNoReceipt").addEventListener("change", (e) => { d.noReceipt = e.target.checked; });
   if ($("custExpInvNo")) $("custExpInvNo").addEventListener("input", (e) => { d.invoice_no = e.target.value; });
-  const openScan = () => DocScan.open({ ai: true, onDone: ({ dataUrl, qr, ai }) => {
-    d.photo = dataUrl; d.noReceipt = false;
+  const applyInvoice = (qr, ai) => {
     d.qr = custodyMergeInvoice(qr, ai);
     const inv = d.qr;
     if (inv) {
@@ -203,7 +202,16 @@ function renderCustodyView(payments) {
       if (!String(d.note).trim() && inv.seller) d.note = inv.seller;
       if (!String(d.invoice_no).trim() && inv.invoiceNo) d.invoice_no = inv.invoiceNo;
     }
+  };
+  const openScan = () => DocScan.open({ ai: true, onDone: ({ dataUrl, qr, ai, aiLater }) => {
+    d.photo = dataUrl; d.noReceipt = false;
+    applyInvoice(qr, ai);
     renderCustodyView(payments);
+    if (aiLater) aiLater.then((late) => {
+      if (!late || late.error || custodyDraftExpense !== d || d.photo !== dataUrl) return;
+      applyInvoice(qr, late);
+      renderCustodyView(payments);
+    });
   } });
   if ($("custPhotoBtn")) $("custPhotoBtn").addEventListener("click", openScan);
   if ($("custExpClear")) $("custExpClear").addEventListener("click", () => { custodyDraftExpense = custodyEmptyDraft(); renderCustodyView(payments); });
