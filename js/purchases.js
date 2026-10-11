@@ -1,13 +1,14 @@
-// ==================== المشتريات (مرحلة ١: تجربة ببيانات وهمية) ====================
+// ==================== المشتريات (تجربة: بيانات حقيقية من شيت يزيد، للمالك والمحاسب بس) ====================
 // الفواتير بتجي من قوقل فورم تبع يزيد (بعدين من الموقع نفسه)، ومصروفات الفروع من إغلاق العهدة.
 // المحاسب يراجع كل فاتورة مع صورتها: يصحح التصنيف أو الوحدة أو الكمية، وبعدين يعتمدها أو يرجّعها.
 // الروضة = المطبخ المركزي: فواتير يزيد تنحسب عليه، والفروع الثانية مشترياتها الإضافية من العهدة.
-// الشاشة شغّالة بوضع التجربة بس لحتى تنبني الجداول بقاعدة البيانات (PURCHASES_LIVE).
+// فواتير شيت يزيد تنسحب كل ساعة (tools/purchases-sync.gs → دالة purchases-sync)، والفورم لسا هو الأساس لحين ما نعتمد الموقع.
+// التصنيفات حسب ورقة المحاسب، وتصنيف يزيد الأصلي محفوظ بالسطر (form_category).
 
-const PURCHASES_LIVE = false;
+const PURCHASES_LIVE = true;
 const PUR_CENTRAL_BRANCH = "الروضة";
 const PUR_CATEGORIES = ["لحوم", "خضراوات", "بهارات", "بقالة", "مشروبات", "بلاستيك وتغليف", "منظفات", "أدوات طبخ", "أخرى"];
-const PUR_UNITS = ["كيلو", "جرام", "حبة", "كرتون", "علبة", "لتر", "كيس", "ربطة", "طبق"];
+const PUR_UNITS = ["كجم", "جرام", "حبة", "كرتون", "علبة", "عبوة", "لتر", "كيس", "ربطة", "طبق", "صندوق", "شبكة", "جالون"];
 const PUR_VAT_RATE = 0.15;
 const PUR_SOURCES = { google_form: "قوقل فورم", custody: "العهدة", site: "الموقع" };
 const PUR_STATUS = { pending: "بانتظار المراجعة", approved: "معتمدة", rejected: "مرجّعة ليزيد" };
@@ -20,6 +21,8 @@ let purOpenId = "";
 let purDraft = null;   // نسخة الفاتورة المفتوحة وهي عم تتعدل
 let purBusy = false;
 let purLoadSeq = 0;
+let purSuppliers = []; // [{name, aliases, default_category, ...}]
+let purShowSuppliers = false;
 
 function purchasesEnabled() {
   return PURCHASES_LIVE || !!window.PH_DEMO;
@@ -50,7 +53,8 @@ function purchaseChecks(inv, all) {
   const sub = purNum(inv.subtotal), vat = purNum(inv.vat), total = purNum(inv.total);
   if (!inv.invoice_date) out.push("التاريخ ناقص");
   if (!String(inv.supplier || "").trim()) out.push("اسم المورد ناقص");
-  if (inv.source !== "custody" && !String(inv.invoice_no || "").trim()) out.push("رقم الفاتورة ناقص");
+  const noInvoice = inv.extra && inv.extra.doc_type === "بدون فاتورة";
+  if (inv.source !== "custody" && !noInvoice && !String(inv.invoice_no || "").trim()) out.push("رقم الفاتورة ناقص");
   if (total === null || total <= 0) out.push("الإجمالي ناقص");
   if (sub !== null && vat !== null && total !== null && Math.abs(sub + vat - total) > 1) {
     out.push(`قبل الضريبة + الضريبة = ${purSar(sub + vat)} مو ${purSar(total)}`);
@@ -137,7 +141,10 @@ async function loadPurchases() {
   const { start, end } = purMonthRange(purMonth);
   let rows, closings;
   try {
-    [rows, closings] = await Promise.all([SupaEngine.getPurchases(start, end), SupaEngine.getCustodyExpensesRange(start, end)]);
+    let sups;
+    [rows, closings, sups] = await Promise.all([SupaEngine.getPurchases(start, end), SupaEngine.getCustodyExpensesRange(start, end),
+      SupaEngine.getPurchaseSuppliers().catch(() => purSuppliers)]);
+    purSuppliers = sups || [];
   } catch (e) {
     if (seq !== purLoadSeq) return;
     view.innerHTML = `<div class="empty-state">⚠ تعذّر جلب المشتريات — ${escHtml(e.message || String(e))}</div>`;
@@ -184,7 +191,8 @@ function renderPurchasesView() {
         </div>
         ${Auth.isOwner() ? `<button type="button" class="cust-btn primary pur-new" id="purNew">➕ فاتورة</button>` : ""}
       </div>
-      ${PURCHASES_LIVE ? "" : `<div class="pur-trial">🧪 مرحلة تجربة — الفواتير هنا وهمية</div>`}
+      ${window.PH_DEMO ? `<div class="pur-trial">🧪 نسخة معاينة — الفواتير هنا وهمية</div>`
+        : `<div class="pur-trial">🧪 تجربة — الفواتير منسوخة من شيت يزيد وتتحدث كل ساعة. الفورم لسا هو الأساس.</div>`}
       <div class="pur-filters">
         <input type="month" id="purMonthInput" value="${purMonth}">
         <select id="purBranchSelect">
@@ -209,6 +217,8 @@ function renderPurchasesView() {
         ${sups.map(([n, v]) => `<div class="cust-row"><span>${escHtml(n)}</span><b>${purSar(v)}</b></div>`).join("")}` : ""}
     </div>
 
+    ${purSuppliersHtml(scoped)}
+
     <div class="pur-chips" role="tablist">
       ${[["pending", `⏳ ${PUR_STATUS.pending}`], ["approved", `✅ ${PUR_STATUS.approved}`], ["rejected", `↩ ${PUR_STATUS.rejected}`], ["all", "الكل"]].map(([k, label]) =>
         `<button type="button" class="pur-chip ${purStatusFilter === k ? "active" : ""}" data-status="${k}">${label}${k === "all" ? "" : ` <small>${counts[k] || 0}</small>`}</button>`).join("")}
@@ -217,6 +227,7 @@ function renderPurchasesView() {
     <div class="pur-list">
       ${list.length ? list.map(purRowHtml).join("") : `<div class="cust-hint pur-empty">ما فيه فواتير هنا.</div>`}
     </div>
+    <datalist id="purSupplierList">${purSuppliers.filter(x => x.active !== false).map(x => `<option value="${escHtml(x.name)}">`).join("")}</datalist>
   `;
   bindPurchasesView();
 }
@@ -257,12 +268,14 @@ function purDetailHtml() {
         ${d.receipt ? `<button type="button" class="cust-receipt-btn" data-receipt="${escHtml(d.receipt)}">📄 صورة الفاتورة</button>` : `<span class="cust-noreceipt">بدون صورة</span>`}
         ${canEdit && Auth.isOwner() ? `<label class="pur-mini pur-photo"><input type="file" accept="image/*" capture="environment" id="purPhoto" hidden>📷 ${d.receipt ? "غيّر الصورة" : "أرفق صورة"}</label>` : ""}
       </div>
+      ${purExtraHtml(d)}
       ${d.kind === "return" ? `<div class="pur-hint">↩ مرتجع ${original ? `من فاتورة ${escHtml(original.supplier || "")} #${escHtml(original.invoice_no || "")}` : ""} — ينقص من المشتريات</div>` : ""}
       ${d.review_note && d.status === "rejected" ? `<div class="pur-note-shown">ملاحظة المحاسب: ${escHtml(d.review_note)}</div>` : ""}
       <div class="pur-grid">
         ${field("invoice_date", "التاريخ", "date")}
         ${field("invoice_no", "رقم الفاتورة")}
-        ${field("supplier", "المورد")}
+        <label class="pur-field"><span>المورد</span>
+          <input type="text" list="purSupplierList" data-f="supplier" value="${escHtml(d.supplier || "")}" ${dis}></label>
         <label class="pur-field"><span>الفرع</span>
           <select data-f="branch" ${dis}>${branchList().map(b => `<option ${b === d.branch ? "selected" : ""}>${escHtml(b)}</option>`).join("")}</select></label>
         ${field("subtotal", "قبل الضريبة", "number")}
@@ -334,6 +347,18 @@ function bindPurchasesView() {
     if (el && purOpenId) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
   if ($("purNew")) $("purNew").addEventListener("click", newPurchaseInvoice);
+  if ($("purSupToggle")) $("purSupToggle").addEventListener("click", () => { purShowSuppliers = !purShowSuppliers; renderPurchasesView(); });
+  if ($("purSupAdd")) $("purSupAdd").addEventListener("click", async () => {
+    const name = $("purSupName").value.trim();
+    if (!name) { showToast("⚠ اكتب اسم المورد"); return; }
+    if (purFindSupplier(name)) { showToast("المورد موجود"); return; }
+    try {
+      await SupaEngine.savePurchaseSupplier({ name, default_category: $("purSupCat").value });
+      purSuppliers.push({ name, default_category: $("purSupCat").value, aliases: [], active: true });
+      showToast("✅ انضاف المورد");
+      renderPurchasesView();
+    } catch (e) { showToast("⚠ ما انضاف — " + (e.message || e)); }
+  });
   if (!purDraft) return;
 
   const refreshChecks = () => {
@@ -349,6 +374,10 @@ function bindPurchasesView() {
   view.querySelectorAll("[data-f]").forEach(inp => inp.addEventListener(inp.tagName === "SELECT" ? "change" : "input", () => {
     const k = inp.dataset.f;
     purDraft[k] = inp.type === "number" ? purNum(inp.value) : inp.value;
+    if (k === "supplier") {
+      const sup = purFindSupplier(inp.value);
+      if (sup && sup.default_category) (purDraft.lines || []).forEach(l => { if (!l.category) l.category = sup.default_category; });
+    }
     refreshChecks();
   }));
   view.querySelectorAll("[data-line]").forEach(row => {
@@ -416,6 +445,11 @@ async function savePurchaseReview(status) {
   purBusy = true;
   try {
     await SupaEngine.savePurchase(row);
+    const supName = String(row.supplier || "").trim();
+    if (supName && Auth.isOwner() && !purFindSupplier(supName)) {
+      const cat = (row.lines || []).map(l => l.category).find(Boolean) || "";
+      await SupaEngine.savePurchaseSupplier({ name: supName, default_category: cat }).catch(() => {});
+    }
     showToast(status === "approved" ? "✅ انعتمدت" : status === "rejected" ? "↩ رجعت ليزيد" : "⏳ رجعت للمراجعة");
     purOpenId = ""; purDraft = null;
   } catch (e) {
@@ -460,4 +494,46 @@ function newPurchaseReturn() {
   purDraft = JSON.parse(JSON.stringify(inv));
   renderPurchasesView();
   showToast("↩ عبّ كميات المرتجع بس، واحذف الأصناف اللي ما رجعت");
+}
+
+function purFindSupplier(name) {
+  const n = String(name || "").trim();
+  if (!n) return null;
+  return purSuppliers.find(x => x.name === n || (x.aliases || []).includes(n)) || null;
+}
+
+// مستند الفاتورة (رابط Drive من شيت يزيد) + الدفع وملاحظة يزيد
+function purExtraHtml(d) {
+  const e = d.extra || {};
+  const bits = [e.doc_type, e.payment_method && `الدفع: ${e.payment_method}`, e.pay_status && `السداد: ${e.pay_status}`,
+    e.remaining > 0 && `المتبقي ${purSar(e.remaining)}`].filter(Boolean);
+  const note = e.form_review && e.form_review !== "سليم" ? e.form_review : "";
+  if (!e.doc_link && !bits.length && !note && !e.supplier_original) return "";
+  return `<div class="pur-extra">
+    ${e.doc_link && /^https:\/\//.test(e.doc_link) ? `<a class="cust-receipt-btn" href="${escHtml(e.doc_link)}" target="_blank" rel="noopener">📄 مستند الفاتورة</a>` : ""}
+    ${bits.length ? `<small>${bits.map(escHtml).join(" · ")}</small>` : ""}
+    ${note ? `<small class="pur-extra-note">ملاحظة الشيت: ${escHtml(note)}</small>` : ""}
+    ${e.supplier_original ? `<small>الاسم بالشيت: ${escHtml(e.supplier_original)}</small>` : ""}
+  </div>`;
+}
+
+// قائمة الموردين: كل الموردين بأسمائهم + كم فاتورة لكل واحد بالشهر، والمالك يضيف مورد جديد
+function purSuppliersHtml(scoped) {
+  const counts = {};
+  scoped.forEach(i => { const n = String(i.supplier || "").trim(); if (n) counts[n] = (counts[n] || 0) + 1; });
+  const list = purSuppliers.filter(x => x.active !== false);
+  return `
+    <div class="cust-owner pur-suppliers">
+      <button type="button" class="pur-sup-toggle" id="purSupToggle">🏪 الموردين (${list.length}) ${purShowSuppliers ? "▲" : "▼"}</button>
+      ${purShowSuppliers ? `
+        <div class="pur-sup-list">
+          ${list.map(x => `<div class="cust-row"><span>${escHtml(x.name)}${x.default_category ? ` <small>· ${escHtml(x.default_category)}</small>` : ""}</span><b>${counts[x.name] || ""}</b></div>`).join("")
+            || `<div class="cust-hint">ما فيه موردين.</div>`}
+        </div>
+        ${Auth.isOwner() ? `<div class="pur-sup-add">
+          <input type="text" id="purSupName" placeholder="اسم مورد جديد">
+          <select id="purSupCat"><option value="">التصنيف</option>${PUR_CATEGORIES.map(c => `<option>${escHtml(c)}</option>`).join("")}</select>
+          <button type="button" class="cust-btn primary" id="purSupAdd">➕ أضف</button>
+        </div>` : ""}` : ""}
+    </div>`;
 }

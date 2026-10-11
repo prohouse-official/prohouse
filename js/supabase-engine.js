@@ -1024,6 +1024,15 @@ const SupaEngine = (() => {
   async function savePurchase(row) {
     return rpc("purchase_save", { p_row: row });
   }
+  // الموردين (من شيت يزيد + اللي يضيفهم المالك)
+  async function getPurchaseSuppliers() {
+    return (await queryAll("purchase_suppliers?select=*", "name")) || [];
+  }
+  async function savePurchaseSupplier(row) {
+    return query("purchase_suppliers?on_conflict=name", {
+      method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify([row])
+    });
+  }
   // مصروفات العهدة لكل الفروع بفترة (تطلع بالمشتريات عشان المحاسب يصنّفها)
   async function getCustodyExpensesRange(start, end) {
     return (await queryAll(`custody_closings?select=date,branch,expenses&date=gte.${start}&date=lte.${end}`, "date,branch")) || [];
@@ -1108,6 +1117,8 @@ const SupaEngine = (() => {
     getCustodyRange,
     getPurchases,
     savePurchase,
+    getPurchaseSuppliers,
+    savePurchaseSupplier,
     getCustodyExpensesRange,
     migratePhotosToStorage,
     sendGoogleForm,
