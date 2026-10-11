@@ -23,8 +23,10 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 Deno.serve(async (req) => {
   const oidc = req.headers.get("x-github-oidc") || "";
+  let isAlj = false;
   try {
     const { payload } = await jwtVerify(oidc, JWKS, { issuer: ISSUER, audience: AUDIENCE });
+    isAlj = payload.job_workflow_ref === `${REPO}/.github/workflows/alj-reports.yml@refs/heads/main`;
     if (payload.repository !== REPO || payload.ref !== "refs/heads/main" || !ALLOWED_WORKFLOWS.has(payload.job_workflow_ref as string)) {
       return json({ error: "not allowed" }, 403);
     }
@@ -35,6 +37,13 @@ Deno.serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   let b: any = {};
   try { b = await req.json(); } catch { return json({ error: "bad body" }, 400); }
+  // إعدادات إيميل تقارير عبداللطيف جميل (المرسل والمستلمين) — لملف alj-reports.yml بس
+  if (b.mailConfig) {
+    if (!isAlj) return json({ error: "not allowed" }, 403);
+    const { data } = await admin.from("settings").select("key,value").in("key", ["alj_mail_from", "alj_mail_to"]);
+    const m = Object.fromEntries((data || []).map((r: { key: string; value: string }) => [r.key, r.value]));
+    return json({ from: m.alj_mail_from || "", to: m.alj_mail_to || "" });
+  }
   if (b.file) {
     const p = String(b.file.path || "");
     if (!ALJ_FILE.test(p)) return json({ error: "bad file path" }, 400);

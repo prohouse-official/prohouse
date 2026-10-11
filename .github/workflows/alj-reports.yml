@@ -3,6 +3,7 @@ name: ALJ Daily Reports
 # تقريرين عبداللطيف جميل اليوميين من تابسنس (ملخص PDF + طلبات Excel) — نفس الملفات بدون تعديل.
 # كل يوم ٦:١٥ مساءً بتوقيت الرياض (بعد إغلاق الفرع)، وتقدر تشغّله يدوي لأيام قديمة.
 # المستودع عام: الملفات تروح للمخزن الخاص بالموقع بس — ما تنرفع كـ artifacts وما تنطبع أرقام.
+# وبعدين تنرسل بالإيميل لعبداللطيف جميل (أيام الدوام بس) — المستلمين بإعدادات الموقع، كلمة المرور سر GMAIL_APP_PASSWORD.
 on:
   schedule:
     - cron: '15 15 * * *'
@@ -16,6 +17,14 @@ on:
         description: "To date YYYY-MM-DD (empty = same as start)"
         required: false
         default: ""
+      send:
+        description: "Email the reports to ALJ"
+        type: boolean
+        default: false
+      test:
+        description: "Test: email only to our own sender address"
+        type: boolean
+        default: false
 
 jobs:
   alj-reports:
@@ -46,4 +55,8 @@ jobs:
         env:
           ALJ_START: ${{ github.event.inputs.start }}
           ALJ_END: ${{ github.event.inputs.end }}
+          # التشغيل اليومي يرسل دايماً؛ اليدوي بس إذا اخترت send أو test
+          ALJ_SEND: ${{ (github.event_name == 'schedule' || github.event.inputs.send == 'true' || github.event.inputs.test == 'true') && '1' || '' }}
+          ALJ_MAIL_TEST: ${{ github.event.inputs.test == 'true' && '1' || '' }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: node alj-run.js

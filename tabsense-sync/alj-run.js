@@ -43,6 +43,20 @@ async function uploadFile(storagePath, filePath) {
   if (!res.ok) throw new Error("رفع فشل [" + res.status + "] " + mask((await res.text().catch(() => "")).slice(0, 120)));
 }
 
+// الإيميل: المرسل والمستلمين محفوظين بإعدادات الموقع (مو بالمستودع العام)، وكلمة مرور تطبيق Gmail سر بـ GitHub.
+// ALJ_SEND=1 يرسل (التشغيل اليومي دايماً)، ALJ_MAIL_TEST=1 يرسل للمرسل نفسه بس للتجربة.
+async function mailConfig() {
+  const res = await fetch(SUPA_URL + "/functions/v1/tabsense-ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: ANON, Authorization: "Bearer " + ANON, "x-github-oidc": await oidcToken() },
+    body: JSON.stringify({ mailConfig: true })
+  });
+  if (!res.ok) throw new Error("إعدادات الإيميل [" + res.status + "]");
+  const c = await res.json();
+  if (!c.from || !c.to) throw new Error("إعدادات الإيميل ناقصة");
+  return process.env.ALJ_MAIL_TEST === "1" ? { from: c.from, to: c.from } : c;
+}
+
 (async () => {
   const start = process.env.ALJ_START || riyadhToday();
   const end = process.env.ALJ_END || start;
@@ -61,6 +75,11 @@ async function uploadFile(storagePath, filePath) {
     return page;
   }
   let failed = 0;
+  let mail = null;
+  if (process.env.ALJ_SEND === "1") {
+    if (!process.env.GMAIL_APP_PASSWORD) console.log("ALJ_MAIL_OFF ما في كلمة مرور Gmail (GMAIL_APP_PASSWORD)");
+    else mail = await mailConfig();
+  }
   try {
     const dir = path.join(__dirname, "alj-out");
     for (const iso of days) {
@@ -71,12 +90,20 @@ async function uploadFile(storagePath, filePath) {
         const r = await downloadAljReports(page, iso, dir);
         // سطر المجموع تحت ملف الطلبات (إجمالي / صافي / خصم) — نفس اللي كان ينضاف باليد
         const { execFileSync } = require("child_process");
-        console.log("ALJ_TOTALS", iso, mask(execFileSync("python3", ["-I", path.join(__dirname, "add_totals.py"), r.orders.path]).toString().trim()));
+        const totals = execFileSync("python3", ["-I", path.join(__dirname, "add_totals.py"), r.orders.path]).toString().trim();
+        console.log("ALJ_TOTALS", iso, mask(totals));
         const names = fileNames(iso);
         const folder = `${iso.slice(0, 7)}/${iso}`;
         await uploadFile(`${folder}/${names.summary}`, r.summary.path);
         await uploadFile(`${folder}/${names.orders}`, r.orders.path);
         console.log("ALJ_OK", iso);
+        // يوم بدون طلبات (ويكند/إجازة الفرع) ما ينرسل
+        if (mail && /no orders/.test(totals)) console.log("ALJ_MAIL_SKIP", iso, "no orders");
+        else if (mail) {
+          const out = execFileSync("python3", ["-I", path.join(__dirname, "send_mail.py"), iso, r.summary.path, names.summary, r.orders.path, names.orders],
+            { env: { PATH: process.env.PATH, MAIL_FROM: mail.from, MAIL_TO: mail.to, GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD } }).toString().trim();
+          console.log("ALJ_MAIL_SENT", iso, mask(out));
+        }
         break;
       } catch (e) {
         // محاولة ثانية مرة وحدة — تابسنس أحياناً يتأخر
