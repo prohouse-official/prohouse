@@ -397,6 +397,14 @@ function bindPurchasesView() {
     if (el && purOpenId) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
   if ($("purNew")) $("purNew").addEventListener("click", newPurchaseInvoice);
+  view.querySelectorAll("[data-supvat]").forEach(inp => inp.addEventListener("change", async () => {
+    const name = inp.dataset.supvat, vat_no = inp.value.replace(/\s+/g, "");
+    try {
+      await SupaEngine.savePurchaseSupplier({ name, vat_no });
+      const sup = purSuppliers.find(x => x.name === name); if (sup) sup.vat_no = vat_no;
+      showToast("✅ انحفظ الرقم الضريبي");
+    } catch (e) { showToast("⚠ ما انحفظ — " + (e.message || e)); }
+  }));
   if ($("purSupToggle")) $("purSupToggle").addEventListener("click", () => { purShowSuppliers = !purShowSuppliers; renderPurchasesView(); });
   if ($("purSupAdd")) $("purSupAdd").addEventListener("click", async () => {
     const name = $("purSupName").value.trim();
@@ -586,7 +594,9 @@ function purSuppliersHtml(scoped) {
       <button type="button" class="pur-sup-toggle" id="purSupToggle">🏪 الموردين (${list.length}) ${purShowSuppliers ? "▲" : "▼"}</button>
       ${purShowSuppliers ? `
         <div class="pur-sup-list">
-          ${list.map(x => `<div class="cust-row"><span>${escHtml(x.name)}${x.default_category ? ` <small>· ${escHtml(x.default_category)}</small>` : ""}</span><b>${counts[x.name] || ""}</b></div>`).join("")
+          ${list.map(x => `<div class="cust-row pur-sup-row"><span>${escHtml(x.name)}${x.default_category ? ` <small>· ${escHtml(x.default_category)}</small>` : ""}
+              ${Auth.isOwner() ? `<input type="text" inputmode="numeric" class="pur-sup-vat" data-supvat="${escHtml(x.name)}" value="${escHtml(x.vat_no || "")}" placeholder="الرقم الضريبي">`
+                : x.vat_no ? `<small>ض: ${escHtml(x.vat_no)}</small>` : ""}</span><b>${counts[x.name] || ""}</b></div>`).join("")
             || `<div class="cust-hint">ما فيه موردين.</div>`}
         </div>
         ${Auth.isOwner() ? `<div class="pur-sup-add">
