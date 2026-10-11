@@ -3,7 +3,8 @@
 // المالك بس بيشوف المطابقة مع مبيعات تابسنس (المتوقع بالدرج والفرق) — الموظف ما بيشوف أي رقم مبيعات.
 
 const CASH_CHANNEL = /^cash$|نقد|كاش/i;
-const CARD_CHANNEL = /mada|visa|master|american|amex|mobicash|مدى|فيزا|ماستر/i;
+// مكينة الشبكة: مدى/فيزا…، وبالشاطئ اسمها بفوديكس «Near pay»
+const CARD_CHANNEL = /mada|visa|master|american|amex|mobicash|near ?pay|nearpay|مدى|فيزا|ماستر|شبكة/i;
 
 let currentCustodyDate = todayStr();
 let currentCustodyBranch = "";
