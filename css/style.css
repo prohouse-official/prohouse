@@ -3527,3 +3527,11 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .pur-sup-list small{ font-weight:700; color:var(--muted, #666); }
 .pur-sup-add{ display:grid; grid-template-columns:1fr; gap:8px; margin-top:10px; }
 .pur-sup-add input, .pur-sup-add select{ min-height:44px; padding:8px 10px; border-radius:14px; border:1.5px solid var(--line-strong); font-family:inherit; font-size:14px; font-weight:800; background:#fff; color:var(--ink); min-width:0; }
+/* المشتريات: فلتر الفترة + ترتيب يومي */
+.pur-presets{ display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; }
+.pur-presets .pur-chip{ flex:0 0 auto; }
+.pur-range{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.pur-range label{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+.pur-range small{ font-size:12px; font-weight:800; color:var(--muted, #666); }
+.pur-day-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:14px 4px 6px; font-size:14px; }
+.pur-day-head span{ font-size:12px; font-weight:800; color:var(--muted, #666); }
