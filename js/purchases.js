@@ -148,7 +148,9 @@ function custodyExpenseToInvoice(closing, exp) {
     id: "cust_" + ref, source: "custody", source_ref: ref, kind: "invoice",
     invoice_date: exp.invoice_date || closing.date, invoice_no: exp.invoice_no || "", supplier: String(exp.supplier || exp.note || "").trim(), branch: closing.branch,
     subtotal: exp.vat !== undefined && exp.vat !== null ? purRound((Number(exp.amount) || 0) - Number(exp.vat)) : null,
-    vat: exp.vat !== undefined && exp.vat !== null ? Number(exp.vat) : null, total: Number(exp.amount) || 0, lines: [], receipt: exp.receipt || "",
+    vat: exp.vat !== undefined && exp.vat !== null ? Number(exp.vat) : null, total: Number(exp.amount) || 0,
+    lines: Array.isArray(exp.lines) ? exp.lines.map(l => ({ name: l.name || "", qty: l.qty ?? null, unit: l.unit || "", unit_price: l.unit_price ?? null, total: l.total ?? null, category: "" })) : [],
+    receipt: exp.receipt || "",
     extra: { ...(exp.supplier_vat ? { supplier_vat: exp.supplier_vat } : {}), ...(exp.note && exp.supplier ? { note: exp.note } : {}) },
     status: "pending", created_by: exp.by || "", created_at: exp.at || "", _virtual: true
   };
@@ -479,11 +481,13 @@ function bindPurchasesView() {
   if ($("purPhoto")) $("purPhoto").addEventListener("click", () => {
     const draft = purDraft;
     if (!draft) return;
-    DocScan.open({ onDone: async ({ dataUrl, qr }) => {
+    DocScan.open({ ai: true, onDone: async ({ dataUrl, qr, ai }) => {
       try {
         showToast("⏳ جاري رفع الصورة…");
         draft.receipt = await SupaEngine.uploadReceipt(draft.invoice_date || todayStr(), draft.branch || PUR_CENTRAL_BRANCH, dataUrl);
         purFillFromQr(draft, qr);
+        purFillFromAi(draft, ai);
+        if (!qr && ai && !ai.error) qr = ai;
         if (purDraft === draft) renderPurchasesView();
         showToast(qr ? "✅ انرفعت وانقرت بيانات الفاتورة — راجعها واحفظ" : "✅ انرفعت الصورة — لا تنسى تحفظ");
       } catch (err) {
@@ -504,6 +508,29 @@ function purFillFromQr(d, qr) {
   if (empty(d.vat) && qr.vat !== null) d.vat = qr.vat;
   if (empty(d.subtotal) && qr.total !== null && qr.vat !== null) d.subtotal = purRound(qr.total - qr.vat);
   if (qr.vatNo) d.extra = { ...(d.extra || {}), supplier_vat: (d.extra && d.extra.supplier_vat) || qr.vatNo };
+}
+
+// قراءة الذكاء الاصطناعي → رقم الفاتورة والأصناف وأي خانة فاضية (المبالغ من الـ QR أولى)
+function purFillFromAi(d, a) {
+  if (!a || a.error) return;
+  const empty = (v) => v === null || v === undefined || String(v).trim() === "";
+  const num = (v) => (empty(v) || isNaN(Number(v)) ? null : Number(v));
+  if (empty(d.supplier) && a.supplier) d.supplier = a.supplier;
+  if (empty(d.invoice_no) && a.invoice_no) d.invoice_no = String(a.invoice_no);
+  if (empty(d.invoice_date) && a.date) d.invoice_date = a.date;
+  if (empty(d.subtotal) && num(a.subtotal) !== null) d.subtotal = num(a.subtotal);
+  if (empty(d.vat) && num(a.vat) !== null) d.vat = num(a.vat);
+  if (empty(d.total) && num(a.total) !== null) d.total = num(a.total);
+  if (empty(d.discount) && num(a.discount)) d.discount = num(a.discount);
+  if (a.supplier_vat) d.extra = { ...(d.extra || {}), supplier_vat: (d.extra && d.extra.supplier_vat) || a.supplier_vat };
+  const hasLines = (d.lines || []).some(l => String(l.name || "").trim());
+  if (!hasLines && Array.isArray(a.lines) && a.lines.length) {
+    const sup = purFindSupplier(d.supplier || "");
+    d.lines = a.lines.slice(0, 60).map(l => ({
+      name: String(l.name || "").trim(), qty: num(l.qty), unit: String(l.unit || "").trim(),
+      unit_price: num(l.unit_price), total: num(l.total), category: (sup && sup.default_category) || ""
+    }));
+  }
 }
 
 async function savePurchaseReview(status) {
