@@ -42,7 +42,15 @@ def xlsx_totals(path):
     return sums
 
 
-def main(pdf, xlsx):
+def order_rows(path):
+    """عدد الفواتير بالملف بعد التنظيف (بدون سطر العناوين وسطر المجموع)."""
+    sheet = zipfile.ZipFile(path).read("xl/worksheets/sheet1.xml").decode("utf-8")
+    rows = re.findall(r'<row\b[^>]*?\br="(\d+)"', sheet)
+    has_total = "<f>" in sheet
+    return max(0, len(rows) - 1 - (1 if has_total else 0))
+
+
+def main(pdf, xlsx, as_json=False, dropped=0):
     p, x = pdf_values(pdf), xlsx_totals(xlsx)
     res = []
     for name, col, _ in ITEMS:
@@ -50,8 +58,17 @@ def main(pdf, xlsx):
             res.append(name + "=?")
         else:
             res.append(name + ("=ok" if abs(p[name] - x[col]) < 0.005 else "=diff"))
-    print(" ".join(res))
+    text = " ".join(res)
+    if not as_json:
+        print(text)
+        return
+    # للموقع بس (ينبعت للداتابيس الخاصة، ما ينطبع بالسجل): أرقام الملخص + نتيجة المطابقة
+    import json
+    m = re.search(N + r"\s*المرتجعات", unicodedata.normalize("NFKC", "\n".join(pg.get_text() for pg in pymupdf.open(pdf))).replace("\ue915", ""))
+    print(json.dumps({**p, "returns": float(m.group(1).replace(",", "")) if m else None,
+                      "orders": order_rows(xlsx), "dropped": int(dropped),
+                      "check_ok": all(r.endswith("=ok") for r in res), "check_text": text}))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], "--json" in sys.argv, next((a.split("=")[1] for a in sys.argv if a.startswith("--dropped=")), 0))

@@ -1202,15 +1202,20 @@ async function loadAljReports(date) {
     }
     const day = (await aljMonthDays(date.slice(0, 7))).find(d => d.date === date);
     if (seq !== aljLoadSeq) return;
-    renderAljDay(date, day ? day.files : []);
+    renderAljDay(date, day ? day.files : [], day ? day.summary : null);
   } catch (e) {
     if (seq === aljLoadSeq) view.innerHTML = `<div class="empty-state">⚠ ${escHtml(e.message || String(e))}</div>`;
   }
 }
 
-function renderAljDay(date, files) {
+function renderAljDay(date, files, summary) {
   const view = document.getElementById("aljReportView");
   const label = new Date(date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const wd = new Date(date + "T12:00:00Z").getUTCDay();
+  if (wd === 5 || wd === 6) {
+    view.innerHTML = `<div class="empty-state">${escHtml(label)}: الفرع مسكّر الجمعة والسبت — ما فيه تقرير.</div>`;
+    return;
+  }
   if (!files.length) {
     view.innerHTML = `<div class="empty-state">ما فيه تقرير ليوم ${escHtml(label)}.<br>التقرير ينسحب كل يوم الساعة ٦:١٥ مساءً.</div>`;
     return;
@@ -1221,9 +1226,32 @@ function renderAljDay(date, files) {
     <div class="alj-files">${sorted.map(f => `<button type="button" class="alj-file" data-path="${escHtml(f.path)}">
       ${/\.pdf$/i.test(f.name) ? "📄" : "📊"} <span>${escHtml(f.name)}</span><small>تنزيل</small></button>`).join("")}</div>
     <button type="button" class="alj-share" id="aljShareBoth">📤 أرسل الملفين (إيميل / واتساب)</button>
+    ${aljSummaryHtml(summary)}
   </div>`;
   view.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => saveAljFiles([files.find(f => f.path === b.dataset.path)], b)));
   document.getElementById("aljShareBoth").addEventListener("click", (e) => shareAljFiles(sorted, e.currentTarget));
+}
+
+// لمحة عن اليوم: أرقام الملخص (PDF) + هل مجاميع الإكسل مطابقة له
+function aljSummaryHtml(s) {
+  if (!s) return `<div class="alj-sum"><small>الملخص بيطلع هون بعد سحب اليوم الجاي.</small></div>`;
+  const n = (v) => (v === null || v === undefined ? "—" : Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  const row = (k, v, cls) => `<div class="alj-sum-row${cls ? " " + cls : ""}"><span>${k}</span><b dir="ltr">${v}</b></div>`;
+  return `<div class="alj-sum">
+    <div class="alj-sum-title">🧾 ملخص اليوم</div>
+    ${row("عدد الفواتير", s.orders ?? "—")}
+    ${row("إجمالي المبيعات", n(s.gross))}
+    ${row("الخصم", n(s.discount))}
+    ${Number(s.returns) ? row("المرتجعات", n(s.returns)) : ""}
+    ${row("صافي المبيعات", n(s.net))}
+    ${row("الضريبة ١٥٪", n(s.vat))}
+    ${row("الإجمالي", n(s.total), "main")}
+    ${row("مدى", n(s.mada))}
+    ${row("نقدي", n(s.cash))}
+    <div class="alj-sum-check ${s.check_ok ? "ok" : "bad"}">${s.check_ok
+      ? "✅ مجاميع الإكسل مطابقة للملخص PDF بالهللة"
+      : "⚠ مجاميع الإكسل مو مطابقة للملخص — لا ترسله قبل ما يتراجع"}${Number(s.dropped) ? `<br><small>انحذف ${Number(s.dropped)} سطر بدون رقم فاتورة من الإكسل</small>` : ""}</div>
+  </div>`;
 }
 
 async function aljFileBlobs(files) {

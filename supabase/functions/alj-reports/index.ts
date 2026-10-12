@@ -1,6 +1,6 @@
 // تقارير عبداللطيف جميل اليومية (ملخص PDF + طلبات Excel — نفس ملفات تابسنس بالضبط).
 // المخزن خاص (alj-reports): المالك والمحاسب بس يشوفون القائمة وياخذون رابط تنزيل مؤقت.
-//   POST {action:"list", month:"2026-09"} → [{date, files:[{name, path}]}]
+//   POST {action:"list", month:"2026-09"} → [{date, summary, files:[{name, path}]}] (بدون الجمعة والسبت وأيام بلا طلبات)
 //   POST {action:"url", path}              → رابط تنزيل مؤقت (ساعة)
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -34,10 +34,20 @@ Deno.serve(async (req) => {
       if (!/^\d{4}-\d{2}$/.test(month)) return json({ error: "الشهر غلط" }, 400);
       const { data: days, error } = await admin.storage.from(BUCKET).list(month, { limit: 40 });
       if (error) throw new Error(error.message);
+      // ملخص كل يوم (أرقام الملخص + هل الإكسل مطابق له) — يطلع تحت زر الإرسال
+      const [y, m] = month.split("-").map(Number);
+      const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      const { data: sums } = await admin.from("alj_daily_summary").select("*").gte("date", `${month}-01`).lte("date", last);
+      const byDate = new Map((sums || []).map((r: { date: string }) => [r.date, r]));
       const out = [];
       for (const d of (days || []).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(x.name))) {
+        // الفرع مسكّر الجمعة والسبت، ويوم بدون طلبات (إجازة) ما إله تقرير
+        const wd = new Date(d.name + "T12:00:00Z").getUTCDay();
+        // deno-lint-ignore no-explicit-any
+        const sum: any = byDate.get(d.name) || null;
+        if (wd === 5 || wd === 6 || (sum && !(Number(sum.orders) > 0))) continue;
         const { data: files } = await admin.storage.from(BUCKET).list(`${month}/${d.name}`, { limit: 10 });
-        out.push({ date: d.name, files: (files || []).map((f) => ({ name: f.name, path: `${month}/${d.name}/${f.name}` })) });
+        out.push({ date: d.name, summary: sum, files: (files || []).map((f) => ({ name: f.name, path: `${month}/${d.name}/${f.name}` })) });
       }
       out.sort((a, b) => a.date.localeCompare(b.date));
       return json({ days: out });
