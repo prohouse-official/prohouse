@@ -44,6 +44,21 @@ Deno.serve(async (req) => {
     const m = Object.fromEntries((data || []).map((r: { key: string; value: string }) => [r.key, r.value]));
     return json({ from: m.alj_mail_from || "", to: m.alj_mail_to || "" });
   }
+  // ملخص يوم عبداللطيف جميل (أرقام الملخص PDF + نتيجة المطابقة مع الإكسل) — يطلع تحت زر الإرسال بالموقع
+  if (b.aljSummary) {
+    if (!isAlj) return json({ error: "not allowed" }, 403);
+    const s = b.aljSummary;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s.date || ""))) return json({ error: "bad date" }, 400);
+    const num = (v: unknown) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
+    const row = {
+      date: s.date, gross: num(s.gross), discount: num(s.discount), returns: num(s.returns), net: num(s.net), vat: num(s.vat),
+      total: num(s.total), cash: num(s.cash), mada: num(s.mada), orders: num(s.orders), dropped: num(s.dropped),
+      check_ok: s.check_ok === true, check_text: String(s.check_text || "").slice(0, 200), updated_at: new Date().toISOString(),
+    };
+    const { error } = await admin.from("alj_daily_summary").upsert(row);
+    if (error) return json({ error: error.message }, 500);
+    return json({ ok: true });
+  }
   if (b.file) {
     const p = String(b.file.path || "");
     if (!ALJ_FILE.test(p)) return json({ error: "bad file path" }, 400);

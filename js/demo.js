@@ -236,7 +236,7 @@
     if (/supabase\.co\/functions\/v1\/alj-reports/.test(url)) {
       let body = {}; try { body = JSON.parse(init.body || "{}"); } catch (e) {}
       const mk = (off) => { const d = riyadh(off), [, m, dd] = d.split("-"); const l = `${Number(dd)} ${["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"][Number(m) - 1]}`;
-        return { date: d, files: [{ name: `Summary ${l}.pdf`, path: `${d.slice(0, 7)}/${d}/Summary ${l}.pdf` }, { name: `Orders (${l}).xlsx`, path: `${d.slice(0, 7)}/${d}/Orders (${l}).xlsx` }] }; };
+        return { date: d, summary: { orders: 126, gross: 3557.39, discount: 1335.65, returns: 0, net: 2221.74, vat: 333.26, total: 2555, cash: 74.4, mada: 2480.6, dropped: off === -1 ? 1 : 0, check_ok: true }, files: [{ name: `Summary ${l}.pdf`, path: `${d.slice(0, 7)}/${d}/Summary ${l}.pdf` }, { name: `Orders (${l}).xlsx`, path: `${d.slice(0, 7)}/${d}/Orders (${l}).xlsx` }] }; };
       const out = body.action === "url" ? { url: "data:application/octet-stream;base64,UEsDBA==" } : { days: [mk(-2), mk(-1)].filter(x => x.date.slice(0, 7) === body.month) };
       return new Response(JSON.stringify(out), { status: 200, headers: { "Content-Type": "application/json" } });
     }

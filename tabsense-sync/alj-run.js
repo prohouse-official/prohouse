@@ -43,6 +43,16 @@ async function uploadFile(storagePath, filePath) {
   if (!res.ok) throw new Error("رفع فشل [" + res.status + "] " + mask((await res.text().catch(() => "")).slice(0, 120)));
 }
 
+// أرقام ملخص اليوم → الداتابيس الخاصة (تطلع بالموقع تحت زر الإرسال للمالك والمحاسب)
+async function sendSummary(summary) {
+  const res = await fetch(SUPA_URL + "/functions/v1/tabsense-ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: ANON, Authorization: "Bearer " + ANON, "x-github-oidc": await oidcToken() },
+    body: JSON.stringify({ aljSummary: summary })
+  });
+  if (!res.ok) throw new Error("الملخص [" + res.status + "]");
+}
+
 // الإيميل: المرسل والمستلمين محفوظين بإعدادات الموقع (مو بالمستودع العام)، وكلمة مرور تطبيق Gmail سر بـ GitHub.
 // ALJ_SEND=1 يرسل (التشغيل اليومي دايماً)، ALJ_MAIL_TEST=1 يرسل للمرسل نفسه بس للتجربة.
 async function mailConfig() {
@@ -83,6 +93,9 @@ async function mailConfig() {
   try {
     const dir = path.join(__dirname, "alj-out");
     for (const iso of days) {
+      // الفرع مسكّر الجمعة والسبت — ما في تقرير
+      const wd = new Date(iso + "T12:00:00Z").getUTCDay();
+      if (wd === 5 || wd === 6) { console.log("ALJ_SKIP", iso, "weekend"); continue; }
       for (let attempt = 1; attempt <= 2; attempt++) {
       let page = null;
       try {
@@ -93,16 +106,22 @@ async function mailConfig() {
         const totals = execFileSync("python3", ["-I", path.join(__dirname, "add_totals.py"), r.orders.path]).toString().trim();
         console.log("ALJ_TOTALS", iso, mask(totals));
         // مطابقة مجاميع الإكسل مع الملخص — بس ok/diff بالسجل، بدون أرقام
-        try { console.log("ALJ_CHECK", iso, execFileSync("python3", ["-I", path.join(__dirname, "alj_check.py"), r.summary.path, r.orders.path]).toString().trim()); }
-        catch (e) { console.log("ALJ_CHECK", iso, "skipped"); }
+        // مطابقة مجاميع الإكسل مع الملخص + أرقام الملخص للموقع (تروح للداتابيس الخاصة — السجل فيه ok/diff بس)
+        const noOrders = /no orders/.test(totals);
+        try {
+          const dropped = (/removed (\d+)/.exec(totals) || [])[1] || "0";
+          const sum = JSON.parse(execFileSync("python3", ["-I", path.join(__dirname, "alj_check.py"), r.summary.path, r.orders.path, "--json", "--dropped=" + dropped]).toString());
+          console.log("ALJ_CHECK", iso, sum.check_text, Number(dropped) ? "dropped-rows" : "");
+          await sendSummary({ date: iso, ...sum });
+        } catch (e) { console.log("ALJ_CHECK", iso, "skipped", mask(String(e.message || e)).slice(0, 80)); }
+        // يوم بدون طلبات (إجازة) ما إله تقرير
+        if (noOrders) { console.log("ALJ_SKIP", iso, "no orders"); break; }
         const names = fileNames(iso);
         const folder = `${iso.slice(0, 7)}/${iso}`;
         await uploadFile(`${folder}/${names.summary}`, r.summary.path);
         await uploadFile(`${folder}/${names.orders}`, r.orders.path);
         console.log("ALJ_OK", iso);
-        // يوم بدون طلبات (ويكند/إجازة الفرع) ما ينرسل
-        if (mail && /no orders/.test(totals)) console.log("ALJ_MAIL_SKIP", iso, "no orders");
-        else if (mail) {
+        if (mail) {
           const out = execFileSync("python3", ["-I", path.join(__dirname, "send_mail.py"), iso, r.summary.path, names.summary, r.orders.path, names.orders],
             { env: { PATH: process.env.PATH, MAIL_FROM: mail.from, MAIL_TO: mail.to, GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD } }).toString().trim();
           console.log("ALJ_MAIL_SENT", iso, mask(out));

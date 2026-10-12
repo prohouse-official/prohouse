@@ -358,7 +358,10 @@ function savePlace() {
     sessionStorage.setItem(PLACE_KEY, JSON.stringify({
       at: Date.now(), tab: lastActiveTab, scroll: window.scrollY,
       rec: currentReceivingDate, rem: currentRemainingDate,
-      cust: typeof currentCustodyDate !== "undefined" ? currentCustodyDate : null
+      cust: typeof currentCustodyDate !== "undefined" ? currentCustodyDate : null,
+      // التقارير: أي تقرير كان مفتوح ويومه (كان التحديث يرجّع لأول تقرير)
+      rtype: (document.getElementById("reportType") || {}).value || "",
+      alj: (document.getElementById("aljReportDate") || {}).value || ""
     }));
   } catch (e) { /* بلا تخزين: بيرجع للرئيسية */ }
 }
@@ -417,6 +420,17 @@ function restorePlaceDates(place) {
   }
 }
 
+function restoreReportPlace(place) {
+  const sel = document.getElementById("reportType");
+  if (!sel || !place.rtype || !Array.from(sel.options).some(o => o.value === place.rtype)) return;
+  if (sel.value !== place.rtype) { sel.value = place.rtype; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+  if (place.rtype === "alj" && /^\d{4}-\d{2}-\d{2}$/.test(place.alj || "") && typeof loadAljReports === "function") {
+    const inp = document.getElementById("aljReportDate");
+    if (inp) { inp.value = place.alj; if (inp._phRefresh) inp._phRefresh(); }
+    loadAljReports(place.alj);
+  }
+}
+
 async function startApp() {
   hideLoginView();
   const place = takeSavedPlace();
@@ -444,9 +458,19 @@ async function startApp() {
   }
   const startTab = wantedTab || (place && place.tab) || "dashboard";
   setActiveTab(tabAllowed(startTab) ? startTab : "dashboard");
+  if (place && !wantedTab && startTab === "report") restoreReportPlace(place);
   if (place && !wantedTab && place.scroll > 0) {
     // منستنى الشاشة تتعبّى قبل ما نرجع لنفس مكان السكرول
-    setTimeout(() => window.scrollTo({ top: place.scroll, behavior: "instant" }), 1200);
+    // (التقارير بتتحمّل من السيرفر وممكن تتأخر — منعيد المحاولة لحد ٤ ثواني إذا الصفحة لسا أقصر)
+    let tries = 0, moved = false;
+    const stop = () => { moved = true; };
+    window.addEventListener("touchstart", stop, { once: true, passive: true });
+    const go = () => {
+      if (moved) return;
+      window.scrollTo({ top: place.scroll, behavior: "instant" });
+      if (Math.abs(window.scrollY - place.scroll) > 40 && ++tries < 8) setTimeout(go, 500);
+    };
+    setTimeout(go, 800);
   }
   if (typeof Push !== "undefined") Push.refreshLink();
 }
