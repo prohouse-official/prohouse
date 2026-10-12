@@ -1,6 +1,7 @@
 name: ALJ Daily Reports
 
-# تقريرين عبداللطيف جميل اليوميين من تابسنس (ملخص PDF + طلبات Excel) — نفس الملفات بدون تعديل.
+# تقريرين عبداللطيف جميل اليوميين من تابسنس (ملخص PDF + طلبات Excel). الملخص زي ما هو؛ الطلبات: نشيل
+# الفواتير بدون رقم ونضيف سطر مجموع محسوب من الفواتير (مطابق للملخص).
 # كل يوم ٦:١٥ مساءً بتوقيت الرياض (بعد إغلاق الفرع)، وتقدر تشغّله يدوي لأيام قديمة.
 # المستودع عام: الملفات تروح للمخزن الخاص بالموقع بس — ما تنرفع كـ artifacts وما تنطبع أرقام.
 # وبعدين تنرسل بالإيميل لعبداللطيف جميل (أيام الدوام بس) — المستلمين بإعدادات الموقع، كلمة المرور سر GMAIL_APP_PASSWORD.
@@ -43,6 +44,7 @@ jobs:
         run: |
           npm ci || npm install
           npx playwright install --with-deps chromium
+          pip install --quiet pymupdf
       - name: Create config.json from GitHub Secret
         working-directory: ./tabsense-sync
         env:
