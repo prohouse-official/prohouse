@@ -66,7 +66,8 @@ async function loadAcctReport() {
     const [invoices, sups, sales] = await Promise.all([
       SupaEngine.getPurchases(acctStart, acctEnd),
       SupaEngine.getPurchaseSuppliers().catch(() => []),
-      SupaEngine.getSalesRange(acctStart, acctEnd).catch(() => [])
+      // فشل جلب المبيعات ما يطلع تقرير مبيعات فاضي بصمت — نعلّمه ونبيّن تحذير
+      SupaEngine.getSalesRange(acctStart, acctEnd).catch(() => null)
     ]);
     if (seq !== acctSeq) return;
     const valid = (invoices || []).filter(i => i.status !== "rejected")
@@ -102,7 +103,7 @@ async function loadAcctReport() {
     acctData = {
       purchases: valid.filter(i => i.kind !== "return").map(i => acctPurchaseRow(i, sups || [])),
       returns: valid.filter(i => i.kind === "return").map(i => acctPurchaseRow(i, sups || [])),
-      sales: salesRows, salesReturns, salesByChannel
+      sales: salesRows, salesReturns, salesByChannel, salesFailed: sales === null
     };
     renderAcctReport();
   } catch (err) {
@@ -167,6 +168,7 @@ function renderAcctReport() {
       <div><span>الصافي المستحق</span><b>${acctN(purRound(outVat - inVat))}</b></div>
     </div>
     ${pending ? `<div class="pur-pending-note">⏳ ${pending} فاتورة مشتريات لسا بانتظار المراجعة (ظاهرة بالأصفر)</div>` : ""}
+    ${d.salesFailed ? `<div class="pur-pending-note">⚠ ما قدرنا نجيب المبيعات (النت ضعيف؟) — جداول المبيعات فاضية. اضغط الفترة مرة ثانية قبل ما تصدّر</div>` : ""}
     ${noVat ? `<div class="pur-sales-note">⚠ ${noVat} فاتورة فيها ضريبة بدون رقم ضريبي للمورد — حطه من قائمة الموردين بصفحة المشتريات</div>` : ""}
     ${acctShow("purchases") ? acctTable("🧾 المشتريات", ACCT_PUR_HEAD, d.purchases, ACCT_PUR_CELLS, "ما فيه مشتريات بهالفترة.") : ""}
     ${acctShow("purchases") ? acctTable("↩ مرتجعات المشتريات", ACCT_PUR_HEAD, d.returns, ACCT_PUR_CELLS, "ما فيه مرتجعات مشتريات.") : ""}
@@ -178,6 +180,7 @@ function renderAcctReport() {
 
 async function exportAcctExcel() {
   if (!acctData) { showToast("جهّز التقرير أول"); return; }
+  if (acctData.salesFailed && acctKind !== "purchases") { showToast("⚠ المبيعات ما تحمّلت — حدّث التقرير أول"); return; }
   await loadReportLibs();
   if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel ما تحمّلت — تأكد من الاتصال بالنت"); return; }
   const wb = new ExcelJS.Workbook();
@@ -365,6 +368,7 @@ async function buildAcctPdf() {
 
 async function shareAcctPdf() {
   if (!acctData) { showToast("جهّز التقرير أول"); return; }
+  if (acctData.salesFailed && acctKind !== "purchases") { showToast("⚠ المبيعات ما تحمّلت — حدّث التقرير أول"); return; }
   const btn = document.getElementById("acctPdfBtn");
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = "⏳ جاري تجهيز PDF…";

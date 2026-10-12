@@ -212,7 +212,7 @@ function mergeFreshRemainingData(freshRem) {
     if (!existing || !userHasLocal) {
       const isSauce = !!it.isSauce || (Number(it.remainingSauce || 0) > 0 && (!it.remainingWeight || Number(it.remainingWeight) === 0));
       const val = isSauce
-        ? String(it.remainingSauce || it.remaining || "")
+        ? String(it.remainingSauce != null && it.remainingSauce !== "" ? it.remainingSauce : (it.remaining ?? "")) // صفر صوص = جرد صفر، مو فاضي
         : String(it.remainingWeight !== undefined && it.remainingWeight !== null && it.remainingWeight !== "" ? it.remainingWeight : (it.remaining ?? ""));
 
       currentRemainingData[it.itemId] = {

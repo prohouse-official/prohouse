@@ -1035,7 +1035,7 @@ async function renderWeekdayAverage(el, date, branch) {
       </div>
       ${actualDays.length ? `<div class="wd-avg-note">«فعلي» = المستلم − المتبقي بأيام: ${dayList(actualDays)}</div>` : ""}`;
   } catch (e) {
-    el.innerHTML = `<div class="wd-avg-title">📊 متوسط الاستهلاك</div><div class="wd-avg-sub">⚠ تعذّر الحساب — ${e.message || e}</div>`;
+    el.innerHTML = `<div class="wd-avg-title">📊 متوسط الاستهلاك</div><div class="wd-avg-sub">⚠ تعذّر الحساب — ${escHtml(e.message || String(e))}</div>`;
   }
 }
 

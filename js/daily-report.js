@@ -35,7 +35,7 @@ async function runDailyReport() {
   try {
     cards = await Promise.all(branches.map(b => loadDailyBranch(date, b)));
   } catch (e) {
-    if (run === dailyReportRun) view.innerHTML = `<div class="empty-state">⚠ تعذّر تحميل التقرير — ${e.message || e}</div>`;
+    if (run === dailyReportRun) view.innerHTML = `<div class="empty-state">⚠ تعذّر تحميل التقرير — ${escHtml(e.message || String(e))}</div>`;
     return;
   }
   if (run !== dailyReportRun) return;

@@ -120,7 +120,7 @@ function categorySelectHtml(cats, selected) {
   return `
     <select data-cat-select>
       <option value="">اختر تصنيف</option>
-      ${cats.map(c => `<option value="${c}" ${c === selected ? "selected" : ""}>${c}</option>`).join("")}
+      ${cats.map(c => `<option value="${escHtml(c)}" ${c === selected ? "selected" : ""}>${escHtml(c)}</option>`).join("")}
       <option value="__new__" ${selected && !cats.includes(selected) ? "selected" : ""}>+ تصنيف جديد</option>
     </select>
     <input type="text" data-cat-new class="${selected && !cats.includes(selected) ? "" : "hidden"}" placeholder="اسم التصنيف الجديد" value="${selected && !cats.includes(selected) ? selected : ""}" style="margin-top:6px;">

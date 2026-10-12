@@ -272,6 +272,7 @@ function onJuiceFieldChange(ev) {
 
 function saveJuiceDayNow(showToastMsg) {
   if (Auth.isViewOnlyEntry()) return;
+  if (juiceLoadFailed) { showToast("⚠ ما انحفظ — الجرد ما تحمّل من السيرفر. حدّث الشاشة أول"); return; }
   const branch = currentJuiceBranch || "";
   const employeeName = (Auth.getEmployee() || {}).name || "";
 
@@ -337,7 +338,11 @@ function applyJuiceDayData(val) {
   });
 }
 
+let juiceLoadSeq = 0, juiceLoadFailed = false;
 async function loadJuiceDay(dateStr) {
+  const seq = ++juiceLoadSeq;
+  // أرقام اليوم/الفرع اللي قبل ما تضل معروضة (كانت تنحفظ على اليوم الجديد لو التحميل فشل)
+  currentJuiceEntry = {};
   currentJuiceBranch = Branch.get();
   const myBranches = allowedBranchList();
   if (myBranches.length === 1 && currentJuiceBranch !== myBranches[0]) currentJuiceBranch = myBranches[0];
@@ -357,16 +362,16 @@ async function loadJuiceDay(dateStr) {
   }
 
   const cacheKey = "juiceday:" + dateStr + ":" + currentJuiceBranch;
-  const data = await Sync.get("getJuiceDay", { date: dateStr, branch: currentJuiceBranch }, cacheKey, (val) => {
-    applyJuiceDayData(val);
-    renderJuicesView();
-  });
+  const data = await Sync.get("getJuiceDay", { date: dateStr, branch: currentJuiceBranch }, cacheKey);
+  if (seq !== juiceLoadSeq) return;
+  juiceLoadFailed = data === null || data === undefined;
   applyJuiceDayData(data);
   renderJuicesView();
 
   const statusEl = document.getElementById("juiceStatus");
   if (statusEl) {
-    statusEl.textContent = (data && data.items && data.items.length)
+    statusEl.textContent = juiceLoadFailed ? "⚠ تعذّر تحميل الجرد — تأكد من النت واسحب الشاشة لتحت (الحفظ موقّف لحتى ما ينمسح شي)"
+      : (data && data.items && data.items.length)
       ? "تم تحميل جرد محفوظ لهذا اليوم لهذا الفرع — عدّل واحفظ لو احتجت"
       : "لم يُحفظ جرد لهذا اليوم لهذا الفرع بعد";
   }

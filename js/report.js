@@ -94,11 +94,11 @@ async function populateReportFilterOptions() {
 
   await Items.load();
   const cats = [...new Set(Items.current.map(it => it.category).filter(Boolean))].sort((a, b) => categoryRank(a) - categoryRank(b));
-  document.getElementById("reportCategoryFilter").innerHTML = `<option value="">كل التصنيفات</option>` + cats.map(c => `<option value="${c}">${c}</option>`).join("");
+  document.getElementById("reportCategoryFilter").innerHTML = `<option value="">كل التصنيفات</option>` + cats.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join("");
 
   const empData = Sync.cacheGet("employees");
   const employees = (empData && empData.value) || [];
-  document.getElementById("reportEmployeeFilter").innerHTML = `<option value="">كل الموظفين</option>` + employees.map(e => `<option value="${e.name}">${e.name}</option>`).join("");
+  document.getElementById("reportEmployeeFilter").innerHTML = `<option value="">كل الموظفين</option>` + employees.map(e => `<option value="${escHtml(e.name)}">${escHtml(e.name)}</option>`).join("");
 }
 
 function currentReportRange() {

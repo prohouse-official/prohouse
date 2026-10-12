@@ -367,7 +367,8 @@ function renderReceivingView() {
       const ordNum = Number(ord || 0);
       const recNum = Number(rec || 0);
       const hasValue = (rec !== "" && rec !== null && rec !== undefined);
-      const diff = hasValue && !receivingPanMode ? (recNum - ordNum) : null;
+      // تقريب لـ ٣ منازل: الطرح العشري كان يطلع 1.1999999999999997 بدل 1.2
+  const diff = hasValue && !receivingPanMode ? Math.round((recNum - ordNum) * 1000) / 1000 : null;
       const status = computeReceivingItemStatus(rec, ord);
 
       let badgeClass = "neutral";
@@ -621,7 +622,8 @@ function updateReceivingItemCardUI(itemId) {
   const ordNum = Number(ordVal || 0);
   const recNum = Number(recVal || 0);
   const hasValue = (recVal !== "" && recVal !== null && recVal !== undefined);
-  const diff = hasValue && !receivingPanMode ? (recNum - ordNum) : null;
+  // تقريب لـ ٣ منازل: الطرح العشري كان يطلع 1.1999999999999997 بدل 1.2
+  const diff = hasValue && !receivingPanMode ? Math.round((recNum - ordNum) * 1000) / 1000 : null;
   const status = computeReceivingItemStatus(recVal, ordVal);
 
   card.dataset.status = status;
@@ -651,15 +653,17 @@ function updateReceivingItemCardUI(itemId) {
   // تحديث حدود الحقل
   const input = document.getElementById("recinput-" + itemId);
   if (input) {
-    input.className = "entry-input rec-main-input " + (diff < 0 ? 'border-red' : (diff > 0 ? 'border-orange' : (hasValue ? 'border-green' : '')));
+    const off = diff !== null && Math.abs(diff) >= 0.01;
+    input.className = "entry-input rec-main-input " + (off && diff < 0 ? 'border-red' : (off ? 'border-orange' : (hasValue ? 'border-green' : '')));
   }
 
   // تحديث شريحة الفرق
   const diffEl = document.getElementById("recdiff-" + itemId);
   if (diffEl) {
     if (diff !== null) {
-      diffEl.className = "rec-meta-chip rec-diff-chip " + (diff < 0 ? 'diff-red' : (diff > 0 ? 'diff-orange' : 'diff-green'));
-      diffEl.innerHTML = diff === 0 ? '✅ مطابق' : (diff < 0 ? `🔻 ${diff}` : `🔺 +${diff}`);
+      const match = Math.abs(diff) < 0.01; // نفس حد «مكتمل» بحالة الصنف
+      diffEl.className = "rec-meta-chip rec-diff-chip " + (match ? 'diff-green' : (diff < 0 ? 'diff-red' : 'diff-orange'));
+      diffEl.innerHTML = match ? '✅ مطابق' : (diff < 0 ? `🔻 ${diff}` : `🔺 +${diff}`);
     } else {
       diffEl.className = "rec-meta-chip rec-diff-chip diff-gray";
       diffEl.textContent = "—";
