@@ -308,7 +308,7 @@ function custodyMergeInvoice(qr, ai) {
     total: qr && qr.total !== null && qr.total !== undefined ? qr.total : num(a && a.total),
     vat: qr && qr.vat !== null && qr.vat !== undefined ? qr.vat : num(a && a.vat),
     invoiceNo: (a && a.invoice_no) || "",
-    lines: a && Array.isArray(a.lines) ? a.lines.slice(0, 60) : []
+    lines: a && Array.isArray(a.lines) ? a.lines.filter(l => l && typeof l === "object").slice(0, 60) : []
   };
 }
 
@@ -331,13 +331,15 @@ function custodyInvoiceFields(qr, invoiceNo) {
 async function attachCustodyReceipt(i, payments) {
   const target = currentCustody.expenses[i];
   if (!target) return;
-  DocScan.open({ ai: true, onDone: async ({ dataUrl, qr: qrRaw, ai }) => {
-    const qr = custodyMergeInvoice(qrRaw, ai);
+  DocScan.open({ ai: true, onDone: async ({ dataUrl, qr: qrRaw, ai, aiLater }) => {
     let receipt = "";
     try {
       showToast("⏳ جاري رفع الفاتورة…");
       receipt = await SupaEngine.uploadReceipt(currentCustodyDate, currentCustodyBranch, dataUrl);
     } catch (e) { showToast("⚠ ما انرفعت الفاتورة — تأكد من النت وجرب مرة ثانية"); return; }
+    // القراءة الآلية لسا ما خلصت؟ نستناها (الرفع أخذ وقت أصلاً) عشان ما تضيع الأصناف ورقم الفاتورة
+    if (!ai && aiLater) ai = await aiLater.catch(() => null);
+    const qr = custodyMergeInvoice(qrRaw, ai);
     await custodyPatch((fresh) => {
       const idx = fresh.expenses.findIndex(e => (target.id && e.id === target.id) || (!target.id && e.amount === target.amount && e.note === target.note));
       if (idx < 0) return null;
@@ -418,6 +420,8 @@ function initCustodyTab() {
   if (dateEl) {
     dateEl.value = currentCustodyDate;
     dateEl.addEventListener("change", () => {
+      // التاريخ انمسح من الحقل؟ نرجّع اليوم اللي كان بدل ما نحمّل يوم فاضي
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateEl.value)) { dateEl.value = currentCustodyDate; return; }
       currentCustodyDate = dateEl.value;
       loadCustody(currentCustodyDate, currentCustodyBranch);
     });
