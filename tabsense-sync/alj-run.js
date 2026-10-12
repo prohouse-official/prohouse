@@ -88,10 +88,13 @@ async function mailConfig() {
       try {
         page = await freshPage();
         const r = await downloadAljReports(page, iso, dir);
-        // سطر المجموع تحت ملف الطلبات (إجمالي / صافي / خصم) — نفس اللي كان ينضاف باليد
+        // ملف الطلبات: نشيل الفواتير بدون رقم + سطر المجموع (معادلات من الفواتير نفسها)
         const { execFileSync } = require("child_process");
         const totals = execFileSync("python3", ["-I", path.join(__dirname, "add_totals.py"), r.orders.path]).toString().trim();
         console.log("ALJ_TOTALS", iso, mask(totals));
+        // مطابقة مجاميع الإكسل مع الملخص — بس ok/diff بالسجل، بدون أرقام
+        try { console.log("ALJ_CHECK", iso, execFileSync("python3", ["-I", path.join(__dirname, "alj_check.py"), r.summary.path, r.orders.path]).toString().trim()); }
+        catch (e) { console.log("ALJ_CHECK", iso, "skipped"); }
         const names = fileNames(iso);
         const folder = `${iso.slice(0, 7)}/${iso}`;
         await uploadFile(`${folder}/${names.summary}`, r.summary.path);
