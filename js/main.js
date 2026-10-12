@@ -509,6 +509,10 @@ document.getElementById("pinSaveBtn").addEventListener("click", async () => {
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   if (!(await phConfirm("متأكد تبي تطلع من حسابك؟", { title: "تسجيل الخروج", ok: "خروج", cancel: "إلغاء", danger: true }))) return;
+  // حفظ لسا ما وصل للسيرفر؟ نحاول نبعته قبل ما تنمسح الجلسة (بعدها ما بيتبعت إلا لما حدا يدخل)
+  try { await Sync.flushQueue(); } catch (e) {}
+  const pending = Sync.getQueue().length;
+  if (pending && !(await phConfirm(`فيه ${pending} حفظ لسا ما وصل للسيرفر (النت ضعيف؟). إذا طلعت هلأ بيضل على هالجوال وما بيتبعت إلا لما حدا يسجّل دخول عليه.`, { title: "تسجيل الخروج", ok: "اطلع كذا", cancel: "استنى", danger: true }))) return;
   await Auth.logout();
   location.reload();
 });

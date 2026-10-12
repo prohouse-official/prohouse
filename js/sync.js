@@ -254,26 +254,26 @@ const Sync = (() => {
     } catch (e) { /* الذاكرة مليانة */ }
   }
 
-  let flushing = false;
+  let flushing = false, flushAgain = false;
+  // التعديل على الطابور دايماً على آخر نسخة بالتخزين (مو نسخة قديمة بالذاكرة): حفظ جديد انضاف
+  // أثناء ما كنا نرسل كان ينمسح لما نكتب النسخة القديمة فوقه.
+  function updateQueue(fn) { setQueue(fn(getQueue())); }
   async function flushQueue() {
-    if (flushing) return;
+    if (flushing) { flushAgain = true; return; }
     if (!API_URL) return; // ما نُشر الباك اند بعد
     flushing = true;
     try {
-      let q = getQueue();
-      for (let i = 0; i < q.length; i++) {
-        const item = q[i];
+      // نمشي على نسخة ثابتة — الحذف من نفس المصفوفة أثناء اللف كان يفوّت كل عنصر بعد المحذوف
+      for (const item of getQueue()) {
         const backoff = Math.min(Math.pow(2, item.attempts) * 5000, 5 * 60000);
         if (item.lastAttemptAt && Date.now() - item.lastAttemptAt < backoff) continue;
+        // نفس العنصر بالضبط (نفس id ونفس وقت الإنشاء) — لو انحفظ فوقه نسخة أحدث أثناء الإرسال ما نمسحها
+        const same = (x) => x.id === item.id && x.createdAt === item.createdAt;
         try {
           item.lastAttemptAt = Date.now();
           await postOnce(item.action, item.payload);
-          q = q.filter(x => x.id !== item.id);
-          setQueue(q);
+          updateQueue(q => q.filter(x => !same(x)));
         } catch (e) {
-          item.attempts += 1;
-          item.lastError = String(e);
-
           // فشل دائم (فعل غير معروف، صلاحية) بيتكرر بنفس السبب للأبد. الوقوف عنده كان
           // بيجمّد الطابور كله فما بيوصل ولا حفظ بعده للسيرفر — حصل فعلاً مع saveWasteReport
           // وحجب حفظ الاستلام معه. هلأ منعزله ومنكمّل، ومنبلّغ المستخدم مرة وحدة.
@@ -282,23 +282,25 @@ const Sync = (() => {
           // (401/403 = الجلسة، و408/429/5xx = مؤقت: هدول بنعيد عليهم)
           const clientError = [400, 404, 409, 422].includes(e.status);
           const permanent = clientError || /unknown action|غير مصرح|لازم تحدد/.test(msg);
+          const attempts = item.attempts + 1;
 
-          if (permanent && item.attempts >= 2) {
-            q = q.filter(x => x.id !== item.id);
-            setQueue(q);
+          if (permanent && attempts >= 2) {
+            updateQueue(q => q.filter(x => !same(x)));
             parkFailed(item, msg);
             console.error("انحذف من الطابور لفشل دائم:", item.action, msg);
             if (typeof showToast === "function") showToast("⚠ تعذّر حفظ " + item.action + " — " + msg.replace(/^(Error:\s*)+/, ""));
             continue; // نكمّل باقي الطابور بدل ما نجمّده
           }
 
-          setQueue(q);
+          updateQueue(q => q.map(x => same(x) ? { ...x, attempts, lastError: String(e), lastAttemptAt: item.lastAttemptAt } : x));
           break; // فشل مؤقت (نت/سيرفر) — نوقف ونعيد المحاولة لاحقاً بنفس الترتيب
         }
       }
     } finally {
       flushing = false;
     }
+    // حفظ انضاف أثناء الإرسال؟ نبعته هلأ بدل ما يستنى ٤٥ ثانية
+    if (flushAgain) { flushAgain = false; flushQueue(); }
   }
 
   // بيانات محفوظة من أيام الشغل بدون نت — ما عاد تنقرأ، فمنمسحها لحتى ما تاخد مساحة

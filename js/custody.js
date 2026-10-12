@@ -70,7 +70,7 @@ async function loadCustody(date, branch) {
       Auth.canSeeSales() ? SupaEngine.getPayments(currentCustodyDate, currentCustodyBranch) : Promise.resolve([])
     ]);
   } catch (e) {
-    view.innerHTML = `<div class="empty-state">⚠ تعذّر جلب العهدة — ${e.message || e}</div>`;
+    view.innerHTML = `<div class="empty-state">⚠ تعذّر جلب العهدة — ${escHtml(e.message || String(e))}</div>`;
     return;
   }
   currentCustody = row || { date: currentCustodyDate, branch: currentCustodyBranch, opening_float: null, cash_counted: null, card_total: null, expenses: [], notes: "" };
@@ -239,7 +239,8 @@ function renderCustodyView(payments) {
 
 // الحفظ دايماً على آخر نسخة بالسيرفر (جهازين ممكن يسجّلوا بنفس اليوم) — ونكتب بس الأعمدة اللي تغيّرت
 async function custodyPatch(mutate, payments, okMsg) {
-  if (custodyBusy) return false;
+  // حفظ ثاني شغال (ضغطتين ورا بعض)؟ كان يرجع بصمت والمصروف ما ينضاف بدون أي رسالة
+  if (custodyBusy) { showToast("⏳ لحظة، فيه حفظ شغال — جرب بعد ثانية"); return false; }
   custodyBusy = true;
   try {
     const fresh = (await Custody.get(currentCustodyDate, currentCustodyBranch)) || { date: currentCustodyDate, branch: currentCustodyBranch, expenses: [] };

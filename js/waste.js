@@ -16,7 +16,9 @@ function initWasteModule() {
   currentWasteDate = todayStr();
 }
 
+let wasteLoadSeq = 0;
 async function loadWasteData(date, branch) {
+  const seq = ++wasteLoadSeq; // تبديل فرع سريع: رد الفرع القديم ما يكتب فوق الجديد
   currentWasteDate = date || currentWasteDate;
   currentWasteBranch = branch || Branch.get() || allowedBranchList()[0] || "";
 
@@ -24,6 +26,7 @@ async function loadWasteData(date, branch) {
   if (view) view.innerHTML = '<div class="loader">جاري تحميل تقارير وتوثيق الهدر والفاقد…</div>';
 
   const data = await Sync.get("getWasteReport", { date: currentWasteDate, branch: currentWasteBranch }, "waste:" + currentWasteDate + ":" + currentWasteBranch);
+  if (seq !== wasteLoadSeq) return;
   const wasteRecords = (data && data.items) || [];
 
   renderWasteView(wasteRecords);
@@ -90,7 +93,7 @@ function renderWasteView(wasteRecords) {
           <label>الصنف *</label>
           <select id="wasteItemSelect">
             <option value="">اختر الصنف</option>
-            ${items.map(it => `<option value="${it.id}">${it.name} (${it.unit || 'جرام'})</option>`).join("")}
+            ${items.map(it => `<option value="${escHtml(it.id)}">${escHtml(it.name)} (${escHtml(it.unit || "جرام")})</option>`).join("")}
           </select>
         </div>
 
@@ -138,13 +141,13 @@ function renderWasteView(wasteRecords) {
             <tbody>
               ${wasteRecords.map((r, idx) => `
                 <tr>
-                  <td><strong>${r.itemName}</strong></td>
-                  <td><span class="text-red"><strong>${r.qty} ${r.unit || 'جرام'}</strong></span></td>
-                  <td><span class="badge warn">${r.reason}</span></td>
-                  <td>${r.notes || '—'}</td>
-                  <td>${new Date(r.timestamp || Date.now()).toLocaleTimeString(phLocale(), { hour: '2-digit', minute: '2-digit' })} (${r.employeeName || 'الموظف'})</td>
+                  <td><strong>${escHtml(r.itemName)}</strong></td>
+                  <td><span class="text-red"><strong>${escHtml(r.qty)} ${escHtml(r.unit || 'جرام')}</strong></span></td>
+                  <td><span class="badge warn">${escHtml(r.reason)}</span></td>
+                  <td>${escHtml(r.notes || '—')}</td>
+                  <td>${new Date(r.timestamp || Date.now()).toLocaleTimeString(phLocale(), { hour: '2-digit', minute: '2-digit' })} (${escHtml(r.employeeName || 'الموظف')})</td>
                   <td>
-                    <button class="btn danger" style="padding:4px 8px;font-size:11px;" onclick="deleteWasteRecord(${idx})">حذف</button>
+                    <button class="btn danger" style="padding:4px 8px;font-size:11px;" onclick="deleteWasteRecord(${idx}, '${escHtml(String(r.id || ''))}')">حذف</button>
                   </td>
                 </tr>
               `).join("")}
@@ -192,8 +195,8 @@ async function addWasteRecordSubmit() {
     timestamp: new Date().toISOString()
   };
 
-  const data = await Sync.get("getWasteReport", { date: currentWasteDate, branch: currentWasteBranch }, "waste:" + currentWasteDate + ":" + currentWasteBranch);
-  const wasteRecords = (data && data.items) || [];
+  const wasteRecords = await wasteCurrentRecords();
+  if (!wasteRecords) return;
   wasteRecords.push(recordObj);
 
   const payload = {
@@ -209,10 +212,26 @@ async function addWasteRecordSubmit() {
   renderWasteView(wasteRecords);
 }
 
-async function deleteWasteRecord(index) {
+// السجلات الحالية لليوم: آخر نسخة لسا بطابور الحفظ (إضافة ما وصلت للسيرفر) وإلا من السيرفر.
+// إذا ما قدرنا نجيبها نرجّع null — الحفظ فوق قائمة فاضية كان يمسح كل هدر اليوم.
+async function wasteCurrentRecords() {
+  const key = "saveWasteReport:" + currentWasteDate + ":" + currentWasteBranch;
+  const pending = Sync.getQueue().find(q => q.key === key);
+  if (pending && pending.payload && Array.isArray(pending.payload.items)) return pending.payload.items.slice();
   const data = await Sync.get("getWasteReport", { date: currentWasteDate, branch: currentWasteBranch }, "waste:" + currentWasteDate + ":" + currentWasteBranch);
-  const wasteRecords = (data && data.items) || [];
-  wasteRecords.splice(index, 1);
+  if (data === null || data === undefined) { showToast("⚠ ما قدرنا نجيب سجل الهدر — تأكد من النت وجرب مرة ثانية"); return null; }
+  return ((data && data.items) || []).slice();
+}
+
+async function deleteWasteRecord(index, id) {
+  const wasteRecords = await wasteCurrentRecords();
+  if (!wasteRecords) return;
+  // نحذف بالمعرّف: القائمة ممكن تكون تغيّرت (جهاز تاني ضاف سجل) فالرقم بالجدول ما يأشر لنفس السجل
+  const i = id ? wasteRecords.findIndex(r => String(r.id) === id) : index;
+  const r = wasteRecords[i];
+  if (!r) { showToast("⚠ السجل تغيّر — حدّث الشاشة"); loadWasteData(currentWasteDate, currentWasteBranch); return; }
+  if (!(await phConfirm(`تحذف هدر ${r.qty} ${r.unit || "جرام"} — ${r.itemName}؟`, { ok: "احذف", danger: true }))) return;
+  wasteRecords.splice(i, 1);
 
   const payload = {
     date: currentWasteDate,
