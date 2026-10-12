@@ -60,6 +60,7 @@ async function loadAcctReport() {
   if (s) s.value = acctStart;
   if (e) e.value = acctEnd;
   const seq = ++acctSeq;
+  acctData = null; // ما نصدّر بيانات فترة قديمة باسم الفترة الجديدة
   view.innerHTML = '<div class="loader">جاري تجهيز تقرير المحاسب…</div>';
   try {
     const [invoices, sups, sales] = await Promise.all([
@@ -73,7 +74,7 @@ async function loadAcctReport() {
     const byCh = {};
     (sales || []).forEach(r => {
       const k = r.date + "|" + r.branch + "|" + (r.channel || "—");
-      byCh[k] = (byCh[k] || 0) + (Number(r.amount) || 0);
+      byCh[k] = (byCh[k] || 0) + (Number(r.amount) || 0) + Math.abs(Number(r.returns_amount) || 0); // إجمالي مثل جدول المبيعات
     });
     const salesByChannel = Object.entries(byCh).sort((a, b) => a[0].localeCompare(b[0])).map(([k, amt]) => {
       const [date, branch, channel] = k.split("|");
@@ -155,14 +156,15 @@ function renderAcctReport() {
   const view = document.getElementById("acctReportView");
   if (!view || !acctData) return;
   const d = acctData;
-  const p = acctSum(d.purchases), pr = acctSum(d.returns), s = acctSum(d.sales);
+  const p = acctSum(d.purchases), pr = acctSum(d.returns), s = acctSum(d.sales), sr = acctSum(d.salesReturns || []);
+  const outVat = purRound(s.vat - sr.vat), inVat = purRound(p.vat - pr.vat);
   const pending = d.purchases.filter(r => r.status === "pending").length;
   const noVat = d.purchases.filter(r => !r.vatNo && r.vat > 0).length;
   view.innerHTML = `
     <div class="acct-kpis">
-      <div><span>ضريبة المبيعات</span><b>${acctN(s.vat)}</b></div>
-      <div><span>ضريبة المشتريات (صافي المرتجع)</span><b>${acctN(purRound(p.vat - pr.vat))}</b></div>
-      <div><span>الصافي المستحق</span><b>${acctN(purRound(s.vat - (p.vat - pr.vat)))}</b></div>
+      <div><span>ضريبة المبيعات (صافي المرتجع)</span><b>${acctN(outVat)}</b></div>
+      <div><span>ضريبة المشتريات (صافي المرتجع)</span><b>${acctN(inVat)}</b></div>
+      <div><span>الصافي المستحق</span><b>${acctN(purRound(outVat - inVat))}</b></div>
     </div>
     ${pending ? `<div class="pur-pending-note">⏳ ${pending} فاتورة مشتريات لسا بانتظار المراجعة (ظاهرة بالأصفر)</div>` : ""}
     ${noVat ? `<div class="pur-sales-note">⚠ ${noVat} فاتورة فيها ضريبة بدون رقم ضريبي للمورد — حطه من قائمة الموردين بصفحة المشتريات</div>` : ""}

@@ -627,7 +627,7 @@ const DocScan = (() => {
       if (readFor === key) { qrBox.innerHTML = summaryHtml(state); return; }
       readFor = key;
       const seq = ++readSeq;
-      state.qr = null; state.ai = null;
+      state.qr = null; state.ai = null; state.aiPromise = null;
       const flatNow = flat, outNow = out;
       readQr([flatNow, outNow, still]).then(async (r) => {
         if (seq !== readSeq) return;
@@ -635,9 +635,12 @@ const DocScan = (() => {
         const live = () => seq === readSeq && qrBox.isConnected ? box.querySelector(".dscan-qr") : null;
         let tgt = live(); if (tgt) tgt.innerHTML = summaryHtml(state, opts.ai && aiAvailable());
         if (opts.ai && aiAvailable()) {
-          state.aiPromise = readWithAi(outNow);
-          state.ai = await state.aiPromise;
+          const p = readWithAi(outNow);
+          state.aiPromise = p;
+          const ai = await p;
+          // الحواف تغيّرت أثناء القراءة؟ النتيجة القديمة ما تنكتب على الجديدة
           if (seq !== readSeq) return;
+          state.ai = ai;
           tgt = live(); if (tgt) tgt.innerHTML = summaryHtml(state);
         }
       }).catch(() => { const t = box.querySelector(".dscan-qr"); if (t && seq === readSeq) t.innerHTML = summaryHtml(state); });
@@ -653,7 +656,7 @@ const DocScan = (() => {
     if (a) {
       const lines = Array.isArray(a.lines) ? a.lines.length : 0;
       parts.push(`🤖 ${a.supplier && !q ? `<b>${escHtml(a.supplier)}</b> · ` : ""}${a.invoice_no ? `فاتورة #${escHtml(a.invoice_no)} · ` : ""}${!q && a.total !== null && a.total !== undefined ? `الإجمالي <b>${fmt(a.total)}</b> · ` : ""}${lines ? `${lines} صنف` : ""}`);
-      if (q && a.total !== null && a.total !== undefined && Math.abs(Number(a.total) - Number(q.total)) > 0.05) parts.push(`⚠ القراءة طلعت إجمالي ${fmt(a.total)} والـ QR ${fmt(q.total)} — نعتمد الـ QR`);
+      if (q && q.total !== null && q.total !== undefined && a.total !== null && a.total !== undefined && Math.abs(Number(a.total) - Number(q.total)) > 0.05) parts.push(`⚠ القراءة طلعت إجمالي ${fmt(a.total)} والـ QR ${fmt(q.total)} — نعتمد الـ QR`);
     } else if (st.ai && st.ai.error) parts.push("ما قدرنا نقرأ تفاصيل الفاتورة — كمّل بإيدك");
     if (aiPending) parts.push("🤖 جاري قراءة تفاصيل الفاتورة…");
     if (!parts.length) return "ما لقينا رمز QR — اكتب المبلغ بإيدك";

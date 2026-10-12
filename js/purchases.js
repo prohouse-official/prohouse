@@ -151,7 +151,7 @@ function custodyExpenseToInvoice(closing, exp) {
     subtotal: exp.vat !== undefined && exp.vat !== null ? purRound((Number(exp.amount) || 0) - Number(exp.vat)) : null,
     vat: exp.vat !== undefined && exp.vat !== null ? Number(exp.vat) : null, total: Number(exp.amount) || 0,
     // أصناف من القراءة الآلية (فيها category_sure) → نفس قواعد التصنيف والعلامة للمحاسب
-    lines: Array.isArray(exp.lines) ? exp.lines.map(l => ("category_sure" in l) ? purAiLine(l, null)
+    lines: Array.isArray(exp.lines) ? exp.lines.filter(l => l && typeof l === "object").map(l => ("category_sure" in l) ? purAiLine(l, null)
       : { name: l.name || "", qty: l.qty ?? null, unit: l.unit || "", unit_price: l.unit_price ?? null, total: l.total ?? null, category: l.category || "", ...(l.cat_check ? { cat_check: true } : {}) }) : [],
     receipt: exp.receipt || "",
     extra: { ...(exp.supplier_vat ? { supplier_vat: exp.supplier_vat } : {}), ...(exp.note && exp.supplier ? { note: exp.note } : {}) },
@@ -486,15 +486,23 @@ function bindPurchasesView() {
   if ($("purPhoto")) $("purPhoto").addEventListener("click", () => {
     const draft = purDraft;
     if (!draft) return;
-    DocScan.open({ ai: true, onDone: async ({ dataUrl, qr, ai }) => {
+    DocScan.open({ ai: true, onDone: async ({ dataUrl, qr, ai, aiLater }) => {
+      // البيانات المقروءة تنحط أول — لو فشل رفع الصورة ما تضيع
+      purFillFromQr(draft, qr);
+      purFillFromAi(draft, ai);
+      if (purDraft === draft) renderPurchasesView();
+      // القراءة الآلية وصلت بعد ما ضغط «استخدم» → نعبّي الفاضي لما توصل
+      if (aiLater) aiLater.then((late) => {
+        if (!late || late.error) return;
+        purFillFromAi(draft, late);
+        if (purDraft === draft) renderPurchasesView();
+      }).catch(() => {});
+      const read = (qr && qr.seller) || (ai && !ai.error);
       try {
         showToast("⏳ جاري رفع الصورة…");
         draft.receipt = await SupaEngine.uploadReceipt(draft.invoice_date || todayStr(), draft.branch || PUR_CENTRAL_BRANCH, dataUrl);
-        purFillFromQr(draft, qr);
-        purFillFromAi(draft, ai);
-        if (!qr && ai && !ai.error) qr = ai;
         if (purDraft === draft) renderPurchasesView();
-        showToast(qr ? "✅ انرفعت وانقرت بيانات الفاتورة — راجعها واحفظ" : "✅ انرفعت الصورة — لا تنسى تحفظ");
+        showToast(read ? "✅ انرفعت وانقرت بيانات الفاتورة — راجعها واحفظ" : "✅ انرفعت الصورة — لا تنسى تحفظ");
       } catch (err) {
         showToast("⚠ ما انرفعت الصورة — " + (err.message || err));
       }
@@ -540,7 +548,7 @@ function purFillFromAi(d, a) {
   const hasLines = (d.lines || []).some(l => String(l.name || "").trim());
   if (!hasLines && Array.isArray(a.lines) && a.lines.length) {
     const sup = purFindSupplier(d.supplier || "");
-    d.lines = a.lines.slice(0, 60).map(l => purAiLine(l, sup));
+    d.lines = a.lines.filter(l => l && typeof l === "object").slice(0, 60).map(l => purAiLine(l, sup));
   }
 }
 
