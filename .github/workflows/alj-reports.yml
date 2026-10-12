@@ -44,7 +44,8 @@ jobs:
         run: |
           npm ci || npm install
           npx playwright install --with-deps chromium
-          pip install --quiet pymupdf
+          # بايثون النظام (السكربتات تشتغل بـ python3 -I اللي يتجاهل مكتبات المستخدم)
+          sudo python3 -m pip install --quiet --break-system-packages pymupdf
       - name: Create config.json from GitHub Secret
         working-directory: ./tabsense-sync
         env:
