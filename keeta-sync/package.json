@@ -1,0 +1,10 @@
+{
+  "name": "prohouse-keeta-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "سحب مبيعات وفواتير كيتا (Keeta) لفرعي الروضة والشاطئ — حالياً وضع استكشاف بس",
+  "main": "keeta.js",
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}

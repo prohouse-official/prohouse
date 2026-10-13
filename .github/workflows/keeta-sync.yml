@@ -1,0 +1,35 @@
+name: Keeta Sync
+
+# كيتا (Keeta) — لوحة التاجر لفرعي الروضة والشاطئ. حالياً تشغيل يدوي للاستكشاف بس.
+# الإعدادات بسر KEETA_CONFIG_JSON: {"branches":[{"name","email","password"}]}
+# المستودع عام: السجل ما فيه أرقام مبيعات ولا بيانات عملاء.
+on:
+  workflow_dispatch:
+    inputs:
+      explore:
+        description: "1 = log login form, menu, page/table names and API paths (no numbers)"
+        required: false
+        default: "1"
+
+jobs:
+  keeta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install
+        working-directory: ./keeta-sync
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+      - name: Keeta
+        working-directory: ./keeta-sync
+        env:
+          KEETA_CONFIG: ${{ secrets.KEETA_CONFIG_JSON }}
+          KEETA_EXPLORE: ${{ github.event.inputs.explore }}
+        run: node keeta.js
