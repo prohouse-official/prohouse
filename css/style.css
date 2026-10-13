@@ -3614,3 +3614,5 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .pur-pdf-btn{ min-height:38px; padding:0 14px; font-size:14px; }
 .pur-src .pur-bar-track i{ background:var(--green); }
 .pur-src .pur-bar-name{ white-space:normal; overflow:visible; text-overflow:clip; }
+.kitchen-line{ font-size:14px; color:var(--text); padding:6px 4px; }
+.kitchen-soon{ color:var(--muted); background:var(--canvas); border-radius:12px; padding:12px; margin-top:6px; }

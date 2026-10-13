@@ -232,6 +232,31 @@ function stepsCardHtml(s, showBranchName) {
     </div>`;
 }
 
+// ---- المطبخ المركزي: مو فرع مبيعات — بطاقة لحالها (المسؤول، الموظفين، ومهامهم لما تنضاف) ----
+// من الإعدادات: central_kitchen = {"name","lead","staff":[...],"tasks":[...]}
+function centralKitchen() {
+  const raw = typeof currentSettings !== "undefined" && currentSettings.central_kitchen;
+  if (!raw) return null;
+  try { const k = typeof raw === "string" ? JSON.parse(raw) : raw; return k && k.name ? k : null; } catch (e) { return null; }
+}
+
+function kitchenCardHtml(k) {
+  const tasks = Array.isArray(k.tasks) ? k.tasks.filter(Boolean) : [];
+  const staff = Array.isArray(k.staff) ? k.staff.filter(Boolean) : [];
+  return `
+    <div class="day-steps-card kitchen-card">
+      <div class="day-steps-head">
+        <span class="day-steps-branch">🍳 ${escHtml(k.name)}</span>
+        <span class="day-steps-count">${staff.length} موظفين</span>
+      </div>
+      ${k.lead ? `<div class="kitchen-line">👨‍🍳 المسؤول: <b>${escHtml(k.lead)}</b></div>` : ""}
+      ${staff.length ? `<div class="kitchen-line">👥 ${staff.map(x => escHtml(x)).join(" · ")}</div>` : ""}
+      ${tasks.length
+        ? tasks.map(t => `<div class="day-step todo"><span class="day-step-icon">📋</span><span class="day-step-title">${escHtml(t)}</span></div>`).join("")
+        : `<div class="kitchen-line kitchen-soon">📋 المهام بتنضاف هون أول ما يوصل الوصف الوظيفي من الشيف</div>`}
+    </div>`;
+}
+
 async function renderDashboard() {
   const view = document.getElementById("dashboardView");
   if (!view.children.length) {
@@ -264,7 +289,16 @@ async function renderDashboard() {
     </div>
     ${isPast ? `<div class="home-past-note">📅 مهام يوم ${dateLabel} — اضغط على أي مهمة تفتحها على نفس اليوم</div>` : ""}`;
 
-  if (Auth.isBranchStaff()) {
+  if (typeof currentSettings !== "undefined" && !Object.keys(currentSettings).length && typeof loadSettings === "function") { try { await loadSettings(); } catch (e) {} }
+  const kitchen = centralKitchen();
+  if (Auth.role() === "kitchen") {
+    view.innerHTML = `
+      <div class="home-hello">${greeting}، ${escHtml(name)} 👋</div>
+      <div class="home-sub">${dateLabel}</div>
+      ${kitchen ? kitchenCardHtml(kitchen) : ""}
+      <button type="button" class="home-help-link" data-tab="assistant">💬 عندك سؤال؟ اسأل المساعد</button>
+    `;
+  } else if (Auth.isBranchStaff()) {
     const activeBranch = Branch.get() || branches[0] || "";
     const s = statuses.find(x => x.branch === activeBranch) || statuses[0];
     const steps = s ? dayStepsFor(s) : [];
@@ -297,8 +331,9 @@ async function renderDashboard() {
       ${dayBar}
       <div class="home-swiper" id="homeSwiper">
         ${statuses.map(s => `<div class="home-slide">${stepsCardHtml(s, true)}</div>`).join("")}
+        ${kitchen ? `<div class="home-slide">${kitchenCardHtml(kitchen)}</div>` : ""}
       </div>
-      ${statuses.length > 1 ? `<div class="home-dots">${statuses.map((s, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${s.branch}"></button>`).join("")}</div>` : ""}
+      ${statuses.length + (kitchen ? 1 : 0) > 1 ? `<div class="home-dots">${[...statuses.map(s => s.branch), ...(kitchen ? [kitchen.name] : [])].map((b, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${escHtml(b)}"></button>`).join("")}</div>` : ""}
       ${flagged.length ? `<button type="button" class="home-flag" data-tab="report">⚠ ${flagged.length} صنف إرجاعه مرتفع هالشهر ‹</button>` : ""}
       ${tabAllowed("custody") && !Auth.isReadOnly() ? `<button type="button" class="home-scan" data-tab="custody" data-scan="1">📷 سكان فاتورة مصروف / مشتريات</button>` : ""}
       ${Auth.isReadOnly() ? `<div class="home-past-note">👁 حساب المحاسب: تقدر تشوف كل البيانات والتقارير، بدون تعديل.</div>` : ""}

@@ -8,7 +8,8 @@ const ROLE_LABELS = {
   branch_staff: "موظف فرع (تشغيل وتسجيل بيانات)",
   employee: "موظف فرع (تشغيل وتسجيل بيانات)",
   viewer: "مراقب وقارئ (Read-Only Viewer)",
-  accountant: "محاسب (قراءة فقط لكل البيانات)"
+  accountant: "محاسب (قراءة فقط لكل البيانات)",
+  kitchen: "عامل المطبخ المركزي (يشوف مهامه بس)"
 };
 
 let usersListState = [];
