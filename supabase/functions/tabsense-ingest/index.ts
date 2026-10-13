@@ -11,7 +11,8 @@ const REPO = "prohouse-official/prohouse";
 const ALLOWED_WORKFLOWS = new Set([
   `${REPO}/.github/workflows/tabsense-sync.yml@refs/heads/main`,
   `${REPO}/.github/workflows/foodics-sync.yml@refs/heads/main`,
-  `${REPO}/.github/workflows/alj-reports.yml@refs/heads/main`
+  `${REPO}/.github/workflows/alj-reports.yml@refs/heads/main`,
+  `${REPO}/.github/workflows/takrar-sync.yml@refs/heads/main`
 ]);
 // ملفات تقارير عبداللطيف جميل اليومية (نفس ملفات تابسنس) → مخزن خاص alj-reports
 const ALJ_FILE = /^\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/(Summary \d{1,2} [a-z]{3}\.pdf|Orders \(\d{1,2} [a-z]{3}\)\.xlsx)$/;

@@ -1,0 +1,46 @@
+name: Takrar Daily Sync
+
+# مبيعات اشتراكات تكرار → الموقع (فرع «تكرار»). كل يوم الساعة ١١:٢٠ مساءً بتوقيت الرياض.
+# الإعدادات بسر TAKRAR_CONFIG_JSON: {"url": "...", "email": "...", "password": "...", "ordersUrl": "...", "exportText": "..."}
+# المستودع عام: السجل ما فيه أرقام مبيعات ولا بيانات عملاء.
+on:
+  schedule:
+    - cron: '20 20 * * *'
+  workflow_dispatch:
+    inputs:
+      explore:
+        description: "1 = only log the dashboard layout (links, buttons, table headers) without sending anything"
+        required: false
+        default: ""
+
+jobs:
+  takrar-sync:
+    runs-on: ubuntu-latest
+    if: github.ref_name == 'main'
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install
+        working-directory: ./takrar-sync
+        run: |
+          npm ci || npm install
+          npx playwright install --with-deps chromium
+          sudo python3 -m pip install --quiet --break-system-packages openpyxl
+      - name: Create config.json from GitHub Secret
+        working-directory: ./takrar-sync
+        env:
+          TAKRAR_CONFIG: ${{ secrets.TAKRAR_CONFIG_JSON }}
+        run: |
+          if [ -z "$TAKRAR_CONFIG" ]; then echo "TAKRAR_CONFIG_JSON secret is not set"; exit 1; fi
+          echo "$TAKRAR_CONFIG" > config.json
+      - name: Pull Takrar orders
+        working-directory: ./takrar-sync
+        env:
+          TAKRAR_EXPLORE: ${{ github.event.inputs.explore }}
+        run: node pull-takrar.js

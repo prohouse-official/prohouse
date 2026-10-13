@@ -1,0 +1,10 @@
+{
+  "name": "prohouse-takrar-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "سحب يومي لمبيعات اشتراكات تكرار (ملف orders) وإرسالها لموقع Pro House كفرع «تكرار»",
+  "main": "pull-takrar.js",
+  "dependencies": {
+    "playwright": "^1.47.0"
+  }
+}
