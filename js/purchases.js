@@ -250,7 +250,8 @@ function renderPurchasesView() {
         <div class="pur-kpi-sales"><span>إجمالي المبيعات</span><b>${sales.total > 0 ? purSar(sales.total) : "—"}</b></div>
         <div><span>إجمالي المشتريات</span><b>${purSar(s.total)}</b></div>
         <div><span>الضريبة</span><b>${purSar(s.vat)}</b></div>
-        <div><span>عدد الفواتير</span><b>${s.count}</b></div>
+        <div><span>فواتير المشتريات</span><b>${s.count}</b></div>
+        <div><span>فواتير المبيعات</span><b>${sales.count > 0 ? sales.count.toLocaleString("en-US") : "—"}</b></div>
         <div><span>من المبيعات</span><b>${sales.total > 0 ? purPct(s.total, sales.total) : "—"}</b></div>
       </div>
       ${!purBranch && sales.sources.length ? `<div class="pur-sec-title">المبيعات حسب المصدر</div>
@@ -722,12 +723,13 @@ function purSalesSummary() {
   for (let d = purStart; d <= end; d = addDaysStr(d, 1)) days++;
   const branches = purBranch ? [purBranch] : branchList();
   const byBranch = {}, amountBy = {};
-  let total = 0;
+  let total = 0, count = 0;
   purSales.forEach(r => {
     // «عبداللطيف جميل — فاتورة الدعم» (الـ٢٠٪ اللي يدفعونها شهرياً) تنحسب مع مبيعات الفرع نفسه
     const br = String(r.branch || "").split(" — ")[0];
     if (purBranch && br !== purBranch) return;
     total += Number(r.amount) || 0;
+    count += Number(r.transactions) || 0;
     amountBy[br] = (amountBy[br] || 0) + (Number(r.amount) || 0);
     if (br !== r.branch) return; // فاتورة الشهر ما تخلّي أيام الفرع «مكتملة»
     (byBranch[r.branch] = byBranch[r.branch] || new Set()).add(r.date);
@@ -739,7 +741,7 @@ function purSalesSummary() {
   const sources = Object.entries(amountBy).filter(([, v]) => v).sort((a, b) => b[1] - a[1])
     .map(([b, v]) => ({ name: b === "تكرار" ? "اشتراكات تكرار" : b, amount: purRound(v) }));
   // تكرار مو فرع بالقائمة — ما ينحسب «ناقص» لو ما له مبيعات
-  return { total: purRound(total), missing: missing.filter(b => b !== "تكرار"), sources };
+  return { total: purRound(total), count, missing: missing.filter(b => b !== "تكرار"), sources };
 }
 
 // ---- ملخص الفترة PDF (A4 طولي): نفس الكرت اللي على الشاشة مع ترويسة الفترة والفرع ----

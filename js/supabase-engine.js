@@ -1040,7 +1040,7 @@ const SupaEngine = (() => {
   }
   // مبيعات كل الفروع بفترة (طرق الدفع من تابسنس وفوديكس) — لنسبة المشتريات من المبيعات
   async function getSalesRange(start, end) {
-    return (await queryAll(`tabsense_payments?select=date,branch,channel,amount,returns_amount&date=gte.${start}&date=lte.${end}`, "date,branch,channel")) || [];
+    return (await queryAll(`tabsense_payments?select=date,branch,channel,amount,returns_amount,transactions&date=gte.${start}&date=lte.${end}`, "date,branch,channel")) || [];
   }
   // الموردين (من شيت يزيد + اللي يضيفهم المالك)
   async function getPurchaseSuppliers() {
