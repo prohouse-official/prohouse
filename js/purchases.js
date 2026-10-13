@@ -252,7 +252,7 @@ function renderPurchasesView() {
         <div><span>الضريبة</span><b>${purSar(s.vat)}</b></div>
         <div><span>فواتير المشتريات</span><b>${s.count}</b></div>
         <div><span>فواتير المبيعات</span><b>${sales.count > 0 ? sales.count.toLocaleString("en-US") : "—"}</b></div>
-        <div><span>من المبيعات</span><b>${sales.total > 0 ? purPct(s.total, sales.total) : "—"}</b></div>
+        <div><span>نسبة المشتريات من المبيعات</span><b>${sales.total > 0 ? purPct(s.total, sales.total) : "—"}</b></div>
       </div>
       ${!purBranch && sales.sources.length ? `<div class="pur-sec-title">المبيعات حسب المصدر</div>
         ${sales.sources.map(x => `<div class="pur-bar pur-src"><span class="pur-bar-name">${escHtml(x.name)}</span>
