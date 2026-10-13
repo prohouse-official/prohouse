@@ -718,9 +718,12 @@ function purSalesSummary() {
   const byBranch = {}, amountBy = {};
   let total = 0;
   purSales.forEach(r => {
-    if (purBranch && r.branch !== purBranch) return;
+    // «عبداللطيف جميل — فاتورة الدعم» (الـ٢٠٪ اللي يدفعونها شهرياً) تنحسب مع مبيعات الفرع نفسه
+    const br = String(r.branch || "").split(" — ")[0];
+    if (purBranch && br !== purBranch) return;
     total += Number(r.amount) || 0;
-    amountBy[r.branch] = (amountBy[r.branch] || 0) + (Number(r.amount) || 0);
+    amountBy[br] = (amountBy[br] || 0) + (Number(r.amount) || 0);
+    if (br !== r.branch) return; // فاتورة الشهر ما تخلّي أيام الفرع «مكتملة»
     (byBranch[r.branch] = byBranch[r.branch] || new Set()).add(r.date);
   });
   // فرع ما له ولا يوم مبيعات = ناقص (أيام الإجازة الطبيعية ما تنحسب نقص)
