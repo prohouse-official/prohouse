@@ -10,13 +10,15 @@ const clean = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/[\w.+-
 const snap = (page) => page.evaluate(() => ({
   url: location.href,
   inputs: Array.from(document.querySelectorAll("input")).filter(i => i.offsetParent).map(i => [i.type, i.name, i.placeholder].join("|")),
-  buttons: Array.from(document.querySelectorAll("button,[role=button]")).filter(b => b.offsetParent).map(b => b.innerText).filter(Boolean).slice(0, 20),
+  buttons: Array.from(document.querySelectorAll("body *")).filter(e => e.offsetParent && e.children.length <= 2 && (e.tagName === "BUTTON" || e.getAttribute("role") === "button" || getComputedStyle(e).cursor === "pointer") && (e.innerText || "").trim().length < 30)
+    .map(e => e.tagName.toLowerCase() + ":" + (e.innerText || "").trim() + (e.disabled || /disabled/.test(e.className) ? "(disabled)" : "")).filter((t, i, a) => a.indexOf(t) === i).slice(0, 25),
+  checks: Array.from(document.querySelectorAll("input[type=checkbox], [role=checkbox], [class*=checkbox]")).filter(e => e.offsetParent).length,
   text: document.body.innerText.slice(0, 300)
 }));
-const show = (tag, f) => console.log(tag, JSON.stringify({ url: clean(f.url), inputs: f.inputs.map(clean), buttons: f.buttons.map(clean), text: clean(f.text) }));
+const show = (tag, f) => console.log(tag, JSON.stringify({ url: clean(f.url), inputs: f.inputs.map(clean), buttons: f.buttons.map(clean), checks: f.checks, text: clean(f.text) }));
 
 async function clickNext(page) {
-  const btn = page.locator('button:visible').filter({ hasText: /^(التالي|متابعة|استمرار|تسجيل الدخول|دخول|Next|Continue|Log ?in|Sign ?in)$/i }).first();
+  const btn = page.locator('button:visible, [role=button]:visible, div:visible, span:visible').filter({ hasText: /^\s*(التالي|متابعة|استمرار|تسجيل الدخول|دخول|Next|Continue|Log ?in|Sign ?in)\s*$/i }).last();
   if (await btn.isVisible().catch(() => false)) { await btn.click().catch(() => {}); return true; }
   const any = page.locator('button[type="submit"]:visible').first();
   if (await any.isVisible().catch(() => false)) { await any.click().catch(() => {}); return true; }
@@ -32,8 +34,9 @@ async function login(page, br) {
   const email = page.locator('input:visible').first();
   if (!(await email.isVisible().catch(() => false))) { console.log("NO_EMAIL_FIELD"); return false; }
   await email.fill(br.email);
-  const cb = page.locator('input[type="checkbox"]:visible').first();
-  if (await cb.isVisible().catch(() => false)) await cb.check().catch(() => {});
+  const cb = page.locator('input[type="checkbox"], [role=checkbox], [class*=checkbox]').first();
+  if (await cb.count()) await cb.click({ force: true }).catch(() => {});
+  show("FILLED", await snap(page));
   await clickNext(page);
   await page.waitForTimeout(5000);
   const step2 = await snap(page);
