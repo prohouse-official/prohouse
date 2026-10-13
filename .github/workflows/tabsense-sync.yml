@@ -18,6 +18,10 @@ on:
         description: "Range end YYYY-MM-DD (empty = yesterday)"
         required: false
         default: ""
+      explore:
+        description: "billing = (non-main branch only) find the subscription invoice page, names only"
+        required: false
+        default: ""
 
 jobs:
   tabsense-sync:
@@ -73,5 +77,7 @@ jobs:
       - name: Explore TabSense pages (read-only, no numbers)
         if: github.ref_name != 'main'
         working-directory: ./tabsense-sync
+        env:
+          EXPLORE_MODE: ${{ github.event.inputs.explore }}
         run: |
           node explore-exports.js
