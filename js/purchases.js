@@ -7,7 +7,9 @@
 
 const PURCHASES_LIVE = true;
 const PUR_CENTRAL_BRANCH = "الروضة";
-const PUR_CATEGORIES = ["لحوم", "خضراوات", "بهارات", "بقالة", "مشروبات", "بلاستيك وتغليف", "منظفات", "أدوات طبخ", "أخرى"];
+const PUR_CATEGORIES = ["لحوم", "خضراوات", "بهارات", "بقالة", "مشروبات", "بلاستيك وتغليف", "منظفات", "أدوات طبخ", "اشتراكات التطبيقات", "أخرى"];
+// شرح قصير يطلع تحت التصنيف بالملخص
+const PUR_CAT_NOTES = { "اشتراكات التطبيقات": "فوديكس وتاب سنس (أنظمة الكاشير) · تكرار (منصة الاشتراكات) · كيتا (عمولة التوصيل)" };
 const PUR_UNITS = ["كجم", "جرام", "حبة", "كرتون", "علبة", "عبوة", "لتر", "كيس", "ربطة", "طبق", "صندوق", "شبكة", "جالون"];
 const PUR_VAT_RATE = 0.15;
 const PUR_SOURCES = { google_form: "قوقل فورم", custody: "العهدة", site: "الموقع" };
@@ -264,7 +266,8 @@ function renderPurchasesView() {
       ${cats.length ? `<div class="pur-sec-title">حسب التصنيف</div>
         ${cats.map(([c, v]) => `<div class="pur-bar"><span class="pur-bar-name">${escHtml(c)}</span>
           <span class="pur-bar-track"><i style="width:${Math.round(Math.abs(v) / maxCat * 100)}%"></i></span><b>${purSar(v)}</b>
-          <small class="pur-bar-pct">${purPct(v, s.total)} من المشتريات${sales.total > 0 ? ` · ${purPct(v, sales.total)} من المبيعات` : ""}</small></div>`).join("")}` : ""}
+          <small class="pur-bar-pct">${purPct(v, s.total)} من المشتريات${sales.total > 0 ? ` · ${purPct(v, sales.total)} من المبيعات` : ""}</small>
+          ${PUR_CAT_NOTES[c] ? `<small class="pur-bar-pct pur-cat-note">${escHtml(PUR_CAT_NOTES[c])}</small>` : ""}</div>`).join("")}` : ""}
       ${sups.length ? `<div class="pur-sec-title">أكثر الموردين</div>
         ${sups.map(([n, v]) => `<div class="cust-row"><span>${escHtml(n)}</span><b>${purSar(v)}</b></div>`).join("")}` : ""}
     </div>
