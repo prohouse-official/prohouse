@@ -3609,3 +3609,6 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .cust-clear-btn{ display:block; width:100%; margin-top:8px; min-height:44px; border:1.5px solid #f1c4c4; background:#fff5f5; color:#b42318; border-radius:14px; font-family:inherit; font-weight:800; font-size:14px; cursor:pointer; }
 .pur-cat-check{ font-size:12px; font-weight:800; color:#9a6700; background:#fff4d6; border:1px solid #f2c94c; border-radius:999px; padding:3px 8px; white-space:nowrap; }
 .acct-kind{ width:100%; min-height:44px; margin:8px 0; border-radius:12px; border:1.5px solid var(--line-strong); padding:8px 10px; font-family:inherit; font-weight:800; font-size:14px; background:#fff; }
+.pur-sum-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.pur-sum-head .cust-owner-title{ margin:0; }
+.pur-pdf-btn{ min-height:38px; padding:0 14px; font-size:14px; }

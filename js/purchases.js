@@ -244,7 +244,8 @@ function renderPurchasesView() {
     </div>
 
     <div class="cust-owner pur-summary">
-      <div class="cust-owner-title">📊 ملخص الفترة</div>
+      <div class="pur-sum-head"><div class="cust-owner-title">📊 ملخص الفترة</div>
+        <button type="button" class="cust-btn pur-pdf-btn" id="purSummaryPdf">📄 PDF</button></div>
       <div class="pur-kpis">
         <div class="pur-kpi-sales"><span>إجمالي المبيعات</span><b>${sales.total > 0 ? purSar(sales.total) : "—"}</b></div>
         <div><span>إجمالي المشتريات</span><b>${purSar(s.total)}</b></div>
@@ -382,6 +383,7 @@ function bindPurchasesView() {
   const view = document.getElementById("purchasesView");
   const $ = (id) => document.getElementById(id);
   const reload = () => { purOpenId = ""; purDraft = null; loadPurchases(); };
+  if ($("purSummaryPdf")) $("purSummaryPdf").addEventListener("click", (e) => sharePurSummaryPdf(e.currentTarget));
   view.querySelectorAll("[data-preset]").forEach(b => b.addEventListener("click", () => { purSetPreset(b.dataset.preset); reload(); }));
   ["purStartInput", "purEndInput"].forEach(id => { if ($(id)) $(id).addEventListener("change", () => {
     const a = $("purStartInput").value, z = $("purEndInput").value;
@@ -720,4 +722,57 @@ function purSalesSummary() {
   const missing = branches.filter(b => !(byBranch[b] && byBranch[b].size)).concat(
     branches.filter(b => byBranch[b] && byBranch[b].size && days > 6 && byBranch[b].size < days / 2).map(b => `${b} (${byBranch[b].size} يوم من ${days})`));
   return { total: purRound(total), missing };
+}
+
+// ---- ملخص الفترة PDF (A4 طولي): نفس الكرت اللي على الشاشة مع ترويسة الفترة والفرع ----
+async function sharePurSummaryPdf(btn) {
+  const card = document.querySelector(".pur-summary");
+  if (!card) return;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳";
+  const stage = document.createElement("div");
+  stage.style.cssText = "position:fixed;left:-99999px;top:0;width:794px;background:#fff;padding:28px 34px;box-sizing:border-box;direction:rtl;";
+  try {
+    await loadPdfLibs();
+    if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
+    const period = purStart === purEnd ? purStart : `${purStart} → ${purEnd}`;
+    stage.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:12px;">
+        <div><b style="font-size:20px;">ملخص المشتريات</b><div style="font-size:13px;color:#444;"><span dir="ltr">${escHtml(period)}</span> · ${escHtml(purBranch || "كل الفروع")}</div></div>
+        <img src="assets/logo.png" style="height:44px;" alt=""></div>`;
+    const clone = card.cloneNode(true);
+    clone.querySelectorAll(".pur-pdf-btn").forEach(b => b.remove());
+    clone.style.boxShadow = "none";
+    stage.appendChild(clone);
+    document.body.appendChild(stage);
+    await new Promise(r => setTimeout(r, 300));
+    const canvas = await html2canvas(stage, { scale: 2, backgroundColor: "#ffffff", logging: false });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
+    const pageH = Math.floor(canvas.width * 297 / 210); // ارتفاع صفحة A4 بالبكسل
+    for (let y = 0, first = true; y < canvas.height; y += pageH, first = false) {
+      const part = document.createElement("canvas");
+      part.width = canvas.width; part.height = Math.min(pageH, canvas.height - y);
+      const ctx = part.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, part.width, part.height);
+      ctx.drawImage(canvas, 0, y, canvas.width, part.height, 0, 0, canvas.width, part.height);
+      if (!first) pdf.addPage();
+      pdf.addImage(part.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, 210, part.height * 210 / canvas.width);
+    }
+    const name = `ملخص_المشتريات_${purStart}_${purEnd}${purBranch ? "_" + purBranch : ""}.pdf`;
+    const file = new File([pdf.output("blob")], name, { type: "application/pdf" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "ملخص المشتريات" }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    showToast("✅ نزل الـ PDF");
+  } catch (e) {
+    showToast("⚠ " + (e.message || e));
+  } finally {
+    stage.remove();
+    btn.disabled = false; btn.textContent = label;
+  }
 }

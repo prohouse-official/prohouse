@@ -8,3 +8,5 @@ foodics-sync/downloads/
 
 # ربط clasp المحلي (خاص بجهاز واحد — فيه معرّف السكربت)
 apps-script/.clasp.json
+takrar-sync/config.json
+takrar-sync/orders.xlsx
