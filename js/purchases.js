@@ -246,7 +246,8 @@ function renderPurchasesView() {
     <div class="cust-owner pur-summary">
       <div class="cust-owner-title">📊 ملخص الفترة</div>
       <div class="pur-kpis">
-        <div><span>الإجمالي</span><b>${purSar(s.total)}</b></div>
+        <div class="pur-kpi-sales"><span>إجمالي المبيعات</span><b>${sales.total > 0 ? purSar(sales.total) : "—"}</b></div>
+        <div><span>إجمالي المشتريات</span><b>${purSar(s.total)}</b></div>
         <div><span>الضريبة</span><b>${purSar(s.vat)}</b></div>
         <div><span>عدد الفواتير</span><b>${s.count}</b></div>
         <div><span>من المبيعات</span><b>${sales.total > 0 ? purPct(s.total, sales.total) : "—"}</b></div>

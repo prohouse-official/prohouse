@@ -3437,6 +3437,9 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .pur-kpis div{ background:var(--canvas); border:1px solid var(--line); border-radius:14px; padding:10px 8px; text-align:center; min-width:0; }
 .pur-kpis span{ display:block; font-size:12px; font-weight:700; color:var(--muted); }
 .pur-kpis b{ display:block; font-size:15px; font-weight:900; margin-top:2px; overflow-wrap:anywhere; }
+.pur-kpis .pur-kpi-sales{ grid-column:1 / -1; background:var(--ink); border-color:var(--ink); }
+.pur-kpis .pur-kpi-sales span{ color:var(--yellow); }
+.pur-kpis .pur-kpi-sales b{ color:#fff; font-size:18px; }
 .pur-pending-note{ font-size:13px; font-weight:800; color:#8A6A00; background:#FFF8D6; border-radius:12px; padding:8px 10px; margin-bottom:8px; }
 .pur-sec-title{ font-size:13.5px; font-weight:900; margin:14px 0 8px; color:var(--ink); }
 .pur-bar{ display:grid; grid-template-columns:96px 1fr auto; align-items:center; gap:8px; margin-bottom:6px; font-size:13px; }
