@@ -12,6 +12,7 @@ const TAB_ROLE_ACCESS = {
   remaining: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
   custody: ["owner", "manager", "branch_staff", "employee", "accountant"],
   purchases: ["owner", "accountant"],
+  inventory: ["owner", "accountant", "chef"],
   tomorrow: ["owner", "manager", "chef", "accountant"],
   // العصيرات وقائمة الفحص ما حدا عم يعبّيهم، فمخفيين عن موظفي الفروع لحتى القائمة تضل بسيطة
   juices: ["owner", "manager", "accountant"],
@@ -63,7 +64,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -126,6 +127,7 @@ function setActiveTab(tab) {
   }
   if (tab === "custody") { loadCustody(currentCustodyDate, Branch.get()); }
   if (tab === "purchases") { loadPurchases(); }
+  if (tab === "inventory") { loadInventory(); }
   if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
   if (tab === "users") { renderUsersView(); }
   if (tab === "audit") { renderAuditView(); }

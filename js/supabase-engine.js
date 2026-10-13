@@ -1035,6 +1035,14 @@ const SupaEngine = (() => {
   async function getPurchases(start, end) {
     return (await queryAll(`purchase_invoices?select=*&invoice_date=gte.${start}&invoice_date=lte.${end}`, "invoice_date,id")) || [];
   }
+  // المخزون: المواد + حركاتها (الوارد من المشتريات وغيره)
+  async function getInventory() {
+    const [materials, moves] = await Promise.all([
+      queryAll("inv_materials?select=id,name,category,base_unit,sort_order&active=eq.true", "sort_order,name"),
+      queryAll("inv_movements?select=id,date,location,material_id,kind,qty_base,value,estimated,voided,created_by&voided=eq.false", "date,id")
+    ]);
+    return { materials: materials || [], moves: moves || [] };
+  }
   async function savePurchase(row) {
     return rpc("purchase_save", { p_row: row });
   }
@@ -1134,6 +1142,7 @@ const SupaEngine = (() => {
     getPayments,
     getCustodyRange,
     getPurchases,
+    getInventory,
     savePurchase,
     getPurchaseSuppliers,
     getSalesRange,
