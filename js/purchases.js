@@ -253,6 +253,10 @@ function renderPurchasesView() {
         <div><span>عدد الفواتير</span><b>${s.count}</b></div>
         <div><span>من المبيعات</span><b>${sales.total > 0 ? purPct(s.total, sales.total) : "—"}</b></div>
       </div>
+      ${!purBranch && sales.sources.length ? `<div class="pur-sec-title">المبيعات حسب المصدر</div>
+        ${sales.sources.map(x => `<div class="pur-bar pur-src"><span class="pur-bar-name">${escHtml(x.name)}</span>
+          <span class="pur-bar-track"><i style="width:${Math.round(x.amount / sales.sources[0].amount * 100)}%"></i></span><b>${purSar(x.amount)}</b>
+          <small class="pur-bar-pct">${purPct(x.amount, sales.total)} من المبيعات</small></div>`).join("")}` : ""}
       ${sales.total > 0 ? `<div class="pur-sales-note">المبيعات بالفترة ${purSar(sales.total)}${purBranch ? ` (${escHtml(purBranch)})` : " (كل الفروع)"}${sales.missing.length ? ` — ⚠ ناقصة: ${sales.missing.map(escHtml).join("، ")}` : ""}</div>`
         : `<div class="pur-sales-note">⚠ ما فيه مبيعات مسجلة بهالفترة عشان نحسب النسبة</div>`}
       ${s.pendingCount ? `<div class="pur-pending-note">⏳ ${s.pendingCount} بانتظار المراجعة (${purSar(s.pendingTotal)}) — محسوبة بالإجمالي</div>` : ""}
@@ -711,17 +715,22 @@ function purSalesSummary() {
   let days = 0;
   for (let d = purStart; d <= end; d = addDaysStr(d, 1)) days++;
   const branches = purBranch ? [purBranch] : branchList();
-  const byBranch = {};
+  const byBranch = {}, amountBy = {};
   let total = 0;
   purSales.forEach(r => {
     if (purBranch && r.branch !== purBranch) return;
     total += Number(r.amount) || 0;
+    amountBy[r.branch] = (amountBy[r.branch] || 0) + (Number(r.amount) || 0);
     (byBranch[r.branch] = byBranch[r.branch] || new Set()).add(r.date);
   });
   // فرع ما له ولا يوم مبيعات = ناقص (أيام الإجازة الطبيعية ما تنحسب نقص)
   const missing = branches.filter(b => !(byBranch[b] && byBranch[b].size)).concat(
     branches.filter(b => byBranch[b] && byBranch[b].size && days > 6 && byBranch[b].size < days / 2).map(b => `${b} (${byBranch[b].size} يوم من ${days})`));
-  return { total: purRound(total), missing };
+  // توزيع المبيعات حسب المصدر (كل فرع + اشتراكات تكرار) — الأكبر أول
+  const sources = Object.entries(amountBy).filter(([, v]) => v).sort((a, b) => b[1] - a[1])
+    .map(([b, v]) => ({ name: b === "تكرار" ? "اشتراكات تكرار" : b, amount: purRound(v) }));
+  // تكرار مو فرع بالقائمة — ما ينحسب «ناقص» لو ما له مبيعات
+  return { total: purRound(total), missing: missing.filter(b => b !== "تكرار"), sources };
 }
 
 // ---- ملخص الفترة PDF (A4 طولي): نفس الكرت اللي على الشاشة مع ترويسة الفترة والفرع ----

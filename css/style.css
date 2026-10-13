@@ -3612,3 +3612,5 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .pur-sum-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .pur-sum-head .cust-owner-title{ margin:0; }
 .pur-pdf-btn{ min-height:38px; padding:0 14px; font-size:14px; }
+.pur-src .pur-bar-track i{ background:var(--green); }
+.pur-src .pur-bar-name{ white-space:normal; overflow:visible; text-overflow:clip; }
