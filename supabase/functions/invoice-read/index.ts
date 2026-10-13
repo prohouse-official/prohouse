@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
     .eq("employee_id", sess.employee_id).gte("at", since);
   if ((count || 0) >= DAILY_LIMIT) return json({ error: "limit" }, 429);
 
-  let ok = false, text = "", err = "";
+  let ok = false, text = "", err = "", ms = 0;
   if (KEY) {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -93,25 +93,41 @@ Deno.serve(async (req) => {
     ok = res.ok; text = (out?.content || []).map((c: { text?: string }) => c.text || "").join("");
     if (!res.ok) err = `${res.status} ${out?.error?.message || ""}`;
   } else {
-    const body = JSON.stringify({
+    // بدون «تفكير» — القراءة كانت تاخذ دقيقة وأكثر، والفاتورة ما تحتاجه
+    const mk = (think: boolean) => JSON.stringify({
       contents: [{ role: "user", parts: [{ inlineData: { mimeType: m[1], data: m[3] } }, { text: PROMPT }] }],
-      generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json" },
+      generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json", ...(think ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
     });
     const errs: string[] = [];
-    const call = async (model: string) => {
-      const res = await fetch(`${GL}/models/${model}:generateContent`, { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": GKEY }, body });
+    const t0 = Date.now();
+    // كل محاولة بحد ٣٥ ثانية؛ ضغط على النموذج (503/429) أو تأخير → نموذج Flash ثاني
+    const call = async (model: string, think = false): Promise<boolean | null> => {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 35000);
+      let res: Response;
+      try {
+        res = await fetch(`${GL}/models/${model}:generateContent`, { method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json", "x-goog-api-key": GKEY }, body: mk(think) });
+      } catch (_e) {
+        errs.push(`${model} timeout`);
+        return false;
+      } finally { clearTimeout(timer); }
       // deno-lint-ignore no-explicit-any
       const out: any = await res.json().catch(() => ({}));
       text = (out?.candidates?.[0]?.content?.parts || []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text || "").join("");
       if (res.ok && text) return true;
-      errs.push(`${model} ${res.status} ${out?.error?.status || ""} ${out?.error?.message || ""} ${out?.candidates?.[0]?.finishReason || ""}`.slice(0, 140));
+      const msg = `${out?.error?.message || ""}`;
+      errs.push(`${model} ${res.status} ${out?.error?.status || ""} ${msg} ${out?.candidates?.[0]?.finishReason || ""}`.slice(0, 140));
+      // النموذج ما يقبل إيقاف التفكير → نعيد بدونه
+      if (res.status === 400 && !think && /thinking/i.test(msg)) return call(model, true);
       return res.status === 404 ? null : false;
     };
     let r = await call(gModel || MODEL);
-    if (r === null) {
-      gModel = await pickGeminiModel();
-      if (gModel) r = await call(gModel);
+    if (r !== true && Date.now() - t0 < 40000) {
+      const alt = await pickGeminiModel();
+      if (alt && alt !== (gModel || MODEL)) { r = await call(alt); if (r === true) gModel = alt; }
     }
+    if (r !== true && Date.now() - t0 < 55000) r = await call("gemini-flash-lite-latest");
+    ms = Date.now() - t0;
     ok = r === true;
     if (!ok) err = errs.join(" | ");
   }
@@ -119,7 +135,7 @@ Deno.serve(async (req) => {
   let invoice: any = null;
   try { const s = text.indexOf("{"), e = text.lastIndexOf("}"); invoice = JSON.parse(text.slice(s, e + 1)); } catch { invoice = null; }
   if (ok && !invoice && !err) err = "bad json: " + text.slice(0, 120);
-  await admin.from("invoice_ai_log").insert({ employee_id: sess.employee_id, ok: !!invoice, model: KEY ? MODEL : (gModel || MODEL), err: err.slice(0, 300) || null });
+  await admin.from("invoice_ai_log").insert({ employee_id: sess.employee_id, ok: !!invoice, model: KEY ? MODEL : (gModel || MODEL), err: err.slice(0, 300) || null, ms });
   if (!ok || !invoice) return json({ error: "ai_failed" }, 502);
   return json({ invoice });
 });

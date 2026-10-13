@@ -495,13 +495,19 @@ function bindPurchasesView() {
     if (!draft) return;
     DocScan.open({ ai: true, onDone: async ({ dataUrl, qr, ai, aiLater }) => {
       // البيانات المقروءة تنحط أول — لو فشل رفع الصورة ما تضيع
-      purFillFromQr(draft, qr);
+      // القراءة الآلية هي الأساس، والـ QR يعبّي الناقص بس
       purFillFromAi(draft, ai);
+      const before = { supplier: draft.supplier, invoice_date: draft.invoice_date, total: draft.total, vat: draft.vat, subtotal: draft.subtotal };
+      purFillFromQr(draft, qr);
+      const fromQr = Object.keys(before).filter(k => draft[k] !== before[k]);
       if (purDraft === draft) renderPurchasesView();
-      // القراءة الآلية وصلت بعد ما ضغط «استخدم» → نعبّي الفاضي لما توصل
+      // القراءة الآلية وصلت بعد ما ضغط «استخدم» → تعبّي الفاضي وتستبدل اللي جا من الـ QR (إذا ما انعدّل)
       if (aiLater) aiLater.then((late) => {
         if (!late || late.error) return;
+        const qrVals = {};
+        fromQr.forEach(k => { qrVals[k] = draft[k]; draft[k] = ""; });
         purFillFromAi(draft, late);
+        fromQr.forEach(k => { if (draft[k] === "" || draft[k] === null || draft[k] === undefined) draft[k] = qrVals[k]; });
         if (purDraft === draft) renderPurchasesView();
       }).catch(() => {});
       const read = (qr && qr.seller) || (ai && !ai.error);

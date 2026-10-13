@@ -419,6 +419,28 @@ const DocScan = (() => {
   const imgDataOf = (cv) => cv.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, cv.width, cv.height);
 
   // canvases: من الأوضح للأضعف (الصورة المعدّلة بدقتها، المحسّنة، الإطار الأصلي)
+  // تنعيم بنصف قطر r ثم أبيض/أسود حسب متوسط المنطقة حواليه (بالصورة المصغرة لـ ١٤٠٠ بكسل)
+  function closeDots(src, r, size = 1400, div = 40, f = 0.9) {
+    const k = size / Math.max(src.width, src.height);
+    const w = Math.max(1, Math.round(src.width * k)), h = Math.max(1, Math.round(src.height * k));
+    const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d"); ctx.drawImage(src, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h), d = img.data;
+    const g = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) g[i] = d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11;
+    const integral = (a) => { const I = new Float64Array((w + 1) * (h + 1)); for (let y = 1; y <= h; y++) { let row = 0; for (let x = 1; x <= w; x++) { row += a[(y - 1) * w + x - 1]; I[y * (w + 1) + x] = I[(y - 1) * (w + 1) + x] + row; } } return I; };
+    const mean = (I, x, y, rad) => { const x0 = Math.max(0, x - rad), y0 = Math.max(0, y - rad), x1 = Math.min(w, x + rad + 1), y1 = Math.min(h, y + rad + 1);
+      return (I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0]) / ((x1 - x0) * (y1 - y0)); };
+    const I1 = integral(g), b = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) b[y * w + x] = mean(I1, x, y, r);
+    const I2 = integral(b), win = Math.round(Math.max(w, h) / div / 2);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const v = b[y * w + x] < mean(I2, x, y, win) * f ? 0 : 255, o = (y * w + x) * 4;
+      d[o] = d[o + 1] = d[o + 2] = v; d[o + 3] = 255;
+    }
+    return img;
+  }
+
   async function readQr(canvases) {
     const list = canvases.filter(Boolean);
     if (await loadZX()) {
@@ -428,6 +450,18 @@ const DocScan = (() => {
           const hit = (r || []).find(x => x.isValid && x.text);
           if (hit) return parseZatca(hit.text) || { raw: hit.text };
         } catch (e) { /* نكمل */ }
+      }
+    }
+    // طابعات الفواتير الحرارية تطبع الرمز نقاط متقطعة — نسدّ الفراغات (تنعيم + عتبة محلية) ونعيد المحاولة
+    if (window.ZXingWASM) {
+      // الإعدادات اللي نجحت على فاتورة حرارية حقيقية (رمز نقاطه متقطعة)
+      for (const cv of list.slice(0, 2)) for (const [size, r, div, f] of [[2000, 2, 100, 0.9], [1400, 2, 140, 0.95], [2400, 3, 100, 0.9]]) {
+        try {
+          const res = await ZXingWASM.readBarcodes(closeDots(cv, r, size, div, f), { formats: ["QRCode"], tryHarder: true, maxNumberOfSymbols: 1 });
+          const hit = (res || []).find(x => x.isValid && x.text);
+          if (hit) return parseZatca(hit.text) || { raw: hit.text };
+        } catch (e) { /* نكمل */ }
+        await new Promise(res => setTimeout(res, 0));
       }
     }
     if (await loadJsQR()) {
@@ -629,21 +663,22 @@ const DocScan = (() => {
       const seq = ++readSeq;
       state.qr = null; state.ai = null; state.aiPromise = null;
       const flatNow = flat, outNow = out;
-      readQr([flatNow, outNow, still]).then(async (r) => {
+      const live = () => seq === readSeq && qrBox.isConnected ? box.querySelector(".dscan-qr") : null;
+      const useAi = opts.ai && aiAvailable();
+      const show = () => { const t = live(); if (t) t.innerHTML = summaryHtml(state, useAi && !state.ai && !!state.aiPromise); };
+      // القراءة الآلية هي الأساس وتبدأ فوراً (ما تستنى الـ QR)، والـ QR احتياط بالتوازي.
+      // «استخدم» ما تستنى شي — اللي ما خلص يكمّل بالخلفية ويتعبّى بالفاتورة لما يوصل.
+      if (useAi) {
+        const p = readWithAi(outNow);
+        state.aiPromise = p;
+        p.then((ai) => { if (seq !== readSeq) return; state.ai = ai; show(); });
+      }
+      show();
+      readQr([flatNow, outNow, still]).then((r) => {
         if (seq !== readSeq) return;
         state.qr = r && r.seller ? r : null;
-        const live = () => seq === readSeq && qrBox.isConnected ? box.querySelector(".dscan-qr") : null;
-        let tgt = live(); if (tgt) tgt.innerHTML = summaryHtml(state, opts.ai && aiAvailable());
-        if (opts.ai && aiAvailable()) {
-          const p = readWithAi(outNow);
-          state.aiPromise = p;
-          const ai = await p;
-          // الحواف تغيّرت أثناء القراءة؟ النتيجة القديمة ما تنكتب على الجديدة
-          if (seq !== readSeq) return;
-          state.ai = ai;
-          tgt = live(); if (tgt) tgt.innerHTML = summaryHtml(state);
-        }
-      }).catch(() => { const t = box.querySelector(".dscan-qr"); if (t && seq === readSeq) t.innerHTML = summaryHtml(state); });
+        show();
+      }).catch(() => {});
     };
     render();
   }
@@ -651,15 +686,19 @@ const DocScan = (() => {
   const fmt = (n) => (n === null || n === undefined || n === "" || isNaN(Number(n)) ? "" : Number(n).toFixed(2));
   function summaryHtml(st, aiPending) {
     const q = st.qr, a = st.ai && !st.ai.error ? st.ai : null;
+    const has = (v) => v !== null && v !== undefined && v !== "";
     const parts = [];
-    if (q) parts.push(`✅ <b>${escHtml(q.seller)}</b>${q.total !== null ? ` · الإجمالي <b>${fmt(q.total)}</b>` : ""}${q.vat !== null ? ` · الضريبة ${fmt(q.vat)}` : ""}${q.date ? ` · ${q.date}` : ""} <small>(من رمز QR)</small>`);
+    // القراءة الآلية أولاً — الـ QR بس إذا القراءة ما وصلت أو فشلت
     if (a) {
       const lines = Array.isArray(a.lines) ? a.lines.length : 0;
-      parts.push(`🤖 ${a.supplier && !q ? `<b>${escHtml(a.supplier)}</b> · ` : ""}${a.invoice_no ? `فاتورة #${escHtml(a.invoice_no)} · ` : ""}${!q && a.total !== null && a.total !== undefined ? `الإجمالي <b>${fmt(a.total)}</b> · ` : ""}${lines ? `${lines} صنف` : ""}`);
-      if (q && q.total !== null && q.total !== undefined && a.total !== null && a.total !== undefined && Math.abs(Number(a.total) - Number(q.total)) > 0.05) parts.push(`⚠ القراءة طلعت إجمالي ${fmt(a.total)} والـ QR ${fmt(q.total)} — نعتمد الـ QR`);
-    } else if (st.ai && st.ai.error) parts.push("ما قدرنا نقرأ تفاصيل الفاتورة — كمّل بإيدك");
-    if (aiPending) parts.push("🤖 جاري قراءة تفاصيل الفاتورة…");
-    if (!parts.length) return "ما لقينا رمز QR — اكتب المبلغ بإيدك";
+      parts.push(`🤖 ${a.supplier ? `<b>${escHtml(a.supplier)}</b> · ` : ""}${a.invoice_no ? `فاتورة #${escHtml(a.invoice_no)} · ` : ""}${has(a.total) ? `الإجمالي <b>${fmt(a.total)}</b>` : ""}${has(a.vat) ? ` · الضريبة ${fmt(a.vat)}` : ""}${lines ? ` · ${lines} صنف` : ""}`);
+      if (q && has(q.total) && has(a.total) && Math.abs(Number(a.total) - Number(q.total)) > 0.05) parts.push(`⚠ القراءة طلعت إجمالي ${fmt(a.total)} والـ QR ${fmt(q.total)} — راجع المبلغ`);
+    } else {
+      if (q) parts.push(`✅ <b>${escHtml(q.seller)}</b>${has(q.total) ? ` · الإجمالي <b>${fmt(q.total)}</b>` : ""}${has(q.vat) ? ` · الضريبة ${fmt(q.vat)}` : ""}${q.date ? ` · ${q.date}` : ""} <small>(من رمز QR)</small>`);
+      if (st.ai && st.ai.error) parts.push(st.ai.slow ? "⏱ القراءة تأخرت كثير — كمّل بإيدك أو اضغط «إعادة» وجرب مرة ثانية" : "ما قدرنا نقرأ تفاصيل الفاتورة — كمّل بإيدك");
+    }
+    if (aiPending) parts.push("🤖 جاري القراءة… تقدر تضغط «استخدم» وتكمّل — البيانات تتعبّى لحالها لما توصل");
+    if (!parts.length) return "اكتب المبلغ بإيدك";
     return parts.join("<br>");
   }
 
@@ -722,7 +761,7 @@ const DocScan = (() => {
   const aiAvailable = () => !aiOff && typeof SupaEngine !== "undefined" && typeof SupaEngine.readInvoice === "function";
   async function readWithAi(canvas) {
     try {
-      const k = Math.min(1, 1800 / Math.max(canvas.width, canvas.height));
+      const k = Math.min(1, 1600 / Math.max(canvas.width, canvas.height));
       const cv = document.createElement("canvas");
       cv.width = Math.round(canvas.width * k); cv.height = Math.round(canvas.height * k);
       cv.getContext("2d").drawImage(canvas, 0, 0, cv.width, cv.height);
@@ -731,7 +770,9 @@ const DocScan = (() => {
       return r && r.invoice ? r.invoice : { error: true };
     } catch (e) {
       // السيرفر رد إن القراءة فشلت → نقول للموظف. انقطاع نت أو نسخة المعاينة → بصمت
-      return /ai_failed|limit/.test(String(e && e.message)) ? { error: true } : null;
+      const m = String(e && e.message);
+      if (/ai_timeout/.test(m)) return { error: true, slow: true };
+      return /ai_failed|limit/.test(m) ? { error: true } : null;
     }
   }
 
@@ -775,5 +816,5 @@ const DocScan = (() => {
     }
   }
 
-  return { open, close, _test: { detect, detectCV, loadCV, processCanvas, parseZatca, readQr, enhance, warp } };
+  return { open, close, _test: { closeDots, detect, detectCV, loadCV, processCanvas, parseZatca, readQr, enhance, warp } };
 })();

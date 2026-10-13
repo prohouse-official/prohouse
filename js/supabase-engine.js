@@ -978,7 +978,13 @@ const SupaEngine = (() => {
   }
   // 🤖 قراءة فاتورة كاملة بالذكاء الاصطناعي (بالسيرفر). {off:true} إذا مو مفعّلة
   async function readInvoice(dataUrl) {
-    const res = await fetch(SUPABASE_URL + "/functions/v1/invoice-read", { method: "POST", headers: fnHeaders(), body: JSON.stringify({ image: dataUrl }) });
+    // حد أقصى دقيقة ونص — كانت الشاشة تضل «جاري القراءة» للأبد لو النت أو النموذج علّق
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 95000);
+    let res;
+    try { res = await fetch(SUPABASE_URL + "/functions/v1/invoice-read", { method: "POST", headers: fnHeaders(), body: JSON.stringify({ image: dataUrl }), signal: ctl.signal }); }
+    catch (e) { throw new Error(e && e.name === "AbortError" ? "ai_timeout" : String(e && e.message || e)); }
+    finally { clearTimeout(t); }
     if (res.status === 503 || res.status === 404) return { off: true };
     const out = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(out.error || `invoice-read [${res.status}]`);
