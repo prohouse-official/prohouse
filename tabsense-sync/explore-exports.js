@@ -22,6 +22,10 @@ const clean = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/\d/g, 
       page.click('button[type="submit"], button:has-text("تسجيل الدخول"), button:has-text("Login")')
     ]);
 
+    if (process.env.EXPLORE_MODE === "billing") {
+      await exploreBilling(page, BASE, ["", "/settings", "/billing", "/subscription", "/invoices", "/account", "/profile", "/settings/billing"]);
+      return;
+    }
     const links = new Map();
     for (const start of [BASE, `${BASE}/reports/sales-by-category`, `${BASE}/orders`]) {
       await page.goto(start, { waitUntil: "networkidle" }).catch(() => {});
@@ -59,3 +63,34 @@ const clean = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/\d/g, 
     await browser.close();
   }
 })();
+
+// ---- استكشاف فاتورة الاشتراك (قراءة بس): يدوّر على صفحة الفوترة/الاشتراك/الفواتير ويطبع أسماء الروابط وعناوين الجداول بس ----
+// المستودع عام: أي رقم ينستبدل بـ # — ما ينطبع مبلغ ولا رقم فاتورة.
+async function exploreBilling(page, base, guesses) {
+  const BILL = /billing|invoice|subscription|subscribe|plan|payment-history|license|فوتر|فاتور|فواتير|اشتراك|الباقة|الخطة|ترخيص/i;
+  const clean = (s) => String(s || "").replace(/\s+/g, " ").trim().replace(/\d/g, "#").slice(0, 70);
+  const seen = new Map();
+  const grab = async () => (await page.evaluate(() => Array.from(document.querySelectorAll("a[href]")).map(a => [a.href, a.innerText || a.title || ""])))
+    .forEach(([h, t]) => { if (!seen.has(h)) seen.set(h, t); });
+  await grab();
+  for (const g of guesses) {
+    await page.goto(base + g, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(2500);
+    await grab();
+  }
+  const hits = [...seen.entries()].filter(([h, t]) => BILL.test(h) || BILL.test(t));
+  console.log("BILLING_LINKS", JSON.stringify(hits.map(([h, t]) => [clean(h), clean(t)])));
+  const pages = [...new Set([...hits.map(([h]) => h), ...guesses.map(g => base + g)])].slice(0, 14);
+  for (const href of pages) {
+    await page.goto(href, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(3000);
+    const info = await page.evaluate(() => ({
+      url: location.href, title: document.title,
+      heads: Array.from(document.querySelectorAll("h1,h2,h3")).map(e => e.innerText).slice(0, 10),
+      tables: Array.from(document.querySelectorAll("table")).map(t => Array.from(t.querySelectorAll("th")).map(th => th.innerText.trim()).slice(0, 12)),
+      rows: document.querySelectorAll("table tbody tr").length,
+      buttons: Array.from(document.querySelectorAll("a,button")).map(e => e.innerText || e.title || "").filter(t => /download|pdf|invoice|view|تحميل|تنزيل|عرض|فاتور|طباعة|print/i.test(t)).slice(0, 15)
+    }));
+    console.log("BILLING_PAGE", JSON.stringify({ from: clean(href), url: clean(info.url), title: clean(info.title), heads: info.heads.map(clean), tables: info.tables.map(r => r.map(clean)), rows: info.rows, buttons: info.buttons.map(clean) }));
+  }
+}
