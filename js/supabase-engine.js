@@ -980,7 +980,7 @@ const SupaEngine = (() => {
   async function readInvoice(dataUrl) {
     // حد أقصى دقيقة ونص — كانت الشاشة تضل «جاري القراءة» للأبد لو النت أو النموذج علّق
     const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), 95000);
+    const t = setTimeout(() => ctl.abort(), 100000);
     let res;
     try { res = await fetch(SUPABASE_URL + "/functions/v1/invoice-read", { method: "POST", headers: fnHeaders(), body: JSON.stringify({ image: dataUrl }), signal: ctl.signal }); }
     catch (e) { throw new Error(e && e.name === "AbortError" ? "ai_timeout" : String(e && e.message || e)); }

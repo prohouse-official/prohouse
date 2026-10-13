@@ -99,11 +99,12 @@ Deno.serve(async (req) => {
       generationConfig: { temperature: 0, maxOutputTokens: 8000, responseMimeType: "application/json", ...(think ? {} : { thinkingConfig: { thinkingBudget: 0 } }) },
     });
     const errs: string[] = [];
+    const texts: Record<string, string> = {}; // نص كل نموذج لحاله (المحاولات المتوازية ما تكتب فوق بعض)
     const t0 = Date.now();
-    // كل محاولة بحد ٣٥ ثانية؛ ضغط على النموذج (503/429) أو تأخير → نموذج Flash ثاني
+    // كل محاولة بحد ٣٠ ثانية؛ ضغط على النموذج (503/429) أو تأخير → نموذج Flash ثاني
     const call = async (model: string, think = false): Promise<boolean | null> => {
       const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 35000);
+      const timer = setTimeout(() => ctl.abort(), 30000);
       let res: Response;
       try {
         res = await fetch(`${GL}/models/${model}:generateContent`, { method: "POST", signal: ctl.signal, headers: { "Content-Type": "application/json", "x-goog-api-key": GKEY }, body: mk(think) });
@@ -113,20 +114,24 @@ Deno.serve(async (req) => {
       } finally { clearTimeout(timer); }
       // deno-lint-ignore no-explicit-any
       const out: any = await res.json().catch(() => ({}));
-      text = (out?.candidates?.[0]?.content?.parts || []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text || "").join("");
-      if (res.ok && text) return true;
+      const t = (out?.candidates?.[0]?.content?.parts || []).filter((p: { thought?: boolean }) => !p.thought).map((p: { text?: string }) => p.text || "").join("");
+      texts[model] = t; text = t;
+      if (res.ok && t) return true;
       const msg = `${out?.error?.message || ""}`;
       errs.push(`${model} ${res.status} ${out?.error?.status || ""} ${msg} ${out?.candidates?.[0]?.finishReason || ""}`.slice(0, 140));
       // النموذج ما يقبل إيقاف التفكير → نعيد بدونه
-      if (res.status === 400 && !think && /thinking/i.test(msg)) return call(model, true);
+      if (res.status === 400 && !think) return call(model, true);
       return res.status === 404 ? null : false;
     };
+    // الأساسي أول؛ إذا فشل (ضغط 503 أو تأخير) نجرّب نموذجين بنفس الوقت ونأخذ أول واحد يرد
     let r = await call(gModel || MODEL);
-    if (r !== true && Date.now() - t0 < 40000) {
+    if (r !== true && Date.now() - t0 < 35000) {
       const alt = await pickGeminiModel();
-      if (alt && alt !== (gModel || MODEL)) { r = await call(alt); if (r === true) gModel = alt; }
+      const tries = [alt && alt !== (gModel || MODEL) ? alt : "", "gemini-flash-lite-latest"].filter(Boolean);
+      const one = async (mdl: string) => { if (await call(mdl) === true) return mdl; throw new Error(mdl); };
+      try { const won = await Promise.any(tries.map(one)); text = texts[won]; r = true; }
+      catch (_e) { r = false; }
     }
-    if (r !== true && Date.now() - t0 < 55000) r = await call("gemini-flash-lite-latest");
     ms = Date.now() - t0;
     ok = r === true;
     if (!ok) err = errs.join(" | ");

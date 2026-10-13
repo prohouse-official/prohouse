@@ -342,17 +342,24 @@ async function attachCustodyReceipt(i, payments) {
       showToast("⏳ جاري رفع الفاتورة…");
       receipt = await SupaEngine.uploadReceipt(currentCustodyDate, currentCustodyBranch, dataUrl);
     } catch (e) { showToast("⚠ ما انرفعت الفاتورة — تأكد من النت وجرب مرة ثانية"); return; }
-    // القراءة الآلية لسا ما خلصت؟ نستناها (الرفع أخذ وقت أصلاً) عشان ما تضيع الأصناف ورقم الفاتورة
-    if (!ai && aiLater) ai = await aiLater.catch(() => null);
-    const qr = custodyMergeInvoice(qrRaw, ai);
-    await custodyPatch((fresh) => {
+    // الصورة تنحفظ فوراً (ما نستنى القراءة — كانت تطول وتضيع الفاتورة لو طلعت من الصفحة)
+    const fill = (inv) => (fresh) => {
       const idx = fresh.expenses.findIndex(e => (target.id && e.id === target.id) || (!target.id && e.amount === target.amount && e.note === target.note));
       if (idx < 0) return null;
       const old = fresh.expenses[idx];
-      const extra = custodyInvoiceFields(qr, "");
+      const extra = custodyInvoiceFields(inv, "");
       Object.keys(extra).forEach(k => { if (old[k] !== undefined && old[k] !== "") delete extra[k]; });
-      return { expenses: fresh.expenses.map((e, k) => k === idx ? { ...e, ...extra, receipt } : e) };
-    }, payments, "✅ انضافت الفاتورة");
+      return { expenses: fresh.expenses.map((e, k) => k === idx ? { ...e, ...extra, receipt: receipt || e.receipt } : e) };
+    };
+    const saved = await custodyPatch(fill(custodyMergeInvoice(qrRaw, ai)), payments, aiLater && !ai ? "✅ انضافت الفاتورة — 🤖 البيانات تتعبّى لحالها" : "✅ انضافت الفاتورة");
+    if (!saved || ai || !aiLater) return;
+    // القراءة الآلية وصلت متأخر → نعبّي الحقول الفاضية بس
+    const late = await aiLater.catch(() => null);
+    if (!late) return;
+    for (let t = 0; t < 5; t++) {
+      if (!custodyBusy) { await custodyPatch(fill(custodyMergeInvoice(qrRaw, late)), payments, "🤖 انقرأت الفاتورة"); return; }
+      await new Promise(r => setTimeout(r, 1500));
+    }
   } });
 }
 

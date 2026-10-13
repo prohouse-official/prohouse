@@ -708,7 +708,7 @@ const DocScan = (() => {
     pane.className = "dscan-adjust";
     pane.innerHTML = `
       <div class="dscan-adjust-stage"><canvas></canvas></div>
-      <div class="dscan-adjust-hint">اسحب النقاط الأربع على زوايا الفاتورة</div>
+      <div class="dscan-adjust-hint">المس قريب من أي زاوية واسحب — الزاوية تمشي مع إصبعك من بعيد</div>
       <div class="dscan-review-actions">
         <button type="button" class="dscan-btn" data-act="cancel">إلغاء</button>
         <button type="button" class="dscan-btn primary" data-act="ok">✓ تم</button>
@@ -735,20 +735,34 @@ const DocScan = (() => {
       ctx.closePath();
       ctx.fillStyle = "rgba(242,190,34,.22)"; ctx.fill();
       ctx.lineWidth = 2.5; ctx.strokeStyle = "#f2be22"; ctx.stroke();
-      pts.forEach(p => { ctx.beginPath(); ctx.arc(ox + p[0] * s, oy + p[1] * s, 13, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = "#f2be22"; ctx.stroke(); });
+      pts.forEach((p, i) => {
+        const on = i === drag, x = ox + p[0] * s, y = oy + p[1] * s;
+        ctx.beginPath(); ctx.arc(x, y, on ? 17 : 13, 0, Math.PI * 2);
+        ctx.fillStyle = on ? "rgba(242,190,34,.35)" : "rgba(255,255,255,.9)"; ctx.fill();
+        ctx.lineWidth = 3; ctx.strokeStyle = "#f2be22"; ctx.stroke();
+        if (on) { ctx.beginPath(); ctx.moveTo(x - 9, y); ctx.lineTo(x + 9, y); ctx.moveTo(x, y - 9); ctx.lineTo(x, y + 9); ctx.lineWidth = 2; ctx.strokeStyle = "#111"; ctx.stroke(); }
+      });
     };
     const toImg = (e) => {
       const r = cv.getBoundingClientRect();
       return [Math.max(0, Math.min(still.width, (e.clientX - r.left - ox) / s)), Math.max(0, Math.min(still.height, (e.clientY - r.top - oy) / s))];
     };
+    // المس أي مكان: أقرب زاوية تتحرك مع إصبعك بنفس المسافة (الإصبع بعيد عنها فتشوفها وأنت تعدّل)
+    let start = null, orig = null;
     cv.addEventListener("pointerdown", (e) => {
       const p = toImg(e);
       let bi = -1, bd = Infinity;
-      pts.forEach((c, i) => { const dd = dist(c, p) * s; if (dd < bd) { bd = dd; bi = i; } });
-      if (bd < 48) { drag = bi; cv.setPointerCapture(e.pointerId); e.preventDefault(); }
+      pts.forEach((c, i) => { const dd = dist(c, p); if (dd < bd) { bd = dd; bi = i; } });
+      drag = bi; start = p; orig = pts[bi].slice();
+      cv.setPointerCapture(e.pointerId); e.preventDefault(); draw();
     });
-    cv.addEventListener("pointermove", (e) => { if (drag < 0) return; pts[drag] = toImg(e); draw(); e.preventDefault(); });
-    const end = () => { drag = -1; };
+    cv.addEventListener("pointermove", (e) => {
+      if (drag < 0) return;
+      const p = toImg(e);
+      pts[drag] = [Math.max(0, Math.min(still.width, orig[0] + p[0] - start[0])), Math.max(0, Math.min(still.height, orig[1] + p[1] - start[1]))];
+      draw(); e.preventDefault();
+    });
+    const end = () => { drag = -1; draw(); };
     cv.addEventListener("pointerup", end); cv.addEventListener("pointercancel", end);
     pane.querySelector('[data-act="cancel"]').addEventListener("click", () => pane.remove());
     pane.querySelector('[data-act="ok"]').addEventListener("click", () => { pane.remove(); done(orderQuad(pts)); });
@@ -765,9 +779,19 @@ const DocScan = (() => {
       const cv = document.createElement("canvas");
       cv.width = Math.round(canvas.width * k); cv.height = Math.round(canvas.height * k);
       cv.getContext("2d").drawImage(canvas, 0, 0, cv.width, cv.height);
-      const r = await SupaEngine.readInvoice(cv.toDataURL("image/jpeg", 0.88));
-      if (r && r.off) { aiOff = true; try { sessionStorage.setItem("ph_invoice_ai_off", "1"); } catch (e) {} return null; }
-      return r && r.invoice ? r.invoice : { error: true };
+      const img = cv.toDataURL("image/jpeg", 0.88);
+      // الخدمة مضغوطة أحياناً (503) — نعيد المحاولة بالخلفية لحد ٤ مرات، فالبيانات توصل حتى بعد «استخدم»
+      for (let attempt = 0; ; attempt++) {
+        let r;
+        try { r = await SupaEngine.readInvoice(img); }
+        catch (e) {
+          const m = String(e && e.message);
+          if (attempt < 3 && /ai_failed|ai_timeout|Failed to fetch|NetworkError|load failed/i.test(m)) { await new Promise(res => setTimeout(res, [8000, 20000, 45000][attempt])); continue; }
+          throw e;
+        }
+        if (r && r.off) { aiOff = true; try { sessionStorage.setItem("ph_invoice_ai_off", "1"); } catch (e) {} return null; }
+        return r && r.invoice ? r.invoice : { error: true };
+      }
     } catch (e) {
       // السيرفر رد إن القراءة فشلت → نقول للموظف. انقطاع نت أو نسخة المعاينة → بصمت
       const m = String(e && e.message);
