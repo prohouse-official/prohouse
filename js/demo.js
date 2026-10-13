@@ -22,7 +22,8 @@
     "2222": { id: "emp_6", name: "محمد البلول", role: "employee", branches: AJL, token: "demo-staff" },
     "3333": { id: "emp_5", name: "العامودي", role: "manager", branches: "الشاطئ", token: "demo-manager" },
     "4444": { id: "emp_8", name: "محمد الشرقاوي", role: "accountant", branches: "", token: "demo-accountant" },
-    "5555": { id: "emp_9", name: "شكيل", role: "employee", branches: "الروضة", token: "demo-rawdah-staff" }
+    "5555": { id: "emp_9", name: "شكيل", role: "employee", branches: "الروضة", token: "demo-rawdah-staff" },
+    "6666": { id: "emp_11", name: "بوبي", role: "kitchen", branches: "المطبخ المركزي", token: "demo-kitchen" }
   };
 
   function seed() {
@@ -56,7 +57,8 @@
     return {
       items, daily_entries, tabsense_sales,
       day_meta: [], tomorrow_orders: [], waste_log: [], juices: [], juice_counts: [], juice_sales: [],
-      settings: [{ key: "branches", value: "الروضة,الشاطئ," + AJL }, { key: "chef_report_employees", value: "emp_5" }],
+      settings: [{ key: "branches", value: "الروضة,الشاطئ," + AJL }, { key: "chef_report_employees", value: "emp_5" },
+        { key: "central_kitchen", value: JSON.stringify({ name: "المطبخ المركزي", lead: "الشيف اسلام", staff: ["بوبي", "محمد محسن", "مد رسال", "سهيل"], tasks: [] }) }],
       employees: Object.values(EMPLOYEES).map(({ token, ...e }) => ({ ...e, active: true })),
       tabsense_payments: [
         { date: riyadh(-1), branch: AJL, channel: "Cash", transactions: 6, amount: 212.4 },

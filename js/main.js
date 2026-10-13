@@ -1,9 +1,9 @@
 // ==================== التنقل بين التابات + الإقلاع + تسجيل الدخول ====================
 
 const TAB_ROLE_ACCESS = {
-  dashboard: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
-  help: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
-  assistant: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
+  dashboard: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
+  help: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
+  assistant: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
   branches: ["owner", "manager", "chef", "accountant"],
   opening: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
   closing: ["owner", "manager", "chef", "branch_staff", "employee", "accountant"],
