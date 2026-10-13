@@ -98,7 +98,7 @@ async function loadAcctReport() {
       const [date, branch] = k.split("|");
       const total = purRound(amt);
       const sub = purRound(total / (1 + PUR_VAT_RATE));
-      return { date, no: `${date.replace(/-/g, "")}-${branchCode(branch)}`, branch, customer: "عملاء نقدي (مبيعات اليوم)", vatNo: "", sub, vat: purRound(total - sub), total };
+      return { date, no: `${date.replace(/-/g, "")}-${branchCode(branch)}`, branch, customer: branch === "تكرار" ? "عملاء اشتراكات تكرار (أونلاين)" : "عملاء نقدي (مبيعات اليوم)", vatNo: "", sub, vat: purRound(total - sub), total };
     }).filter(r => r.total);
     acctData = {
       purchases: valid.filter(i => i.kind !== "return").map(i => acctPurchaseRow(i, sups || [])),
@@ -113,7 +113,7 @@ async function loadAcctReport() {
 }
 
 function branchCode(b) {
-  return { "الروضة": "R", "الشاطئ": "S", "عبداللطيف جميل": "A" }[b] || "B";
+  return { "الروضة": "R", "الشاطئ": "S", "عبداللطيف جميل": "A", "تكرار": "T" }[b] || "B";
 }
 
 const acctSum = (rows) => rows.reduce((t, r) => ({ sub: purRound(t.sub + r.sub), vat: purRound(t.vat + r.vat), total: purRound(t.total + r.total) }), { sub: 0, vat: 0, total: 0 });
