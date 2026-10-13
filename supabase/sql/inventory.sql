@@ -1,0 +1,8 @@
+-- المخزون (مطبّق على قاعدة البيانات): inv_materials (المواد الخام)، inv_aliases (اسم سطر الفاتورة|الوحدة → مادة + حجم العبوة)،
+-- inv_movements (سجل حركات: إضافة بس، والتصحيح بإلغاء voided أو حركة عكسية).
+-- الدالة inv_sync_invoice(id) تحوّل أسطر فاتورة مشتريات لحركات (id ثابت = pur:<فاتورة>:<رقم السطر>)،
+-- والـ trigger «inv_purchase_sync» على purchase_invoices يشغلها مع كل إضافة/تعديل/حذف.
+-- مبدئياً كل فاتورة غير مرجّعة (status <> 'rejected') تدخل المخزون؛ «اشتراكات التطبيقات» و«أخرى» (خدمات) ما تدخل.
+-- سطر اسمه جديد (ما له ربط) يروح للمادة «unmapped» لين نربطه بـ inv_aliases ونعيد inv_sync_invoice.
+-- القراءة: المالك والمحاسب والشيف (inv_can_read). الكتابة: من الدوال بس.
+-- التعريفات الكاملة: select pg_get_functiondef('public.inv_sync_invoice(text)'::regprocedure);

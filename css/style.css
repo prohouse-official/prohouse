@@ -3618,3 +3618,18 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .kitchen-line{ font-size:14px; color:var(--text); padding:6px 4px; }
 .kitchen-soon{ color:var(--muted); background:var(--canvas); border-radius:12px; padding:12px; margin-top:6px; }
 .pur-cat-note{ color:var(--text); opacity:.75; }
+/* المخزون */
+.inv-note{ font-size:12.5px; line-height:1.7; color:var(--muted); background:var(--canvas); border-radius:12px; padding:10px 12px; margin:8px 0; }
+.inv-note.warn{ background:#fff5d6; color:#7a5b00; }
+.inv-search{ width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:12px; padding:10px 12px; font:inherit; margin-top:6px; background:var(--card, #fff); }
+.inv-cat-head{ display:flex; justify-content:space-between; align-items:center; font-weight:900; font-size:15px; margin-bottom:6px; }
+.inv-row{ display:grid; grid-template-columns:1.3fr 1fr auto; gap:8px; align-items:center; width:100%; text-align:start; background:none; border:0; border-top:1px solid var(--line); padding:9px 2px; font:inherit; color:inherit; cursor:pointer; }
+.inv-row.open{ background:var(--canvas); border-radius:10px; }
+.inv-name{ font-weight:800; font-size:14px; }
+.inv-qty{ font-size:13px; font-weight:700; }
+.inv-qty small, .inv-val small{ display:block; font-size:11px; font-weight:700; color:var(--muted); }
+.inv-val{ font-size:13.5px; text-align:end; white-space:nowrap; }
+.inv-est{ color:#b07a00; font-weight:900; }
+.inv-detail{ padding:4px 6px 10px; }
+.inv-detail-sub{ font-size:12px; color:var(--muted); margin-bottom:4px; }
+.inv-mv{ display:grid; grid-template-columns:auto 1fr auto auto; gap:8px; font-size:12px; padding:4px 0; border-bottom:1px dashed var(--line); }

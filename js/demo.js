@@ -73,7 +73,15 @@
       purchase_invoices: demoPurchases(),
       purchase_suppliers: ["مؤسسة اللحوم الطازجة", "سوق الخضار المركزي", "مستودع البهارات", "شركة التغليف الحديثة", "النظافة المثالية", "بقالة الحي"]
         .map((name, i) => ({ name, aliases: [], default_category: ["لحوم", "خضراوات", "بهارات", "بلاستيك وتغليف", "منظفات", "بقالة"][i], active: true })),
-      push_subscriptions: [], reminder_settings: []
+      push_subscriptions: [], reminder_settings: [],
+      inv_materials: [["chicken_breast", "صدور دجاج (تندر)", "بروتين", "جم"], ["beef_fillet", "فيليه بقر", "بروتين", "جم"], ["salmon", "سالمون فيليه", "بروتين", "جم"],
+        ["rice", "رز", "نشويات", "جم"], ["potato", "بطاطس", "نشويات", "جم"], ["mozzarella", "جبنة موزاريلا", "ألبان", "جم"], ["olive_oil", "زيت زيتون", "زيوت وصوصات", "مل"],
+        ["eggs", "بيض", "بروتين", "حبة"], ["lettuce", "خس", "خضار وفواكه", "وحدة"], ["pk_microwave", "علب ميكرويف", "تغليف", "وحدة"], ["misc_بقالة", "غير مفصّل — بقالة", "غير مفصّل", "قيمة"]]
+        .map(([id, name, category, base_unit], i) => ({ id, name, category, base_unit, sort_order: i, active: true })),
+      inv_movements: [["chicken_breast", 0, 200000, 3700], ["chicken_breast", -6, 150000, 2780, true], ["beef_fillet", -3, 30000, 2100], ["salmon", -2, 20000, 1780],
+        ["rice", -4, 100000, 720], ["potato", -1, 50000, 140], ["mozzarella", -5, 21000, 220], ["olive_oil", -9, 10000, 245], ["eggs", -2, 300, 130],
+        ["lettuce", -1, 6, 120], ["pk_microwave", -7, 4, 520], ["misc_بقالة", -3, null, 310]]
+        .map(([material_id, d, qty_base, value, est], i) => ({ id: "dm" + i, date: riyadh(d), location: "الروضة", material_id, kind: "purchase", qty_base, value, estimated: !!est, voided: false, created_by: "مورد تجريبي" }))
     };
   }
   // فواتير مشتريات وهمية بأخطاء متعمدة (وحدة ناقصة، ضريبة غلط، مكررة) عشان نجرّب فحوصات المحاسب
@@ -102,7 +110,7 @@
 
   const KEYS = {
     daily_entries: ["date", "branch", "item_id"], day_meta: ["date", "branch"], items: ["id"], settings: ["key"], juices: ["id"],
-    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], purchase_invoices: ["id"], purchase_suppliers: ["name"],
+    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], purchase_invoices: ["id"], purchase_suppliers: ["name"], inv_materials: ["id"], inv_movements: ["id"],
     push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"], tabsense_payments: ["date", "branch", "channel"]
   };
 
