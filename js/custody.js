@@ -194,13 +194,16 @@ function renderCustodyView(payments) {
   if ($("custExpNote")) $("custExpNote").addEventListener("input", (e) => { d.note = e.target.value; });
   if ($("custNoReceipt")) $("custNoReceipt").addEventListener("change", (e) => { d.noReceipt = e.target.checked; });
   if ($("custExpInvNo")) $("custExpInvNo").addEventListener("input", (e) => { d.invoice_no = e.target.value; });
+  // الخانات اللي عبّيناها آلياً (مو الموظف) تتحدّث لما توصل القراءة المتأخرة
+  const auto = d._auto || (d._auto = {});
+  const setAuto = (k, v) => { if (!String(d[k]).trim() || d[k] === auto[k]) { d[k] = v; auto[k] = v; } };
   const applyInvoice = (qr, ai) => {
     d.qr = custodyMergeInvoice(qr, ai);
     const inv = d.qr;
     if (inv) {
-      if (!String(d.amount).trim() && inv.total !== null && inv.total !== undefined) d.amount = String(inv.total);
-      if (!String(d.note).trim() && inv.seller) d.note = inv.seller;
-      if (!String(d.invoice_no).trim() && inv.invoiceNo) d.invoice_no = inv.invoiceNo;
+      if (inv.total !== null && inv.total !== undefined) setAuto("amount", String(inv.total));
+      if (inv.seller) setAuto("note", inv.seller);
+      if (inv.invoiceNo) setAuto("invoice_no", inv.invoiceNo);
     }
   };
   const openScan = () => DocScan.open({ ai: true, onDone: ({ dataUrl, qr, ai, aiLater }) => {
@@ -297,17 +300,18 @@ async function addCustodyExpense(payments) {
   else if (btn) { btn.disabled = false; btn.textContent = "➕ أضف المصروف"; }
 }
 
-// رمز QR (موثوق للمبالغ) + قراءة الذكاء الاصطناعي (رقم الفاتورة والأصناف) → بيانات وحدة
+// قراءة الذكاء الاصطناعي (الأساس) + رمز QR (احتياط للناقص) → بيانات وحدة
 function custodyMergeInvoice(qr, ai) {
   const a = ai && !ai.error ? ai : null;
   if (!(qr && qr.seller) && !a) return null;
   const num = (v) => (v === null || v === undefined || v === "" || isNaN(Number(v)) ? null : Number(v));
+  // القراءة الآلية أولاً، والـ QR يكمّل الناقص بس
   return {
-    seller: (qr && qr.seller) || (a && a.supplier) || "",
-    vatNo: (qr && qr.vatNo) || (a && a.supplier_vat) || "",
-    date: (qr && qr.date) || (a && a.date) || "",
-    total: qr && qr.total !== null && qr.total !== undefined ? qr.total : num(a && a.total),
-    vat: qr && qr.vat !== null && qr.vat !== undefined ? qr.vat : num(a && a.vat),
+    seller: (a && a.supplier) || (qr && qr.seller) || "",
+    vatNo: (a && a.supplier_vat) || (qr && qr.vatNo) || "",
+    date: (a && a.date) || (qr && qr.date) || "",
+    total: num(a && a.total) !== null ? num(a.total) : (qr && qr.total !== null && qr.total !== undefined ? qr.total : null),
+    vat: num(a && a.vat) !== null ? num(a.vat) : (qr && qr.vat !== null && qr.vat !== undefined ? qr.vat : null),
     invoiceNo: (a && a.invoice_no) || "",
     lines: a && Array.isArray(a.lines) ? a.lines.filter(l => l && typeof l === "object").slice(0, 60) : []
   };
