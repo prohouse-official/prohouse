@@ -533,7 +533,7 @@ async function readGroupedReportOnce(page, path, iso, nameLabel, valueLabel, ext
     if (part.error) return { ok: false, reason: part.error, rows: [] };
     if (pageNo === 0) {
       const branchesSeen = Array.from(new Set(part.rows.map(r => r.branch).filter(Boolean)));
-      console.log(`🔎 ${path}: أعمدة ${JSON.stringify(part.headers.slice(0, 4))} · اسم=${part.nameIdx} فرع=${part.branchIdx} كمية=${part.qtyIdx} · فروع: ${branchesSeen.join("، ")}`);
+      console.log(`🔎 ${path}: أعمدة ${JSON.stringify(/payment/.test(path) ? part.headers : part.headers.slice(0, 4))} · اسم=${part.nameIdx} فرع=${part.branchIdx} كمية=${part.qtyIdx} · فروع: ${branchesSeen.join("، ")}`);
       if (part.nameIdx < 0 || part.qtyIdx < 0) return { ok: false, reason: "أعمدة الاسم/الكمية مو موجودة", rows: [] };
       if (part.rows.length && !branchesSeen.length) return { ok: false, reason: "ما بان اسم الفرع بالصفوف", rows: [] };
     }
@@ -560,7 +560,7 @@ async function readPaymentsReport(page, iso) {
   for (const p of paths) {
     // المبلغ = الصافي بعد المرتجعات، ومعه مبلغ وعدد المرتجعات لتقرير مردودات المبيعات
     const res = await readGroupedReportOnce(page, p, iso, "(طريقة الدفع|طرق الدفع|الدفع|وسيلة الدفع)", "(صافي المبلغ|المبلغ الصافي|المبلغ|صافي المبيعات|الإجمالي|المجموع)",
-      { ret: "مبلغ الإرجاع", retCount: "عدد المرتجعات" });
+      { ret: "مبلغ الإرجاع", retCount: "عدد المرتجعات", tx: "(عدد العمليات|عدد المعاملات|عدد الطلبات|عدد الدفعات|عدد الفواتير|العدد)" });
     if (res.ok) { paymentPathFound = p; return res; }
     console.log(`ℹ️ طرق الدفع: ${p} — ${res.reason}`);
   }
@@ -685,7 +685,7 @@ async function run() {
           catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ مبيعات المنتجات:`, e.message); }
         }
         // طرق الدفع (كاش/شبكة) لمطابقة إغلاق العهدة
-        const payRows = pays.ok ? mine(pays.rows).filter(r => r.name && r.qty != null).map(r => ({ channel: r.name, transactions: 0, amount: r.qty, returns_amount: r.ret || 0, returns_count: r.retCount || 0 })) : [];
+        const payRows = pays.ok ? mine(pays.rows).filter(r => r.name && r.qty != null).map(r => ({ channel: r.name, transactions: Number(String(r.tx || "").replace(/[^\d.]/g, "")) || 0, amount: r.qty, returns_amount: r.ret || 0, returns_count: r.retCount || 0 })) : [];
         if (payRows.length) {
           try { await sendToSupabase("import_payments", iso, branch, payRows); console.log(`💳 ${branch}: انحفظت طرق الدفع (${payRows.length} طريقة)`); }
           catch (e) { console.warn(`⚠ ${branch}: تعذر حفظ طرق الدفع:`, e.message); }
