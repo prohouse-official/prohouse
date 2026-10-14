@@ -214,6 +214,14 @@ async function syncBills(page, branchName) {
       }
     } catch (e) {}
   });
+  // تطبيق المالية لازم ينفتح من القائمة أول (فتح الرابط مباشرة ما يحمّل الفواتير)
+  await page.evaluate(() => {
+    document.querySelectorAll(".roo-modal, .roo-modal-backdrop, [class*=guideModal]").forEach(e => e.remove());
+    const all = Array.from(document.querySelectorAll("li, span, div, a")).filter(e => (e.innerText || "").trim() === "الشؤون المالية");
+    const el = all.find(e => !Array.from(e.children).some(c => (c.innerText || "").trim() === "الشؤون المالية")) || all[0];
+    if (el) { el.click(); const li = el.closest("li"); if (li && li !== el) li.click(); }
+  }).catch(() => {});
+  await page.waitForTimeout(9000);
   await page.goto(BASE + "/m/web/app/finance#/main/bill", { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
   await page.waitForTimeout(9000);
   // نفتح «التفاصيل» لكل فاتورة بالقائمة (كل ضغطة تجيب تفاصيل فترتها)
