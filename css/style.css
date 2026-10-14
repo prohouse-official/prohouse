@@ -3536,6 +3536,14 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .pur-extra .pur-extra-note{ color:#9a5b00; }
 .pur-extra a.cust-receipt-btn{ text-decoration:none; }
 .pur-suppliers{ margin-top:12px; }
+.pur-prod{ margin-top:12px; }
+.pur-prod-input{ width:100%; box-sizing:border-box; margin:8px 0 10px; padding:11px 12px; border:1.5px solid var(--line, #e5e5e5); border-radius:12px; font:inherit; font-size:16px; background:var(--card, #fff); color:var(--ink); }
+.pur-prod-total{ font-size:13px; font-weight:800; margin-bottom:6px; color:var(--ink); }
+.pur-prod-item{ border-top:1px solid var(--line, #eee); }
+.pur-prod-row{ width:100%; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; background:none; border:0; padding:10px 0; font-family:inherit; color:var(--ink); text-align:start; cursor:pointer; }
+.pur-prod-name{ flex:1 1 auto; font-weight:800; font-size:14.5px; }
+.pur-prod-meta{ flex-basis:100%; color:var(--muted, #777); font-size:12px; line-height:1.6; }
+.pur-prod-buys{ padding:0 8px 10px; font-size:13px; }
 .pur-sup-toggle{ width:100%; text-align:start; background:none; border:0; padding:4px 0; font-family:inherit; font-size:15px; font-weight:900; color:var(--ink); cursor:pointer; }
 .pur-sup-list{ max-height:320px; overflow:auto; margin-top:6px; }
 .pur-sup-list small{ font-weight:700; color:var(--muted, #666); }

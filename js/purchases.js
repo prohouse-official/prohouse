@@ -27,6 +27,8 @@ let purBusy = false;
 let purLoadSeq = 0;
 let purSuppliers = []; // [{name, aliases, default_category, ...}]
 let purShowSuppliers = false;
+let purProdQuery = ""; // بحث تكلفة المنتجات
+let purProdOpen = "";
 let purSales = []; // [{date, branch, amount}] مبيعات الفترة
 
 function purchasesEnabled() {
@@ -272,6 +274,12 @@ function renderPurchasesView() {
         ${sups.map(([n, v]) => `<div class="cust-row"><span>${escHtml(n)}</span><b>${purSar(v)}</b></div>`).join("")}` : ""}
     </div>
 
+    <div class="cust-owner pur-prod">
+      <div class="cust-owner-title">🔍 تكلفة المنتجات</div>
+      <input type="search" id="purProdSearch" class="pur-prod-input" value="${escHtml(purProdQuery)}" placeholder="اكتب اسم المنتج (مثلاً: دجاج، رز، طماطم)" autocomplete="off">
+      <div id="purProdResults">${purProductsHtml(scoped)}</div>
+    </div>
+
     ${purSuppliersHtml(scoped)}
 
     <div class="pur-chips" role="tablist">
@@ -424,6 +432,8 @@ function bindPurchasesView() {
       showToast("✅ انحفظ الرقم الضريبي");
     } catch (e) { showToast("⚠ ما انحفظ — " + (e.message || e)); }
   }));
+  purRenderProducts();
+  if ($("purProdSearch")) $("purProdSearch").addEventListener("input", (e) => { purProdQuery = e.target.value; purProdOpen = ""; purRenderProducts(); });
   if ($("purSupToggle")) $("purSupToggle").addEventListener("click", () => { purShowSuppliers = !purShowSuppliers; renderPurchasesView(); });
   if ($("purSupAdd")) $("purSupAdd").addEventListener("click", async () => {
     const name = $("purSupName").value.trim();
@@ -660,6 +670,75 @@ function purExtraHtml(d) {
     ${note ? `<small class="pur-extra-note">ملاحظة الشيت: ${escHtml(note)}</small>` : ""}
     ${e.supplier_original ? `<small>الاسم بالشيت: ${escHtml(e.supplier_original)}</small>` : ""}
   </div>`;
+}
+
+// ---- بحث تكلفة المنتجات: كل مشتريات المنتج بالفترة (والفرع المختار) — الكمية، المبلغ، متوسط السعر وآخر سعر ----
+const purNormName = (t) => String(t || "").replace(/[\u064B-\u0652\u0640]/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي")
+  .replace(/\s+/g, " ").trim().toLowerCase();
+
+function purProductGroups(scoped, query) {
+  const words = purNormName(query).split(" ").filter(Boolean);
+  if (!words.length) return [];
+  const groups = {};
+  scoped.forEach(inv => {
+    if (inv.status === "rejected") return;
+    const sign = purSign(inv);
+    (inv.lines || []).forEach(l => {
+      const name = String(l.name || "").trim();
+      const key = purNormName(name);
+      if (!key || !words.every(w => key.includes(w))) return;
+      const unit = String(l.unit || "").trim();
+      const gk = key + "|" + unit;
+      const g = groups[gk] || (groups[gk] = { key: gk, name, unit, qty: 0, spent: 0, buys: [] });
+      const qty = Number(l.qty) || 0, net = purLineNet(l);
+      g.qty += qty * sign; g.spent = purRound(g.spent + net * sign);
+      g.buys.push({ id: inv.id, date: inv.invoice_date || "", supplier: inv.supplier || "", branch: inv.branch || "", qty: qty * sign, unit,
+        price: qty ? purRound(net / qty) : purNum(l.unit_price) || 0, total: purRound(net * sign), status: inv.status });
+    });
+  });
+  return Object.values(groups).map(g => {
+    g.buys.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const prices = g.buys.filter(b => b.qty > 0 && b.price > 0).map(b => b.price);
+    g.avg = g.qty > 0 ? purRound(g.spent / g.qty) : 0;
+    g.min = prices.length ? Math.min(...prices) : 0;
+    g.max = prices.length ? Math.max(...prices) : 0;
+    g.last = g.buys.find(b => b.qty > 0 && b.price > 0) || null;
+    return g;
+  }).sort((a, b) => b.spent - a.spent);
+}
+
+function purProductsHtml(scoped) {
+  if (!purProdQuery.trim()) return `<div class="cust-hint">ابحث عن أي منتج وبيطلعلك كم اشترينا منه بالفترة، بكم، ومتوسط سعره وآخر سعر.</div>`;
+  const groups = purProductGroups(scoped, purProdQuery);
+  if (!groups.length) return `<div class="cust-hint">ما لقينا «${escHtml(purProdQuery.trim())}» بمشتريات هالفترة — جرّب كلمة ثانية أو وسّع الفترة.</div>`;
+  const all = purRound(groups.reduce((t, g) => t + g.spent, 0));
+  const fmtQ = (n) => (Math.round(n * 100) / 100).toLocaleString("en-US");
+  const fmtD = (d) => (d ? new Date(d + "T12:00:00Z").toLocaleDateString(phLocale(), { day: "numeric", month: "numeric", timeZone: "UTC" }) : "—");
+  return `<div class="pur-prod-total">${groups.length} منتج · المجموع ${purSar(all)} <small>(قبل الضريبة)</small></div>
+    ${groups.slice(0, 40).map(g => {
+      const open = purProdOpen === g.key;
+      return `<div class="pur-prod-item ${open ? "open" : ""}">
+        <button type="button" class="pur-prod-row" data-prod="${escHtml(g.key)}">
+          <span class="pur-prod-name">${escHtml(g.name)}${g.unit ? ` <small>/ ${escHtml(g.unit)}</small>` : ""}</span>
+          <b>${purSar(g.spent)}</b>
+          <small class="pur-prod-meta">${fmtQ(g.qty)} ${escHtml(g.unit)} · ${g.buys.length} مرة · متوسط ${purSar(g.avg)}${g.last ? ` · آخر سعر ${purSar(g.last.price)} (${fmtD(g.last.date)})` : ""}${g.max > g.min ? ` · من ${purSar(g.min)} إلى ${purSar(g.max)}` : ""}</small>
+        </button>
+        ${open ? `<div class="pur-prod-buys">${g.buys.map(b => `<div class="cust-row"><span>${fmtD(b.date)} · ${escHtml(b.supplier || "—")}${purBranch ? "" : ` <small>· ${escHtml(b.branch)}</small>`}${b.status === "pending" ? ` <small>⏳</small>` : ""}<br>
+          <small>${fmtQ(b.qty)} ${escHtml(b.unit)} × ${purSar(b.price)}</small></span><b>${purSar(b.total)}</b></div>`).join("")}</div>` : ""}
+      </div>`;
+    }).join("")}
+    ${groups.length > 40 ? `<div class="cust-hint">وفيه ${groups.length - 40} غيرهم — اكتب الاسم أدق.</div>` : ""}`;
+}
+
+// تحديث النتائج بس (عشان ما يروح المؤشر من خانة البحث)
+function purRenderProducts() {
+  const box = document.getElementById("purProdResults");
+  if (!box) return;
+  box.innerHTML = purProductsHtml(purInvoices.filter(i => !purBranch || i.branch === purBranch));
+  box.querySelectorAll("[data-prod]").forEach(b => b.addEventListener("click", () => {
+    purProdOpen = purProdOpen === b.dataset.prod ? "" : b.dataset.prod;
+    purRenderProducts();
+  }));
 }
 
 // قائمة الموردين: كل الموردين بأسمائهم + كم فاتورة لكل واحد بالفترة، والمالك يضيف مورد جديد
