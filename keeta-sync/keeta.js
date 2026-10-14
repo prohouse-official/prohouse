@@ -191,7 +191,9 @@ function billLines(cate) {
     const name = String(n.categoryName || "").trim();
     const subs = n.subCategoryInfos || [];
     if (top && subs.length) return walk(subs, false);
-    const amt = Math.abs(Number(n.amount) || 0);
+    // المبلغ بالنص (ر.س) أدق؛ الرقم الخام بالهللة
+    const fromText = Number(String(n.unsignedAmountText || n.amountText || "").replace(/[^\d.]/g, ""));
+    const amt = fromText > 0 ? fromText : Math.abs(Number(n.amount) || 0) / 100;
     if (!amt || !neg(n)) return;
     if (/ضريبة القيمة المضافة|VAT/i.test(name)) { vat += amt; return; }
     out.push({ name, amount: Math.round(amt * 100) / 100, category: /عمولة|رسوم|commission|fee/i.test(name) ? "اشتراكات التطبيقات" : "أخرى" });
