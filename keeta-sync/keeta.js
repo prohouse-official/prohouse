@@ -71,6 +71,7 @@ async function explore(page, apis) {
     const u = res.url();
     if (!/\/api\/(order\/history\/getOrders|settlement|bill|invoice|finance|data\/shop\/download-center)/.test(u)) return;
     let body = null; try { body = await res.json(); } catch (e) {}
+    if (body && typeof body.data === "string" && /cate\/detail/.test(u)) { try { console.log("CATE_DATA_SHAPE", JSON.stringify(shape(JSON.parse(body.data))).slice(0, 3000)); } catch (e) { console.log("CATE_DATA_NOT_JSON", body.data.length); } }
     const req = res.request().postData() || "";
     let reqShape = req; try { reqShape = JSON.stringify(shape(JSON.parse(req))); } catch (e) { reqShape = clean(req).slice(0, 200); }
     // أسماء البنود (بدون مبالغ): رموز الرسوم بالطلب، وأنواع الحركات بكشف الحساب، وحالات الطلب
@@ -150,6 +151,13 @@ async function explore(page, apis) {
     n0 = apis.size;
     console.log("CLICK_DETAILS", await clickIn("التفاصيل"));
     await page.waitForTimeout(7000);
+    // زر «تنزيل الفاتورة»: نشوف نوع الملف وحجمه بس
+    try {
+      let dl = null;
+      for (const f of page.frames()) { const el = f.getByText("تنزيل الفاتورة", { exact: true }).first(); if (await el.isVisible().catch(() => false)) { [dl] = await Promise.all([page.waitForEvent("download", { timeout: 20000 }).catch(() => null), el.click({ force: true }).catch(() => {})]); break; } }
+      if (dl) { const fp = await dl.path().catch(() => null); const sz = fp ? require("fs").statSync(fp).size : 0; console.log("DOWNLOAD", clean(dl.suggestedFilename()), sz, "bytes", clean(dl.url().split("?")[0])); }
+      else { await page.waitForTimeout(4000); console.log("DOWNLOAD none; popups:", page.context().pages().length, JSON.stringify(newApis(n0))); }
+    } catch (e) { console.log("DOWNLOAD_ERR", clean(e.message)); }
     console.log("BILL_DETAIL", clean(page.url()), JSON.stringify((await leafAll()).slice(0, 100)), JSON.stringify(newApis(n0)));
     await page.goto("https://merchant.mykeeta.com/m/web/app/finance#/main/bill", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(7000);
@@ -169,7 +177,7 @@ async function explore(page, apis) {
   try {
     // الاستكشاف يكفي على أول فرع — نتأكد بس إن الثاني يدخل
     for (const [i, br] of branches.entries()) {
-      const page = await (await browser.newContext({ viewport: { width: 1500, height: 900 }, locale: "ar-SA" })).newPage();
+      const page = await (await browser.newContext({ viewport: { width: 1500, height: 900 }, locale: "ar-SA", acceptDownloads: true })).newPage();
       const apis = new Set();
       page.on("request", (r) => { if (!["image", "stylesheet", "font", "media", "script"].includes(r.resourceType())) { const u = r.url().split("?")[0]; if (!/sentry|collect|\/lx|beacon/i.test(u)) apis.add(r.resourceType() + " " + r.method() + " " + u.replace(/\d{3,}/g, "#").slice(0, 140)); } });
       console.log(`=== فرع ${i + 1}`);
