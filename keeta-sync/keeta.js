@@ -139,16 +139,24 @@ async function explore(page, apis) {
         break;
       }
     }
-    // مسارات محتملة لصفحة الفواتير داخل تطبيق المالية
-    for (const h of ["#/main/bill", "#/main/bills", "#/main/invoice", "#/main/statement", "#/bill/list", "#/invoice/list", "#/main/settlement"]) {
-      const n0 = apis.size;
-      await page.goto("https://merchant.mykeeta.com/m/web/app/finance" + h, { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-      await page.waitForTimeout(7000);
-      const t = [];
-      for (const f of page.frames()) t.push(...(await f.evaluate(() => Array.from(document.querySelectorAll("body *")).filter(e => e.offsetParent && e.children.length === 0).map(e => (e.innerText || "").trim()).filter(x => x && x.length < 40)).catch(() => [])));
-      const uniq = [...new Set(t)].map(clean).filter(x => x.replace(/[#.,\s%/\-]/g, "") && !/^(المتجر|الصفحة الرئيسية|مراقبة أدائي|الأداء|برنامج TOP|التقييمات|التقارير|إدارة متجري|القائمة|ساعات العمل|تنمية أعمالي|تعزيز الزيارات|مركز العروض الترويجية|عروضي الترويجية|استكشاف مواردي|أكاديمية|مركز المساعدة|الإشعارات|الشؤون المالية)$/.test(x));
-      console.log("ROUTE", h, clean(page.url()), JSON.stringify(uniq.slice(0, 60)), JSON.stringify([...apis].slice(n0).filter(u => /\/api\//.test(u) && !/rapfront|i18n|log|metric/.test(u))));
-    }
+    // صفحة الفواتير: نفتح «التفاصيل» لأول فاتورة، وبعدين تبويب «تنزيل» — نسجل الأسماء ومسارات الـ API بس
+    const leafAll = async () => { const t = []; for (const f of page.frames()) t.push(...(await f.evaluate(() => Array.from(document.querySelectorAll("body *")).filter(e => e.offsetParent && e.children.length === 0).map(e => (e.innerText || "").trim()).filter(x => x && x.length < 50)).catch(() => []))); return [...new Set(t)].map(clean).filter(x => x.replace(/[#.,\s%/\-‏‎ر.س]/g, "")); };
+    const newApis = (n0) => [...apis].slice(n0).filter(u => /\/api\//.test(u) && !/rapfront|i18n|log|metric/.test(u));
+    const clickIn = async (txt) => { for (const f of page.frames()) { const el = f.getByText(txt, { exact: true }).first(); if (await el.isVisible().catch(() => false)) { await el.click({ force: true }).catch(() => {}); return true; } } return false; };
+    let n0 = apis.size;
+    await page.goto("https://merchant.mykeeta.com/m/web/app/finance#/main/bill", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(9000);
+    console.log("BILL_PAGE", JSON.stringify((await leafAll()).slice(0, 80)), JSON.stringify(newApis(n0)));
+    n0 = apis.size;
+    console.log("CLICK_DETAILS", await clickIn("التفاصيل"));
+    await page.waitForTimeout(7000);
+    console.log("BILL_DETAIL", clean(page.url()), JSON.stringify((await leafAll()).slice(0, 100)), JSON.stringify(newApis(n0)));
+    await page.goto("https://merchant.mykeeta.com/m/web/app/finance#/main/bill", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(7000);
+    n0 = apis.size;
+    console.log("CLICK_DOWNLOAD_TAB", await clickIn("تنزيل"));
+    await page.waitForTimeout(7000);
+    console.log("DOWNLOAD_TAB", clean(page.url()), JSON.stringify((await leafAll()).slice(0, 100)), JSON.stringify(newApis(n0)));
     const frames = page.frames().map(f => clean(f.url().split("?")[0])).filter(u => u && u !== "about:blank");
     console.log("PAGE", JSON.stringify({ menu: name, url: clean(info.url), frames, tabs: info.tabs.map(clean), heads: info.heads.map(clean), tables: info.tables.map(r => r.map(clean)), buttons: info.buttons.map(clean), newApis: [...apis].slice(before).filter(u => /\/api\//.test(u) && !/rapfront|i18n|log|metric/.test(u)) }));
   }
