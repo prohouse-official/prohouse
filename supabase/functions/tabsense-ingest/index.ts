@@ -12,7 +12,8 @@ const ALLOWED_WORKFLOWS = new Set([
   `${REPO}/.github/workflows/tabsense-sync.yml@refs/heads/main`,
   `${REPO}/.github/workflows/foodics-sync.yml@refs/heads/main`,
   `${REPO}/.github/workflows/alj-reports.yml@refs/heads/main`,
-  `${REPO}/.github/workflows/takrar-sync.yml@refs/heads/main`
+  `${REPO}/.github/workflows/takrar-sync.yml@refs/heads/main`,
+  `${REPO}/.github/workflows/keeta-sync.yml@refs/heads/main`
 ]);
 // ملفات تقارير عبداللطيف جميل اليومية (نفس ملفات تابسنس) → مخزن خاص alj-reports
 const ALJ_FILE = /^\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/(Summary \d{1,2} [a-z]{3}\.pdf|Orders \(\d{1,2} [a-z]{3}\)\.xlsx)$/;
@@ -24,10 +25,11 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 Deno.serve(async (req) => {
   const oidc = req.headers.get("x-github-oidc") || "";
-  let isAlj = false;
+  let isAlj = false, isKeeta = false;
   try {
     const { payload } = await jwtVerify(oidc, JWKS, { issuer: ISSUER, audience: AUDIENCE });
     isAlj = payload.job_workflow_ref === `${REPO}/.github/workflows/alj-reports.yml@refs/heads/main`;
+    isKeeta = payload.job_workflow_ref === `${REPO}/.github/workflows/keeta-sync.yml@refs/heads/main`;
     if (payload.repository !== REPO || payload.ref !== "refs/heads/main" || !ALLOWED_WORKFLOWS.has(payload.job_workflow_ref as string)) {
       return json({ error: "not allowed" }, 403);
     }
@@ -59,6 +61,35 @@ Deno.serve(async (req) => {
     const { error } = await admin.from("alj_daily_summary").upsert(row);
     if (error) return json({ error: error.message }, 500);
     return json({ ok: true });
+  }
+  // فواتير كيتا (عمولة ورسوم كل فترة) → المشتريات بمورد «كيتا». الحالة (مراجعة المحاسب) ما تتغير لو الفاتورة موجودة.
+  if (b.keetaBills) {
+    if (!isKeeta) return json({ error: "not allowed" }, 403);
+    const branch = String(b.keetaBills.branch || "");
+    if (!["الروضة", "الشاطئ"].includes(branch)) return json({ error: "bad branch" }, 400);
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+    let saved = 0;
+    for (const bill of (b.keetaBills.bills || []).slice(0, 60)) {
+      const id = "keeta_" + String(bill.billId || "").replace(/[^\w-]/g, "").slice(0, 60);
+      if (id === "keeta_" || !/^\d{4}-\d{2}-\d{2}$/.test(String(bill.end || ""))) continue;
+      const lines = (bill.lines || []).slice(0, 40).map((l: { name: string; amount: number; category: string }) => ({
+        name: String(l.name || "").slice(0, 120), qty: 1, unit: "فترة", unit_price: r2(Number(l.amount) || 0), total: r2(Number(l.amount) || 0),
+        category: l.category === "اشتراكات التطبيقات" ? "اشتراكات التطبيقات" : "أخرى" }));
+      const sub = r2(lines.reduce((t: number, l: { total: number }) => t + l.total, 0));
+      const vat = r2(Number(bill.vat) || 0);
+      const row = {
+        source: "keeta", source_ref: "keeta|" + branch + "|" + bill.billId, kind: "invoice", invoice_date: bill.end, invoice_no: String(bill.billId).slice(0, 60),
+        supplier: "كيتا", branch, subtotal: sub, vat, total: r2(sub + vat), lines, created_by: "تلقائي (كيتا)",
+        extra: { note: `فاتورة كيتا للفترة ${bill.start} → ${bill.end}${bill.payDate ? " · الدفع " + bill.payDate : ""}`, doc_type: "فاتورة كيتا", keeta_status: bill.status },
+        updated_at: new Date().toISOString(),
+      };
+      const { data: ex } = await admin.from("purchase_invoices").select("id").eq("id", id).maybeSingle();
+      const { error } = ex ? await admin.from("purchase_invoices").update(row).eq("id", id)
+        : await admin.from("purchase_invoices").insert({ id, ...row, status: "pending" });
+      if (error) return json({ error: error.message }, 500);
+      saved++;
+    }
+    return json({ ok: true, saved });
   }
   if (b.file) {
     const p = String(b.file.path || "");

@@ -1,4 +1,5 @@
 // كيتا (Keeta): دخول لوحة التاجر لكل فرع (KEETA_CONFIG_JSON = {"branches":[{"name","email","password"}]}).
+// بدون KEETA_EXPLORE: يسحب فواتير كيتا (بنود العمولة والرسوم لكل فترة) ويرسلها للمشتريات عن طريق tabsense-ingest (هوية GitHub).
 // KEETA_EXPLORE=1 → استكشاف بس: شكل صفحة الدخول، الروابط، عناوين الصفحات والجداول، ومسارات طلبات الـ API اللي تستخدمها اللوحة.
 // المستودع عام: أي رقم ينستبدل بـ # — ما ينطبع مبلغ ولا بيانات عملاء ولا الإيميل.
 const { chromium } = require("playwright");
@@ -170,10 +171,90 @@ async function explore(page, apis) {
   }
 }
 
+// ---- السحب الفعلي: فواتير كيتا (كل فترة فوترة) → المشتريات (مورد «كيتا») ----
+const SUPA_URL = "https://sadtinfdwucwrxlmwxov.supabase.co";
+const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhZHRpbmZkd3Vjd3J4bG13eG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NTM4MDgsImV4cCI6MjEwNTEyOTgwOH0.jMtjOIBQIuv0N0Q4ms9LJ5ys3h3lfakND4pVQXNbU2w";
+async function oidcToken() {
+  const url = process.env.ACTIONS_ID_TOKEN_REQUEST_URL, bearer = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+  if (!url || !bearer) throw new Error("ما في هوية GitHub (OIDC)");
+  const res = await fetch(url + "&audience=prohouse-ingest", { headers: { Authorization: "bearer " + bearer } });
+  if (!res.ok) throw new Error("GitHub OIDC [" + res.status + "]");
+  return (await res.json()).value;
+}
+
+// شجرة بنود الفاتورة → بنود التكاليف (عمولة ورسوم وإعلانات وخصومات يتحملها المطعم) + ضريبة العمولة
+function billLines(cate) {
+  const out = [];
+  let vat = 0;
+  const neg = (n) => (Number(n.amount) < 0) || /^\s*[-‎‏]*-/.test(String(n.amountText || ""));
+  const walk = (nodes, top) => (nodes || []).forEach(n => {
+    const name = String(n.categoryName || "").trim();
+    const subs = n.subCategoryInfos || [];
+    if (top && subs.length) return walk(subs, false);
+    const amt = Math.abs(Number(n.amount) || 0);
+    if (!amt || !neg(n)) return;
+    if (/ضريبة القيمة المضافة|VAT/i.test(name)) { vat += amt; return; }
+    out.push({ name, amount: Math.round(amt * 100) / 100, category: /عمولة|رسوم|commission|fee/i.test(name) ? "اشتراكات التطبيقات" : "أخرى" });
+  });
+  walk(cate.categoryInfoList || [], true);
+  return { lines: out, vat: Math.round(vat * 100) / 100 };
+}
+
+async function syncBills(page, branchName) {
+  const bills = new Map(), cates = new Map();
+  page.on("response", async (res) => {
+    const u = res.url();
+    if (!/billPage\/(billList|cate\/detail)/.test(u)) return;
+    try {
+      const body = await res.json();
+      if (/billList/.test(u)) (body.data && body.data.billInfoList || []).forEach(b => bills.set(String(b.periodStartDateStamp) + "-" + String(b.periodEndDateStamp), b));
+      else {
+        const req = JSON.parse(res.request().postData() || "{}");
+        cates.set(String(req.periodStartDateStamp) + "-" + String(req.periodEndDateStamp), JSON.parse(body.data || "{}"));
+      }
+    } catch (e) {}
+  });
+  await page.goto(BASE + "/m/web/app/finance#/main/bill", { waitUntil: "domcontentloaded", timeout: 45000 }).catch(() => {});
+  await page.waitForTimeout(9000);
+  // نفتح «التفاصيل» لكل فاتورة بالقائمة (كل ضغطة تجيب تفاصيل فترتها)
+  for (const f of page.frames()) {
+    const items = f.getByText("التفاصيل", { exact: true });
+    const n = await items.count().catch(() => 0);
+    for (let i = 0; i < n; i++) {
+      await f.evaluate(() => document.querySelectorAll(".roo-modal, .roo-modal-backdrop, [class*=guideModal]").forEach(e => e.remove())).catch(() => {});
+      await items.nth(i).click({ force: true }).catch(() => {});
+      await page.waitForTimeout(3500);
+      await page.keyboard.press("Escape").catch(() => {});
+      await page.waitForTimeout(800);
+    }
+  }
+  const out = [];
+  for (const [key, b] of bills) {
+    const cate = cates.get(key);
+    if (!cate) continue;
+    const { lines, vat } = billLines(cate);
+    if (!lines.length) continue;
+    const day = (ms) => new Date(Number(ms) + 3 * 3600 * 1000).toISOString().slice(0, 10);
+    out.push({ billId: String(b.billId), start: day(b.periodStartDateStamp), end: day(b.periodEndDateStamp), status: Number(b.status), payDate: b.payTime ? day(b.payTime) : "", lines, vat });
+  }
+  console.log(`${branchName === "الروضة" ? "R" : "S"} bills=${bills.size} details=${cates.size} toSend=${out.length}`);
+  if (!out.length) return 0;
+  const res = await fetch(SUPA_URL + "/functions/v1/tabsense-ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: ANON, Authorization: "Bearer " + ANON, "x-github-oidc": await oidcToken() },
+    body: JSON.stringify({ keetaBills: { branch: branchName, bills: out } })
+  });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error("إرسال فواتير كيتا فشل [" + res.status + "] " + clean(j.error || ""));
+  console.log("saved", j.saved || 0);
+  return out.length;
+}
+
 (async () => {
   const branches = cfg.branches || [];
   if (!branches.length) throw new Error("KEETA_CONFIG_JSON فاضي أو ما فيه branches");
   const browser = await chromium.launch({ headless: true });
+  let failed = 0;
   try {
     // الاستكشاف يكفي على أول فرع — نتأكد بس إن الثاني يدخل
     for (const [i, br] of branches.entries()) {
@@ -184,7 +265,14 @@ async function explore(page, apis) {
       const ok = await login(page, br);
       console.log("LOGIN_OK", ok);
       if (ok && i === 0 && process.env.KEETA_EXPLORE) await explore(page, apis);
+      else if (ok && !process.env.KEETA_EXPLORE) {
+        // أسرار GitHub أحياناً تخرّب العربي — لو الاسم مو مفهوم نعتمد الترتيب (الأول الروضة، الثاني الشاطئ)
+        const name = ["الروضة", "الشاطئ"].includes(br.name) ? br.name : ["الروضة", "الشاطئ"][i];
+        await syncBills(page, name);
+      }
+      else if (!ok) failed++;
       await page.context().close();
     }
   } finally { await browser.close(); }
+  if (failed) throw new Error(failed + " فرع ما قدر يدخل");
 })().catch(e => { console.error("ERROR:", clean(e.message)); process.exit(1); });
