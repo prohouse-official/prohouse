@@ -12,7 +12,7 @@ const PUR_CATEGORIES = ["لحوم", "خضراوات", "بهارات", "بقال�
 const PUR_CAT_NOTES = { "اشتراكات التطبيقات": "فوديكس وتاب سنس (أنظمة الكاشير) · تكرار (منصة الاشتراكات) · كيتا (عمولة التوصيل)" };
 const PUR_UNITS = ["كجم", "جرام", "حبة", "كرتون", "علبة", "عبوة", "لتر", "كيس", "ربطة", "طبق", "صندوق", "شبكة", "جالون"];
 const PUR_VAT_RATE = 0.15;
-const PUR_SOURCES = { google_form: "قوقل فورم", custody: "العهدة", site: "الموقع" };
+const PUR_SOURCES = { google_form: "قوقل فورم", custody: "العهدة", site: "الموقع", keeta: "كيتا (تلقائي)" };
 const PUR_STATUS = { pending: "بانتظار المراجعة", approved: "معتمدة", rejected: "مرجّعة ليزيد" };
 
 let purStart = "";  // الفترة: من تاريخ لين تاريخ

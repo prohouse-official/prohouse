@@ -1,15 +1,17 @@
 name: Keeta Sync
 
-# كيتا (Keeta) — لوحة التاجر لفرعي الروضة والشاطئ. حالياً تشغيل يدوي للاستكشاف بس.
+# كيتا (Keeta) — لوحة التاجر لفرعي الروضة والشاطئ: كل يوم 8:40 الصبح بتوقيت الرياض تنسحب فواتير كيتا (العمولة والرسوم) للمشتريات.
 # الإعدادات بسر KEETA_CONFIG_JSON: {"branches":[{"name","email","password"}]}
 # المستودع عام: السجل ما فيه أرقام مبيعات ولا بيانات عملاء.
 on:
+  schedule:
+    - cron: '40 5 * * *'
   workflow_dispatch:
     inputs:
       explore:
         description: "1 = log login form, menu, page/table names and API paths (no numbers)"
         required: false
-        default: "1"
+        default: ""
 
 jobs:
   keeta:
@@ -17,6 +19,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
