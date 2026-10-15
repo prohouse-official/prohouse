@@ -12,7 +12,7 @@
   if (!on) return;
 
   const AJL = "عبداللطيف جميل";
-  const DB_KEY = "ph_demo_db_v4";
+  const DB_KEY = "ph_demo_db_v5";
   const riyadh = (offset) => {
     const d = new Date(Date.now() + offset * 86400000);
     return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(d);
@@ -57,9 +57,11 @@
     return {
       items, daily_entries, tabsense_sales,
       day_meta: [], tomorrow_orders: [], waste_log: [], juice_counts: [], juice_sales: [],
-      juices: [["سنكرز بروتين بار", "سنكرز بروتين بار"], ["بورن وينر", "بورن وينر"], ["جرينيد", "جرينيد"], ["مارس بروتين بار", "مارس بروتين بار"]]
-        .map(([name, ts], i) => ({ id: "snack_" + (i + 1), name, unit: "حبة", tabsense_name: ts, branches: AJL, kind: "snack", active: true, sort_order: i + 1 })),
-      tabsense_product_sales: [[riyadh(0), "سنكرز بروتين بار", 6], [riyadh(0), "جرينيد", 2], [riyadh(-1), "سنكرز بروتين بار", 5], [riyadh(-1), "بورن وينر", 1]]
+      juices: [["سنكرز بروتين بار", "سنكرز بروتين بار|بروتين بار سنيكرس"], ["بورن وينر", "بورن وينر|بروتين بار بورن وينر"], ["جرينيد", "جرينيد|بروتين بار جرينيد"], ["مارس بروتين بار", "مارس بروتين بار|بروتين بار مارس"]]
+        .map(([name, ts], i) => ({ id: "snack_" + (i + 1), name, unit: "حبة", tabsense_name: ts, branches: "الروضة,الشاطئ," + AJL, kind: "snack", active: true, sort_order: i + 1 }))
+        .concat([["سانتي برتقال", AJL], ["سانتي مانجو الفونسو", AJL], ["سانتي (كل النكهات)", "الروضة,الشاطئ", "سانتي"]]
+          .map(([name, br, ts], i) => ({ id: "juice_" + (i + 1), name, unit: "حبة", tabsense_name: ts || "", branches: br, kind: "juice", active: true, sort_order: 10 + i }))),
+      tabsense_product_sales: [[riyadh(0), "سنكرز بروتين بار", 6], [riyadh(0), "جرينيد", 2], [riyadh(0), "سانتي برتقال", 4], [riyadh(-1), "سنكرز بروتين بار", 5], [riyadh(-1), "بورن وينر", 1]]
         .map(([date, product, qty]) => ({ date, branch: AJL, product, category: "", qty, amount: null })),
       settings: [{ key: "branches", value: "الروضة,الشاطئ," + AJL }, { key: "chef_report_employees", value: "emp_5" },
         { key: "central_kitchen", value: JSON.stringify({ name: "المطبخ المركزي", lead: "الشيف اسلام", staff: ["بوبي", "محمد محسن", "مد رسال", "سهيل"], tasks: [] }) }],

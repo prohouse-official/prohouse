@@ -107,7 +107,7 @@ async function loadBranchStatus(branch, dash) {
   if (touched > 0 && confirmed >= total && total > 0) status = "done";
   else if (touched > 0) status = "partial";
 
-  const juicesTotal = typeof visibleJuicesFor === "function" ? visibleJuicesFor(branch).length : 0;
+  const juicesTotal = typeof visibleJuicesFor === "function" ? visibleJuicesFor(branch, true).length : 0;
   const juicesCounted = ((juiceDay && juiceDay.items) || [])
     .filter(r => r.counted !== "" && r.counted != null && !isNaN(Number(r.counted))).length;
 

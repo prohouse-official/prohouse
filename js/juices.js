@@ -10,10 +10,10 @@
 // والمبيعات بتتعبّى تلقائياً من تابسنس بمطابقة الاسم — والاثنين قابلين للتعديل اليدوي لو الواقع مختلف.
 
 const JUICE_MODES = {
-  juice: { title: "🥤 جرد العصيرات", noun: "عصير", save: "💾 حفظ جرد العصيرات", none: "ما فيه عصيرات مضافة لهذا الفرع — أضفها من الكرت تحت." },
-  snack: { title: "🍫 جرد البروتين بار", noun: "صنف", save: "💾 حفظ جرد البروتين بار", none: "ما فيه أصناف بروتين بار لهذا الفرع — أضفها من الكرت تحت." }
+  snack: { tab: "🍫 البروتين بار", noun: "صنف", none: "ما فيه أصناف بروتين بار لهذا الفرع — أضفها من الكرت تحت." },
+  juice: { tab: "🥤 العصيرات", noun: "عصير", none: "ما فيه عصيرات مضافة لهذا الفرع — أضفها من الكرت تحت." }
 };
-let juiceMode = "juice";
+let juiceMode = "snack";
 const juiceM = () => JUICE_MODES[juiceMode] || JUICE_MODES.juice;
 const juiceKind = (j) => (j.kind === "snack" ? "snack" : "juice");
 
@@ -89,20 +89,21 @@ function juiceBranches(j) {
   return (j.branches || "").split(",").map(s => s.trim()).filter(Boolean);
 }
 
-function visibleJuicesFor(branch) {
-  return Juices.current.filter(j => juiceKind(j) === juiceMode).filter(j => {
+function visibleJuicesFor(branch, allKinds) {
+  return Juices.current.filter(j => allKinds || juiceKind(j) === juiceMode).filter(j => {
     const list = juiceBranches(j);
     return list.length === 0 || list.includes(branch);
   });
 }
 
 // المبيعات المسحوبة تلقائياً لهذا العصير (أو undefined لو ما في تطابق)
+// «اسم تابسنس» ممكن يكون أكثر من اسم مفصولة بـ | (كل فرع اسمه بالكاشير مختلف، أو نكهتين لنفس الصنف) — منجمعهم
 function autoSoldFor(juice) {
-  const keys = [juice.tabsenseName, juice.name].filter(Boolean).map(normalizeArabic);
-  for (const k of keys) {
-    if (juiceSalesMap[k] !== undefined) return juiceSalesMap[k];
-  }
-  return undefined;
+  const names = juice.tabsenseName ? String(juice.tabsenseName).split("|") : [juice.name];
+  const keys = [...new Set(names.map(normalizeArabic).filter(Boolean))];
+  let found = false, total = 0;
+  keys.forEach(k => { if (juiceSalesMap[k] !== undefined) { found = true; total += Number(juiceSalesMap[k]) || 0; } });
+  return found ? total : undefined;
 }
 
 function num(v) {
@@ -133,7 +134,10 @@ function renderJuicesView() {
   const ro = Auth.isViewOnlyEntry() ? "disabled" : "";
 
   view.innerHTML = `
-    <h2 class="juice-page-title">${juiceM().title}</h2>
+    <h2 class="juice-page-title">🧊 جرد الثلاجة اليومي</h2>
+    <div class="juice-mode-tabs" role="tablist">
+      ${Object.entries(JUICE_MODES).map(([k, m]) => `<button type="button" class="juice-mode-btn ${juiceMode === k ? "active" : ""}" data-jmode="${k}">${m.tab}</button>`).join("")}
+    </div>
     <div class="item-card">
       <div class="inputs-row">
         <div class="field">
@@ -153,6 +157,14 @@ function renderJuicesView() {
     <div id="juiceList"></div>
     <div id="juiceCatalog"></div>
   `;
+
+  view.querySelectorAll("[data-jmode]").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.jmode === juiceMode) return;
+    clearTimeout(juiceAutoSaveTimer);
+    saveJuiceDayNow(false); // نحفظ أرقام الصفحة الحالية قبل ما نبدّل
+    setJuiceMode(b.dataset.jmode);
+    loadJuiceDay(currentJuiceDate);
+  }));
 
   if (!branchLocked) {
     document.getElementById("juiceBranchSelect").addEventListener("change", (e) => {
@@ -345,7 +357,7 @@ function applyJuiceDayData(val) {
   cachedJuiceSalesRows = val.sales || [];
   juiceLoadedItems = val.items || [];
   juiceSalesMap = {};
-  cachedJuiceSalesRows.forEach(r => { juiceSalesMap[normalizeArabic(r.productName)] = r.qty; });
+  cachedJuiceSalesRows.forEach(r => { const k = normalizeArabic(r.productName); juiceSalesMap[k] = (Number(juiceSalesMap[k]) || 0) + (Number(r.qty) || 0); });
 
   const map = {};
   (val.items || []).forEach(it => {
@@ -422,7 +434,7 @@ function renderJuiceCatalog() {
         <div class="field"><label>اسم الصنف</label><input type="text" id="newJuiceName"></div>
         <div class="inputs-row">
           <div class="field"><label>الوحدة</label><input type="text" id="newJuiceUnit" placeholder="مثال: زجاجة"></div>
-          <div class="field"><label>اسم المنتج بتابسنس (اختياري)</label><input type="text" id="newJuiceTabsense" placeholder="اتركه فاضي لو نفس الاسم"></div>
+          <div class="field"><label>اسم المنتج بالكاشير (اختياري)</label><input type="text" id="newJuiceTabsense" placeholder="فاضي = نفس الاسم · أكثر من اسم: افصل بـ |"></div>
         </div>
         ${isOwner ? `
         <div class="field">
@@ -512,9 +524,7 @@ function renderJuiceCatalog() {
 // تبديل الصفحة (عصيرات ↔ بروتين بار) من التنقل
 function setJuiceMode(mode) {
   const changed = juiceMode !== mode;
-  juiceMode = mode === "snack" ? "snack" : "juice";
-  const btn = document.getElementById("juiceSaveBtn");
-  if (btn) btn.textContent = juiceM().save;
+  juiceMode = mode === "juice" ? "juice" : "snack";
   return changed;
 }
 
