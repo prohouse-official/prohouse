@@ -652,6 +652,9 @@ table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
 .juice-mode-tabs{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:0 0 12px; }
 .juice-mode-btn{ padding:11px 8px; border-radius:14px; border:2px solid var(--black, #000); background:var(--card, #fff); color:var(--ink, #111); font:inherit; font-weight:900; font-size:15px; cursor:pointer; }
 .juice-mode-btn.active{ background:var(--yellow, #F7DC4E); }
+.juice-sold{ text-align:center; font-weight:900; }
+.juice-hint{ display:block; margin-top:4px; color:var(--muted, #777); font-size:11.5px; }
+.juice-close-link{ width:100%; margin:4px 0 10px; }
 .juice-add-btn{ margin-top:6px; width:100%; padding:8px 10px; font-size:13px; }
 
 /* ==================== فئات قابلة للطي بشاشة إدخال اليوم ==================== */

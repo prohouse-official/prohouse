@@ -113,13 +113,14 @@ function num(v) {
 }
 
 // المتوقع بينحسب بس لما يكون في رقم افتتاحي على الأقل — بدونه المعادلة بلا معنى
-function juiceExpected(e) {
-  const opening = num(e.opening);
+// لو ما انعدّ الصبح، منحسب من إغلاق أمس
+function juiceExpected(e, prev) {
+  const opening = num(e.opening) !== null ? num(e.opening) : num(prev);
   if (opening === null) return null;
   return opening + (num(e.added) || 0) - (num(e.sold) || 0);
 }
-function juiceVariance(e) {
-  const expected = juiceExpected(e);
+function juiceVariance(e, prev) {
+  const expected = juiceExpected(e, prev);
   const counted = num(e.counted);
   if (expected === null || counted === null) return null;
   return counted - expected;
@@ -192,27 +193,25 @@ function renderJuicesView() {
       <div class="item-name">${juice.name}${juice.unit ? ` <span class="item-unit">(${juice.unit})</span>` : ""}</div>
       <div class="inputs-row">
         <div class="field">
-          <label>الرصيد الافتتاحي</label>
-          <input type="number" inputmode="decimal" data-jid="${juice.id}" data-jfield="opening" value="${e.opening}" ${ro}>
+          <label>☀️ عدّ بداية الدوام</label>
+          <input type="number" inputmode="numeric" placeholder="—" data-jid="${juice.id}" data-jfield="opening" value="${e.opening}" ${ro}>
         </div>
         <div class="field">
-          <label>الإضافات (وارد اليوم)</label>
-          <input type="number" inputmode="decimal" data-jid="${juice.id}" data-jfield="added" value="${e.added}" ${ro}>
+          <label>📦 الواصل اليوم</label>
+          <input type="number" inputmode="numeric" placeholder="0" data-jid="${juice.id}" data-jfield="added" value="${e.added}" ${ro}>
           ${ro ? "" : `<button type="button" class="btn juice-add-btn" data-jaddqty="${juice.id}">➕ وصلتنا كمية</button>`}
         </div>
       </div>
       <div class="inputs-row">
         <div class="field">
-          <label>المبيعات${auto !== undefined ? " (من تابسنس)" : ""}</label>
-          <input type="number" inputmode="decimal" data-jid="${juice.id}" data-jfield="sold" value="${e.sold}" ${ro}>
+          <label>🧾 مبيعات اليوم</label>
+          <div class="readonly-field juice-sold" id="juicesold-${juice.id}">${num(e.sold) !== null && (Number(e.sold) > 0 || auto !== undefined) ? e.sold : "—"}</div>
+          <small class="juice-hint">تنزل تلقائياً من الكاشير</small>
         </div>
         <div class="field">
-          <label>العدّ الفعلي آخر اليوم</label>
-          <input type="number" inputmode="decimal" data-jid="${juice.id}" data-jfield="counted" value="${e.counted}" ${ro}>
+          <label>🌙 عدّ الإغلاق</label>
+          <input type="number" inputmode="numeric" placeholder="—" data-jid="${juice.id}" data-jfield="counted" value="${e.counted}" ${ro}>
         </div>
-      </div>
-      <div class="notes-row">
-        <input type="text" placeholder="ملاحظة (اختياري)" data-jid="${juice.id}" data-jfield="notes" value="${escHtml(e.notes || "")}" ${ro}>
       </div>
       <div class="badges" id="juicebadges-${juice.id}"></div>
     `;
@@ -248,26 +247,21 @@ function updateJuiceBadges(juice) {
   let html = "";
 
   const prev = juicePrevCounted[juice.id];
-  if (prev !== undefined && prev !== "") html += `<span class="badge neutral">إقفال أمس: ${prev}</span>`;
-
-  const auto = autoSoldFor(juice);
-  if (auto !== undefined) {
-    const manual = num(e.sold);
-    html += manual !== null && manual !== Number(auto)
-      ? `<span class="badge warn">✎ معدّل يدوياً — تابسنس: ${auto}</span>`
-      : `<span class="badge ok">🔗 مبيعات تابسنس: ${auto}</span>`;
-  } else if (Object.keys(juiceSalesMap).length) {
-    html += `<span class="badge neutral">ما لقينا اسم مطابق في تابسنس — دخّل المبيعات يدوياً أو اضبط "اسم تابسنس"</span>`;
+  const opening = num(e.opening);
+  if (prev !== undefined && prev !== "" && prev !== null) {
+    html += opening !== null && opening !== Number(prev)
+      ? `<span class="badge warn">⚠ إغلاق أمس ${prev} — الصبح ${opening}</span>`
+      : `<span class="badge neutral">إغلاق أمس: ${prev}</span>`;
   }
 
-  const expected = juiceExpected(e);
-  if (expected !== null) html += `<span class="badge neutral">المتوقع: ${round1(expected)}</span>`;
+  const expected = juiceExpected(e, prev);
+  if (expected !== null && num(e.counted) === null) html += `<span class="badge neutral">المفروض يكون بالثلاجة: ${round1(expected)}</span>`;
 
-  const v = juiceVariance(e);
+  const v = juiceVariance(e, prev);
   if (v !== null) {
-    if (Math.abs(v) <= JUICE_VARIANCE_TOLERANCE) html += `<span class="badge ok">✅ مطابق</span>`;
-    else if (v < 0) html += `<span class="badge warn">⚠ نقص ${round1(Math.abs(v))} (هدر محتمل)</span>`;
-    else html += `<span class="badge warn">⚠ زيادة ${round1(v)} غير مفسّرة</span>`;
+    if (Math.abs(v) <= JUICE_VARIANCE_TOLERANCE) html += `<span class="badge ok">✅ مطابق للمبيعات</span>`;
+    else if (v < 0) html += `<span class="badge warn">⚠ ناقص ${round1(Math.abs(v))} عن المفروض (${round1(expected)})</span>`;
+    else html += `<span class="badge warn">⚠ زايد ${round1(v)} عن المفروض (${round1(expected)})</span>`;
   }
 
   el.innerHTML = html;
@@ -282,7 +276,7 @@ function updateJuiceSummary() {
   if (!el) return;
   const counted = currentVisibleJuices.filter(j => num((currentJuiceEntry[j.id] || {}).counted) !== null);
   const mismatched = currentVisibleJuices.filter(j => {
-    const v = juiceVariance(currentJuiceEntry[j.id] || {});
+    const v = juiceVariance(currentJuiceEntry[j.id] || {}, juicePrevCounted[j.id]);
     return v !== null && Math.abs(v) > JUICE_VARIANCE_TOLERANCE;
   });
   const total = currentVisibleJuices.length;
@@ -290,7 +284,7 @@ function updateJuiceSummary() {
   el.innerHTML = `
     <div class="progress-bar-wrap">
       <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-      <div class="progress-bar-label">${counted.length} من ${total} ${juiceM().noun} تم عدّه (${pct}%)${mismatched.length ? ` — ⚠ ${mismatched.length} فيه فرق` : ""}</div>
+      <div class="progress-bar-label">${counted.length} من ${total} ${juiceM().noun} انعدّ عند الإغلاق (${pct}%)${mismatched.length ? ` — ⚠ ${mismatched.length} فيه فرق` : ""}</div>
     </div>
   `;
 }
@@ -317,7 +311,7 @@ function saveJuiceDayNow(showToastMsg) {
     .filter(j => juiceKind(j) === juiceMode)
     .filter(j => {
       const e = currentJuiceEntry[j.id];
-      return e && (e.opening !== "" || e.added !== "" || e.sold !== "" || e.counted !== "" || e.notes);
+      return e && (e.opening !== "" || e.added !== "" || e.sold !== "" || e.counted !== "");
     })
     .map(j => {
       const e = currentJuiceEntry[j.id];
@@ -370,10 +364,7 @@ function applyJuiceDayData(val) {
   visibleJuicesFor(currentJuiceBranch).forEach(j => {
     if (!currentJuiceEntry[j.id]) currentJuiceEntry[j.id] = { opening: "", added: "", sold: "", counted: "", notes: "" };
     const e = currentJuiceEntry[j.id];
-    if (e.opening === "" || e.opening === null || e.opening === undefined) {
-      const prev = juicePrevCounted[j.id];
-      if (prev !== undefined && prev !== "") e.opening = prev;
-    }
+    // عدّ بداية الدوام ما يتعبّى تلقائياً — الموظف يعدّ بنفسه، وإغلاق أمس يطلع كمرجع
     // مبيعات تابسنس توصل متأخرة أحياناً: لو انحفظ الجرد والمبيعات صفر، منعبّيها لما توصل
     const auto = autoSoldFor(j);
     if (auto !== undefined && (e.sold === "" || e.sold === null || e.sold === undefined || (Number(e.sold) === 0 && Number(auto) > 0))) e.sold = auto;
