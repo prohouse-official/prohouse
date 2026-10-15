@@ -176,6 +176,7 @@ function renderCustodyView(payments) {
         <span class="cust-label">ملاحظات (اختياري)</span>
         <input type="text" data-field="notes" placeholder="أي شي لازم تعرفه الإدارة" value="${escHtml(c.notes || "")}" ${canEdit ? "" : "disabled"}>
       </label>
+      ${opened && canEdit && typeof tabAllowed === "function" && tabAllowed("juices") ? `<button type="button" class="cust-btn juice-close-link" id="custFridgeBtn">🧊 عدّ الثلاجة (عدّ الإغلاق) قبل ما تقفل</button>` : ""}
       ${canEdit ? `<button type="button" class="cust-close-btn" id="custodyCloseBtn" ${opened ? "" : "disabled"}>${closed ? "💾 حفظ التعديل" : "🔒 إغلاق العهدة"}</button>` : ""}
       ${opened ? "" : `<div class="cust-hint">سجّل العهدة (خطوة 1) أول.</div>`}
     </div>
@@ -238,6 +239,7 @@ function renderCustodyView(payments) {
     loadCustody(currentCustodyDate, branchSelect.value);
   });
   if ($("custodyCloseBtn")) $("custodyCloseBtn").addEventListener("click", () => saveCustody(payments));
+  if ($("custFridgeBtn")) $("custFridgeBtn").addEventListener("click", () => { Branch.set(currentCustodyBranch || Branch.get()); setActiveTab("juices"); window.scrollTo(0, 0); });
 }
 
 // الحفظ دايماً على آخر نسخة بالسيرفر (جهازين ممكن يسجّلوا بنفس اليوم) — ونكتب بس الأعمدة اللي تغيّرت
