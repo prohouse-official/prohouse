@@ -14,9 +14,8 @@ const TAB_ROLE_ACCESS = {
   purchases: ["owner", "accountant"],
   inventory: ["owner", "accountant", "chef"],
   tomorrow: ["owner", "manager", "chef", "accountant"],
-  juices: ["owner", "manager", "accountant"],
-  // جرد البروتين بار: صفحة لحالها، موظف الفرع يشوفها بس لو فرعه له أصناف فيها (شوف tabAllowed)
-  snacks: ["owner", "manager", "accountant", "branch_staff", "employee"],
+  // جرد الثلاجة اليومي (بروتين بار + عصيرات): موظف الفرع يشوفه بس لو فرعه له أصناف فيه (شوف tabAllowed)
+  juices: ["owner", "manager", "accountant", "branch_staff", "employee"],
   checklist: ["owner", "manager", "chef", "accountant"],
   waste: ["owner", "manager", "chef", "accountant"],
   report: ["owner", "accountant"],
@@ -31,10 +30,10 @@ function tabAllowed(tab) {
   const role = Auth.role();
   if (tab === "report" && typeof isChefReportOnlyUser === "function" && isChefReportOnlyUser()) return true;
   if (!(role && TAB_ROLE_ACCESS[tab] && TAB_ROLE_ACCESS[tab].includes(role))) return false;
-  if (tab === "snacks" && JUICE_STAFF_ROLES.includes(role)) {
+  if (tab === "juices" && JUICE_STAFF_ROLES.includes(role)) {
     const mine = (Auth.branches && Auth.branches()) || [];
     const list = (typeof Juices !== "undefined" && Juices.current.length ? Juices.current : (Sync.cacheGet("juices_v1") || {}).value) || [];
-    if (!list.some(j => j.kind === "snack" && j.active !== false && mine.some(b => String(j.branches || "").split(",").map(s => s.trim()).includes(b)))) return false;
+    if (!list.some(j => j.active !== false && mine.some(b => String(j.branches || "").split(",").map(s => s.trim()).includes(b)))) return false;
   }
   // المشتريات بمرحلة التجربة: تطلع بوضع المعاينة بس
   if (tab === "purchases" && !(typeof purchasesEnabled === "function" && purchasesEnabled())) return false;
@@ -77,7 +76,7 @@ function setActiveTab(tab) {
     if (el) el.classList.add("hidden");
   });
 
-  const jTab = tab === "juices" || tab === "snacks"; // الصفحتين على نفس الشاشة
+  const jTab = tab === "juices";
   const activeViewId = tab === "report" ? "reportContainer" : jTab ? "juicesView" : (tab + "View");
   const activeEl = document.getElementById(activeViewId);
   if (activeEl) activeEl.classList.remove("hidden");
@@ -150,8 +149,7 @@ function setActiveTab(tab) {
   }
   if (jTab) {
     initJuicesTab();
-    const modeChanged = setJuiceMode(tab === "snacks" ? "snack" : "juice");
-    if (modeChanged || currentJuiceBranch !== Branch.get()) loadJuiceDay(currentJuiceDate);
+    if (currentJuiceBranch !== Branch.get()) loadJuiceDay(currentJuiceDate);
   }
   if (tab === "items") { Items.load().then(renderItemsAdminView); }
   if (tab === "settings") { Promise.all([loadSettings(), Items.load()]).then(renderSettingsView); }
@@ -458,10 +456,10 @@ async function startApp() {
   if (tabAllowed("custody")) initCustodyTab();
   initDashboardTab();
   initTomorrowTab();
-  if (tabAllowed("juices") || tabAllowed("snacks")) initJuicesTab();
+  if (tabAllowed("juices")) initJuicesTab();
   else if (JUICE_STAFF_ROLES.includes(Auth.role())) {
-    // أول دخول (ما فيه كاش): نجيب القائمة ونفتح صفحة البروتين بار لو فرعه له أصناف
-    Juices.load().then(() => { if (tabAllowed("snacks")) { applyRoleUiGating(); initJuicesTab(); } }).catch(() => {});
+    // أول دخول (ما فيه كاش): نجيب القائمة ونفتح جرد الثلاجة لو فرعه له أصناف
+    Juices.load().then(() => { if (tabAllowed("juices")) { applyRoleUiGating(); initJuicesTab(); } }).catch(() => {});
   }
   initChecklistTab();
   initReportTab();
