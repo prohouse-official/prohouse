@@ -1,4 +1,6 @@
-// ==================== جرد العصيرات (عدّ يومي + إضافات + مطابقة مبيعات) ====================
+// ==================== الجرد اليومي: صفحة العصيرات + صفحة البروتين بار (عدّ يومي + إضافات + مطابقة مبيعات) ====================
+// نفس الشاشة بوضعين: juiceMode = "juice" (جرد العصيرات) أو "snack" (جرد البروتين بار) — كل صنف له kind،
+// وكل فرع يشوف أصنافه بس (حسب «الفروع» بالكتالوج).
 //
 // المعادلة لكل عصير:  المتوقع = افتتاحي + إضافات − مبيعات
 //                      الفرق   = العدّ الفعلي − المتوقع
@@ -6,6 +8,14 @@
 //
 // الافتتاحي بيتعبّى تلقائياً من "العدّ الفعلي" لأمس بنفس الفرع (سلسلة متصلة، ما حدا يعيد كتابته كل يوم)،
 // والمبيعات بتتعبّى تلقائياً من تابسنس بمطابقة الاسم — والاثنين قابلين للتعديل اليدوي لو الواقع مختلف.
+
+const JUICE_MODES = {
+  juice: { title: "🥤 جرد العصيرات", noun: "عصير", save: "💾 حفظ جرد العصيرات", none: "ما فيه عصيرات مضافة لهذا الفرع — أضفها من الكرت تحت." },
+  snack: { title: "🍫 جرد البروتين بار", noun: "صنف", save: "💾 حفظ جرد البروتين بار", none: "ما فيه أصناف بروتين بار لهذا الفرع — أضفها من الكرت تحت." }
+};
+let juiceMode = "juice";
+const juiceM = () => JUICE_MODES[juiceMode] || JUICE_MODES.juice;
+const juiceKind = (j) => (j.kind === "snack" ? "snack" : "juice");
 
 const JUICE_VARIANCE_TOLERANCE = 0; // فرق أكبر من هيك (بالمطلق) بيتعلّم كتنبيه
 
@@ -80,7 +90,7 @@ function juiceBranches(j) {
 }
 
 function visibleJuicesFor(branch) {
-  return Juices.current.filter(j => {
+  return Juices.current.filter(j => juiceKind(j) === juiceMode).filter(j => {
     const list = juiceBranches(j);
     return list.length === 0 || list.includes(branch);
   });
@@ -123,6 +133,7 @@ function renderJuicesView() {
   const ro = Auth.isViewOnlyEntry() ? "disabled" : "";
 
   view.innerHTML = `
+    <h2 class="juice-page-title">${juiceM().title}</h2>
     <div class="item-card">
       <div class="inputs-row">
         <div class="field">
@@ -156,7 +167,7 @@ function renderJuicesView() {
   currentVisibleJuices = visible;
 
   if (!visible.length) {
-    list.innerHTML = '<div class="empty-state">ما فيه عصيرات مضافة لهذا الفرع — أضفها من الكرت تحت.</div>';
+    list.innerHTML = `<div class="empty-state">${juiceM().none}</div>`;
   }
 
   visible.forEach(juice => {
@@ -175,6 +186,7 @@ function renderJuicesView() {
         <div class="field">
           <label>الإضافات (وارد اليوم)</label>
           <input type="number" inputmode="decimal" data-jid="${juice.id}" data-jfield="added" value="${e.added}" ${ro}>
+          ${ro ? "" : `<button type="button" class="btn juice-add-btn" data-jaddqty="${juice.id}">➕ وصلتنا كمية</button>`}
         </div>
       </div>
       <div class="inputs-row">
@@ -198,6 +210,19 @@ function renderJuicesView() {
   view.querySelectorAll("input[data-jfield]").forEach(inp => {
     inp.addEventListener("input", onJuiceFieldChange);
   });
+  // وصلت كمية للفرع: تنضاف على «الإضافات» (تتجمع لو وصل أكثر من مرة باليوم)
+  view.querySelectorAll("[data-jaddqty]").forEach(btn => btn.addEventListener("click", async () => {
+    const juice = Juices.current.find(j => j.id === btn.dataset.jaddqty);
+    if (!juice) return;
+    const raw = await phPrompt(`كم حبة وصلت من «${juice.name}»؟`, "", { ok: "أضف" });
+    const q = Number(String(raw || "").replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+    if (!(q > 0)) return;
+    const inp = view.querySelector(`input[data-jid="${CSS.escape(juice.id)}"][data-jfield="added"]`);
+    if (!inp) return;
+    inp.value = round1((num(inp.value) || 0) + q);
+    inp.dispatchEvent(new Event("input", { bubbles: true }));
+    showToast(`✅ انضاف ${q} — إضافات اليوم صارت ${inp.value}`);
+  }));
 
   visible.forEach(j => updateJuiceBadges(j));
   updateJuiceSummary();
@@ -253,7 +278,7 @@ function updateJuiceSummary() {
   el.innerHTML = `
     <div class="progress-bar-wrap">
       <div class="progress-bar-track"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-      <div class="progress-bar-label">${counted.length} من ${total} عصير تم عدّه (${pct}%)${mismatched.length ? ` — ⚠ ${mismatched.length} فيه فرق` : ""}</div>
+      <div class="progress-bar-label">${counted.length} من ${total} ${juiceM().noun} تم عدّه (${pct}%)${mismatched.length ? ` — ⚠ ${mismatched.length} فيه فرق` : ""}</div>
     </div>
   `;
 }
@@ -277,6 +302,7 @@ function saveJuiceDayNow(showToastMsg) {
   const employeeName = (Auth.getEmployee() || {}).name || "";
 
   const items = Juices.current
+    .filter(j => juiceKind(j) === juiceMode)
     .filter(j => {
       const e = currentJuiceEntry[j.id];
       return e && (e.opening !== "" || e.added !== "" || e.sold !== "" || e.counted !== "" || e.notes);
@@ -291,12 +317,15 @@ function saveJuiceDayNow(showToastMsg) {
 
   const payload = { date: currentJuiceDate, branch, employeeName, items };
   Sync.enqueue("saveJuiceDay:" + currentJuiceDate + ":" + branch, "saveJuiceDay", payload);
-  Sync.cacheSet("juiceday:" + currentJuiceDate + ":" + branch, { date: currentJuiceDate, branch, items, prevCounted: juicePrevCounted, sales: cachedJuiceSalesRows });
+  // الكاش فيه الصفحتين (عصيرات + بروتين بار) — منحافظ على أرقام الصفحة الثانية
+  const mineIds = new Set(Juices.current.filter(j => juiceKind(j) === juiceMode).map(j => j.id));
+  const others = juiceLoadedItems.filter(it => !mineIds.has(it.juiceId));
+  Sync.cacheSet("juiceday:" + currentJuiceDate + ":" + branch, { date: currentJuiceDate, branch, items: [...others, ...items], prevCounted: juicePrevCounted, sales: cachedJuiceSalesRows });
 
   const at = new Date().toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" });
   const statusEl = document.getElementById("juiceStatus");
   if (statusEl) statusEl.textContent = branch ? "✅ محفوظ — جاري المزامنة " + at : `✅ محفوظ (بدون الفرع — كمّله أول ما تقدر) — ${at}`;
-  if (showToastMsg) showToast("تم حفظ جرد العصيرات");
+  if (showToastMsg) showToast("تم الحفظ");
 }
 
 let juiceAutoSaveTimer = null;
@@ -308,11 +337,13 @@ function scheduleJuiceAutoSave() {
 }
 
 let cachedJuiceSalesRows = [];
+let juiceLoadedItems = [];
 
 function applyJuiceDayData(val) {
   if (!val) return;
   juicePrevCounted = val.prevCounted || {};
   cachedJuiceSalesRows = val.sales || [];
+  juiceLoadedItems = val.items || [];
   juiceSalesMap = {};
   cachedJuiceSalesRows.forEach(r => { juiceSalesMap[normalizeArabic(r.productName)] = r.qty; });
 
@@ -331,10 +362,9 @@ function applyJuiceDayData(val) {
       const prev = juicePrevCounted[j.id];
       if (prev !== undefined && prev !== "") e.opening = prev;
     }
-    if (e.sold === "" || e.sold === null || e.sold === undefined) {
-      const auto = autoSoldFor(j);
-      if (auto !== undefined) e.sold = auto;
-    }
+    // مبيعات تابسنس توصل متأخرة أحياناً: لو انحفظ الجرد والمبيعات صفر، منعبّيها لما توصل
+    const auto = autoSoldFor(j);
+    if (auto !== undefined && (e.sold === "" || e.sold === null || e.sold === undefined || (Number(e.sold) === 0 && Number(auto) > 0))) e.sold = auto;
   });
 }
 
@@ -387,9 +417,9 @@ function renderJuiceCatalog() {
 
   wrap.innerHTML = `
     <div class="item-card">
-      <button type="button" class="btn" id="juiceCatalogToggle">⚙ إدارة قائمة العصيرات</button>
+      <button type="button" class="btn" id="juiceCatalogToggle">⚙ إدارة أصناف الجرد</button>
       <div id="juiceCatalogBody" class="hidden" style="margin-top:12px;">
-        <div class="field"><label>اسم العصير</label><input type="text" id="newJuiceName"></div>
+        <div class="field"><label>اسم الصنف</label><input type="text" id="newJuiceName"></div>
         <div class="inputs-row">
           <div class="field"><label>الوحدة</label><input type="text" id="newJuiceUnit" placeholder="مثال: زجاجة"></div>
           <div class="field"><label>اسم المنتج بتابسنس (اختياري)</label><input type="text" id="newJuiceTabsense" placeholder="اتركه فاضي لو نفس الاسم"></div>
@@ -400,7 +430,7 @@ function renderJuiceCatalog() {
           <div class="badges" id="newJuiceBranchChecks">${branchCheckboxesHtml([])}</div>
         </div>` : `
         <div class="field"><label>الفرع</label>${branchLockedFieldHtml("newJuiceBranchLocked", mine[0] || "")}</div>`}
-        <button class="btn gold" id="saveNewJuiceBtn">إضافة عصير</button>
+        <button class="btn gold" id="saveNewJuiceBtn">إضافة صنف</button>
         <div id="juiceCatalogList" style="margin-top:14px;"></div>
       </div>
     </div>
@@ -417,16 +447,17 @@ function renderJuiceCatalog() {
     const branches = isOwner
       ? checkedBranches(document.getElementById("newJuiceBranchChecks"))
       : document.getElementById("newJuiceBranchLocked").value;
-    if (!name) { showToast("اكتب اسم العصير"); return; }
+    if (!name) { showToast("اكتب اسم الصنف"); return; }
     if (!isOwner && !branches) { showToast("ما فيه فرع مرتبط بحسابك"); return; }
-    Juices.save({ name, unit, tabsenseName, branches, sortOrder: Juices.current.length + 1 });
-    showToast("تمت إضافة العصير");
+    Juices.save({ name, unit, tabsenseName, branches, kind: juiceMode, sortOrder: Juices.current.length + 1 });
+    showToast("تمت إضافة الصنف");
     renderJuicesView();
   });
 
   const list = document.getElementById("juiceCatalogList");
   // غير المالك بيتحكم بس بالعصيرات الموسومة بفرع واحد من فروعه (نفس قاعدة إدارة الأصناف)
-  const editable = isOwner ? Juices.current : Juices.current.filter(j => {
+  const ofMode = Juices.current.filter(j => juiceKind(j) === juiceMode);
+  const editable = isOwner ? ofMode : ofMode.filter(j => {
     const b = juiceBranches(j);
     return b.length === 1 && mine.includes(b[0]);
   });
@@ -450,7 +481,7 @@ function renderJuiceCatalog() {
     `;
     row.querySelector('[data-jact="save"]').addEventListener("click", () => {
       const name = row.querySelector('[data-jf="name"]').value.trim();
-      if (!name) { showToast("اكتب اسم العصير"); return; }
+      if (!name) { showToast("اكتب اسم الصنف"); return; }
       Juices.save({
         id: juice.id, name,
         unit: row.querySelector('[data-jf="unit"]').value.trim(),
@@ -458,6 +489,7 @@ function renderJuiceCatalog() {
         branches: isOwner
           ? checkedBranches(row.querySelector("[data-jbranches]"))
           : document.getElementById("editJuiceBranch-" + juice.id).value,
+        kind: juiceKind(juice),
         sortOrder: juice.sortOrder
       });
       showToast("تم الحفظ");
@@ -467,17 +499,29 @@ function renderJuiceCatalog() {
       if (!(await phConfirm(`متأكد من حذف "${juice.name}"؟`, { ok: "احذف", danger: true }))) return;
       Juices.remove(juice.id);
       renderJuicesView();
-      showToast("تم حذف العصير");
+      showToast("تم حذف الصنف");
     });
     list.appendChild(row);
   });
 
   if (!editable.length) {
-    list.innerHTML = '<div class="empty-state">ما فيه عصيرات للحين.</div>';
+    list.innerHTML = '<div class="empty-state">ما فيه أصناف للحين.</div>';
   }
 }
 
+// تبديل الصفحة (عصيرات ↔ بروتين بار) من التنقل
+function setJuiceMode(mode) {
+  const changed = juiceMode !== mode;
+  juiceMode = mode === "snack" ? "snack" : "juice";
+  const btn = document.getElementById("juiceSaveBtn");
+  if (btn) btn.textContent = juiceM().save;
+  return changed;
+}
+
+let juicesTabInited = false;
 function initJuicesTab() {
+  if (juicesTabInited) return;
+  juicesTabInited = true;
   const dateInput = document.getElementById("juiceDateInput");
   dateInput.value = currentJuiceDate;
   dateInput.addEventListener("change", (ev) => {

@@ -6,3 +6,6 @@
 -- سطر اسمه جديد (ما له ربط) يروح للمادة «unmapped» لين نربطه بـ inv_aliases ونعيد inv_sync_invoice.
 -- القراءة: المالك والمحاسب والشيف (inv_can_read). الكتابة: من الدوال بس.
 -- التعريفات الكاملة: select pg_get_functiondef('public.inv_sync_invoice(text)'::regprocedure);
+
+-- جرد البروتين بار (صفحة لحالها): نفس جدول juices مع kind = 'snack' (مطبّق على القاعدة)
+-- alter table juices add column if not exists kind text not null default 'juice';

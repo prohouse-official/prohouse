@@ -14,8 +14,9 @@ const TAB_ROLE_ACCESS = {
   purchases: ["owner", "accountant"],
   inventory: ["owner", "accountant", "chef"],
   tomorrow: ["owner", "manager", "chef", "accountant"],
-  // العصيرات وقائمة الفحص ما حدا عم يعبّيهم، فمخفيين عن موظفي الفروع لحتى القائمة تضل بسيطة
   juices: ["owner", "manager", "accountant"],
+  // جرد البروتين بار: صفحة لحالها، موظف الفرع يشوفها بس لو فرعه له أصناف فيها (شوف tabAllowed)
+  snacks: ["owner", "manager", "accountant", "branch_staff", "employee"],
   checklist: ["owner", "manager", "chef", "accountant"],
   waste: ["owner", "manager", "chef", "accountant"],
   report: ["owner", "accountant"],
@@ -25,10 +26,16 @@ const TAB_ROLE_ACCESS = {
   settings: ["owner"]
 };
 
+const JUICE_STAFF_ROLES = ["branch_staff", "employee"];
 function tabAllowed(tab) {
   const role = Auth.role();
   if (tab === "report" && typeof isChefReportOnlyUser === "function" && isChefReportOnlyUser()) return true;
   if (!(role && TAB_ROLE_ACCESS[tab] && TAB_ROLE_ACCESS[tab].includes(role))) return false;
+  if (tab === "snacks" && JUICE_STAFF_ROLES.includes(role)) {
+    const mine = (Auth.branches && Auth.branches()) || [];
+    const list = (typeof Juices !== "undefined" && Juices.current.length ? Juices.current : (Sync.cacheGet("juices_v1") || {}).value) || [];
+    if (!list.some(j => j.kind === "snack" && j.active !== false && mine.some(b => String(j.branches || "").split(",").map(s => s.trim()).includes(b)))) return false;
+  }
   // المشتريات بمرحلة التجربة: تطلع بوضع المعاينة بس
   if (tab === "purchases" && !(typeof purchasesEnabled === "function" && purchasesEnabled())) return false;
   // صور التوثيق تنشال عن الموظف إذا كل فروعه لسا ما تحددت لها مناطق تصوير
@@ -70,7 +77,8 @@ function setActiveTab(tab) {
     if (el) el.classList.add("hidden");
   });
 
-  const activeViewId = tab === "report" ? "reportContainer" : (tab + "View");
+  const jTab = tab === "juices" || tab === "snacks"; // الصفحتين على نفس الشاشة
+  const activeViewId = tab === "report" ? "reportContainer" : jTab ? "juicesView" : (tab + "View");
   const activeEl = document.getElementById(activeViewId);
   if (activeEl) activeEl.classList.remove("hidden");
 
@@ -82,7 +90,7 @@ function setActiveTab(tab) {
   document.getElementById("custodyDateBar").classList.toggle("hidden", tab !== "custody");
   document.getElementById("openingDateBar").classList.toggle("hidden", tab !== "opening");
   document.getElementById("tomorrowDateBar").classList.toggle("hidden", tab !== "tomorrow");
-  document.getElementById("juiceDateBar").classList.toggle("hidden", tab !== "juices");
+  document.getElementById("juiceDateBar").classList.toggle("hidden", !jTab);
   document.getElementById("checklistDateBar").classList.toggle("hidden", tab !== "checklist");
 
   const saveBarReceiving = document.getElementById("saveBarReceiving");
@@ -91,7 +99,7 @@ function setActiveTab(tab) {
   if (saveBarRemaining) saveBarRemaining.classList.toggle("hidden", tab !== "remaining" || Auth.isViewOnlyEntry());
 
   document.getElementById("saveBarTomorrow").classList.toggle("hidden", tab !== "tomorrow" || Auth.isViewOnlyTomorrow());
-  document.getElementById("saveBarJuices").classList.toggle("hidden", tab !== "juices" || Auth.isViewOnlyEntry());
+  document.getElementById("saveBarJuices").classList.toggle("hidden", !jTab || Auth.isViewOnlyEntry());
   document.getElementById("saveBarChecklist").classList.toggle("hidden", tab !== "checklist" || Auth.isViewOnlyEntry());
 
   // تبويبات الشاشات المدموجة (قائمة الفحص جوّا التوثيق، إغلاق الفرع جوّا العهدة)
@@ -140,7 +148,11 @@ function setActiveTab(tab) {
       if (!document.getElementById("reportContainer").classList.contains("hidden")) redrawTrendChartIfReady();
     });
   }
-  if (tab === "juices" && currentJuiceBranch !== Branch.get()) { loadJuiceDay(currentJuiceDate); }
+  if (jTab) {
+    initJuicesTab();
+    const modeChanged = setJuiceMode(tab === "snacks" ? "snack" : "juice");
+    if (modeChanged || currentJuiceBranch !== Branch.get()) loadJuiceDay(currentJuiceDate);
+  }
   if (tab === "items") { Items.load().then(renderItemsAdminView); }
   if (tab === "settings") { Promise.all([loadSettings(), Items.load()]).then(renderSettingsView); }
 }
@@ -446,7 +458,11 @@ async function startApp() {
   if (tabAllowed("custody")) initCustodyTab();
   initDashboardTab();
   initTomorrowTab();
-  if (tabAllowed("juices")) initJuicesTab();
+  if (tabAllowed("juices") || tabAllowed("snacks")) initJuicesTab();
+  else if (JUICE_STAFF_ROLES.includes(Auth.role())) {
+    // أول دخول (ما فيه كاش): نجيب القائمة ونفتح صفحة البروتين بار لو فرعه له أصناف
+    Juices.load().then(() => { if (tabAllowed("snacks")) { applyRoleUiGating(); initJuicesTab(); } }).catch(() => {});
+  }
   initChecklistTab();
   initReportTab();
   initDayJumpButtons();
