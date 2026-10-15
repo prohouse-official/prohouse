@@ -648,6 +648,8 @@ table.order-table td.total-cell{ font-weight:900; background:#FFF4D6; }
 
 /* ==================== جرد العصيرات ==================== */
 .juice-card .badges{ margin-top:6px; }
+.juice-page-title{ font-size:18px; font-weight:900; margin:4px 2px 10px; }
+.juice-add-btn{ margin-top:6px; width:100%; padding:8px 10px; font-size:13px; }
 
 /* ==================== فئات قابلة للطي بشاشة إدخال اليوم ==================== */
 .category-section{ margin-bottom:16px; }

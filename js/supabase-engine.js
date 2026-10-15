@@ -185,6 +185,7 @@ const SupaEngine = (() => {
       pan_size: payload.panSize || "",
       optional: !!payload.optional,
       branches: payload.branches || "",
+      kind: payload.kind === "snack" ? "snack" : "juice",
       active: payload.active !== false,
       sort_order: payload.sortOrder || 0,
       updated_at: new Date().toISOString()
@@ -602,6 +603,7 @@ const SupaEngine = (() => {
       unit: r.unit,
       tabsenseName: r.tabsense_name,
       branches: r.branches,
+      kind: r.kind || "juice",
       active: r.active,
       sortOrder: r.sort_order
     }));
@@ -609,10 +611,12 @@ const SupaEngine = (() => {
 
   async function getJuiceDay(date, branch) {
     const prevDate = addDaysStr(date, -1);
-    const [todayItems, prevItems, sales] = await Promise.all([
+    const [todayItems, prevItems, sales, productSales] = await Promise.all([
       query(`juice_counts?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`),
       query(`juice_counts?select=*&date=eq.${prevDate}&branch=eq.${encodeURIComponent(branch)}`),
-      query(`juice_sales?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`)
+      query(`juice_sales?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`),
+      // مبيعات كل المنتجات (تابسنس/فوديكس) — عشان أي صنف بالجرد (بروتين بار…) تنسحب مبيعاته
+      query(`tabsense_product_sales?select=product,qty&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`).catch(() => [])
     ]);
 
     const prevCounted = {};
@@ -633,7 +637,8 @@ const SupaEngine = (() => {
         employeeName: r.employee_name
       })),
       prevCounted,
-      sales: (sales || []).map(r => ({ productName: r.product_name, qty: r.qty }))
+      sales: [...(productSales || []).map(r => ({ productName: r.product, qty: Number(r.qty) || 0 })),
+        ...(sales || []).map(r => ({ productName: r.product_name, qty: r.qty }))]
     };
   }
 
