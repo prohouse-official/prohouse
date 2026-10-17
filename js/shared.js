@@ -399,6 +399,9 @@ function isChefSlot(it) {
   return isOptionalItem(it) && /الشيف\s*\d+\s*$/.test(String(it.name || ""));
 }
 const CHEF_SLOT_CATS = ["دجاج", "لحم", "بحري"];
+// أقسام منيوها ثابت (6 أصناف ثابتة + 3 متغيرة باليوم) — ما فيها زر «إضافة صنف»
+const LOCKED_MENU_CATS = ["دجاج"];
+const canAddToCategory = (cat) => !LOCKED_MENU_CATS.includes(String(cat || "").trim());
 // الأقسام الأساسية (دجاج/لحم/بحري) تضل ظاهرة حتى لو كل أصنافها انشالت أو ما انطلب منها شي —
 // قبل كان القسم يختفي ويختفي معه زر «إضافة صنف»، فما يقدر الموظف يسجّل طبخات الشيف
 function ensureCoreCategories(byCat, branch) {

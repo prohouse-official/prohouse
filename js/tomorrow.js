@@ -366,7 +366,7 @@ function renderTomorrowView() {
       inner.appendChild(card);
     });
 
-    if (!Auth.isViewOnlyTomorrow()) {
+    if (!Auth.isViewOnlyTomorrow() && canAddToCategory(group.category)) {
       const addBtn = document.createElement("button");
       addBtn.type = "button";
       addBtn.className = "rec-add-item-btn";
