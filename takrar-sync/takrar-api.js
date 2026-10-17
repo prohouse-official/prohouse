@@ -104,7 +104,12 @@ async function fetchOrders(from, to) {
     while (url) {
       const { status, j } = await getJson(url);
       if (status !== 200 || !j) {
-        if (first) { console.log("TAKRAR_PATH", p, status); break; }
+        if (first) {
+          // رسالة الخطأ من تكرار (متل "Invalid token") — بلا أرقام
+          const msg = j && (j.error || j.detail || j.message) ? JSON.stringify(j.error || j.detail || j.message).replace(/\d{4,}/g, "#").slice(0, 200) : "";
+          console.log("TAKRAR_PATH", p, status, msg);
+          break;
+        }
         throw new Error("صفحة طلبات فشلت [" + status + "]");
       }
       first = false;
