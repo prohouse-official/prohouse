@@ -11,6 +11,10 @@ let cfg = {};
 try { cfg = JSON.parse(raw); } catch (e) { cfg = { token: raw }; }
 if (typeof cfg === "string") cfg = { token: cfg };
 const TOKEN = cfg.token || cfg.apiToken || "";
+// رقم التاجر (app-id) إلزامي عند تكرار — إذا مش بالسر بناخده من التوكن نفسه (JWT: app_id)
+if (!cfg.appId && TOKEN.split(".").length === 3) {
+  try { cfg.appId = JSON.parse(Buffer.from(TOKEN.split(".")[1], "base64url").toString()).app_id; } catch (e) {}
+}
 const BASE = (cfg.base || "https://api.techrar.com").replace(/\/$/, "");
 const MODE = (process.env.TAKRAR_EXPLORE || "").trim();
 
@@ -88,7 +92,7 @@ const riyadh = (ms) => new Date(ms + 3 * 3600000).toISOString().slice(0, 10);
 
 async function getJson(url) {
   const headers = { Authorization: "Bearer " + TOKEN, Accept: "application/json" };
-  if (cfg.appId) headers["app-id"] = String(cfg.appId); // رقم التاجر — اختياري، التوكن نفسه مربوط بالمتجر
+  if (cfg.appId) headers["app-id"] = String(cfg.appId); // رقم التاجر (من السر أو من التوكن)
   const res = await fetch(url, { headers });
   const body = await res.text();
   let j = null; try { j = JSON.parse(body); } catch (e) {}
