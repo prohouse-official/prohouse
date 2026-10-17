@@ -11,7 +11,7 @@
 
 const JUICE_MODES = {
   snack: { tab: "🍫 البروتين بار", noun: "صنف", none: "ما فيه أصناف بروتين بار لهذا الفرع — أضفها من الكرت تحت." },
-  juice: { tab: "🥤 العصيرات", noun: "عصير", none: "ما فيه عصيرات مضافة لهذا الفرع — أضفها من الكرت تحت." }
+  juice: { tab: "🥤 المشروبات", noun: "مشروب", none: "ما فيه مشروبات مضافة لهذا الفرع — أضفها من الكرت تحت." }
 };
 let juiceMode = "snack";
 const juiceM = () => JUICE_MODES[juiceMode] || JUICE_MODES.juice;
