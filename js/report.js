@@ -777,17 +777,17 @@ async function runTomorrowReport() {
     cBtn.classList.toggle("active", tomorrowReportCombined && !branchFilter);
     cBtn.textContent = tomorrowReportCombined && !branchFilter ? "✓ ورقة مجمعة — اضغط لأوراق الفروع" : "📋 ورقة مجمعة لكل الفروع";
   }
-  // ورقة مجمعة (اختيار لحاله): الصنف، إجمالي المطلوب، وكم طالب كل فرع
-  if (tomorrowReportCombined && !branchFilter && branches.length > 1) {
-    const combined = chefCombinedSheet(branches, perBranch, order);
-    lastTomorrowReportSheets = combined.rows.length ? [combined] : [];
-  }
-
-  // اشتراكات تكرار (تقرير BoQ): عمود «اشتراكات» بالورقة المجمعة، أو ورقة فرع لحالها لو أوراق فروع
+  // اشتراكات تكرار (تقرير BoQ): تطلع كأنها فرع (كميات تصنيع) — التوزيع بعدين على الموظف المسؤول
+  // الاشتراكات تنطبخ قبل يوم: طلبية الأحد فيها اشتراكات الاثنين
   let boq = [];
-  if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(date); } catch (e) { /* بدونها */ } }
+  if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(addDaysStr(date, 1)); } catch (e) { /* بدونها */ } }
   if (run !== tomorrowReportRun) return;
-  if (boq.length) {
+
+  // ورقة مجمعة (اختيار لحاله): الصنف، إجمالي المطلوب، وكم طالب كل فرع (+ الاشتراكات مدموجة مع أصناف الفروع)
+  if (tomorrowReportCombined && !branchFilter && branches.length > 1) {
+    const combined = chefCombinedSheet(branches, perBranch, order, boq);
+    lastTomorrowReportSheets = combined.rows.length ? [combined] : [];
+  } else if (boq.length) {
     const fmt = (q) => String(Number(q) || 0);
     const subRows = boq.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), "ar") || String(a.size).localeCompare(String(b.size)))
       .map(r => ({
@@ -795,18 +795,7 @@ async function runTomorrowReport() {
         name: r.name + ((r.variants || []).length ? " (" + r.variants.map(v => `${v.name} ×${fmt(v.qty)}`).join("، ") + ")" : ""),
         size: r.size || "—", qty: fmt(r.qty), total: fmt(r.qty), rec: "", rem: "", notes: "", rank: 9999, sort: 9999
       }));
-    // تطلع كأنها فرع (كميات تصنيع) — التوزيع بعدين على الموظف المسؤول
-    let comb = lastTomorrowReportSheets.find(s => s.combined);
-    // الورقة المجمعة مفتوحة بس ما فيها طلبات فروع: منعمل ورقة وحدة فيها الاشتراكات
-    if (!comb && tomorrowReportCombined && branches.length > 1) {
-      comb = { combined: true, branch: "كل الفروع", branches: [], rows: [] };
-      lastTomorrowReportSheets = [comb];
-    }
-    if (comb) {
-      comb.branches = comb.branches.concat("اشتراكات");
-      comb.rows = comb.rows.map(r => ({ ...r, byBranch: r.byBranch.concat("") }))
-        .concat(subRows.map(r => ({ ...r, byBranch: comb.branches.map((b, i) => i === comb.branches.length - 1 ? r.qty : "") })));
-    } else lastTomorrowReportSheets.push({ branch: "اشتراكات", rows: subRows });
+    lastTomorrowReportSheets.push({ branch: "اشتراكات", rows: subRows });
   }
 
   // صفحة السلطات (لحالها بنفس الملف): فروع الطلبية + اللي محفوظ لهاليوم
@@ -855,7 +844,11 @@ function chefTotalText(parts) {
 const CHEF_COMBINED_ALIASES = { "رز بخاري": "رز الشيف", "سمك فيليه": "سمك الشيف", "جمبري داينمت": "جمبري الشيف" };
 const chefNormName = (n) => String(n || "").replace(/\s*\(.*\)\s*$/, "").replace(/[ة]$/, "ه").replace(/\s+/g, " ").trim();
 
-function chefCombinedSheet(branches, perBranch, order) {
+// اسم الطبق بدون «مع رز أبيض…» وبدون فروق الهمزة — لمطابقة أصناف تكرار مع أصناف الفروع
+const chefLooseName = (n) => chefNormName(n).replace(/[أإآ]/g, "ا").replace(/\s+مع\s+.*$/, "").trim();
+const SUB_BRANCH = "اشتراكات";  // عمودها بالورقة المجمعة = كميات اشتراكات اليوم اللي بعده
+
+function chefCombinedSheet(branches, perBranch, order, boq = []) {
   const rows = new Map();
   const aliased = []; // [{ base, branch, e, it }]
   const addTo = (key, init, branch, e, it) => {
@@ -890,6 +883,37 @@ function chefCombinedSheet(branches, perBranch, order) {
     const cat = target ? target[1].category : (it.category || "-");
     addTo(key, { category: cat, name: `${base} ……`, base, rank: 999, sort: 9999 }, branch, e, it);
   });
+  // الاشتراكات: كل طبق ينجمع (كل الأحجام) — البروتين بالجرام (150P × العدد) وينضاف لسطر نفس الطبق عند الفروع،
+  // والرز الأبيض (الكارب C) ينضاف لسطر «رز أبيض». الطبق اللي مو موجود عند الفروع سطر جديد بالعدد.
+  if (boq.length) {
+    branches = branches.concat(SUB_BRANCH);
+    const byLoose = new Map([...rows.entries()].filter(([k]) => k.startsWith("n:")).map(([k, r]) => [chefLooseName(r.name), k]));
+    const meals = new Map(); // key → عدد الوجبات
+    const add = (key, init, part, count) => {
+      if (!rows.has(key)) rows.set(key, { ...init, sizes: new Set(), parts: {}, notes: [] });
+      (rows.get(key).parts[SUB_BRANCH] = rows.get(key).parts[SUB_BRANCH] || []).push(part);
+      if (count) meals.set(key, (meals.get(key) || 0) + count);
+    };
+    boq.forEach(r => {
+      const qty = Number(r.qty) || 0;
+      if (!qty) return;
+      const m = /(\d+)\s*P\s*-\s*(\d+)\s*C/i.exec(String(r.size || ""));
+      const loose = chefLooseName(r.name);
+      const key = byLoose.get(loose) || "sub:" + loose;
+      const init = { category: SUB_BRANCH, name: chefNormName(r.name).replace(/\s+مع\s+.*$/, ""), base: "", rank: 9999, sort: 9999 };
+      add(key, init, m ? { key: "g", qty: Number(m[1]) * qty } : { key: "n:", qty }, qty);
+      // الرز: «مع رز أبيض» بالاسم أو اختيار رز أبيض — الكارب بالجرام لسطر الرز الأبيض
+      if (m) {
+        const vs = (r.variants || []).filter(v => /رز|ارز|أرز/.test(v.name));
+        const rice = vs.length ? vs.map(v => [v.name, Number(v.qty) || 0]) : /(رز|أرز|ارز)\s+(أبيض|ابيض)/.test(r.name) ? [["رز أبيض", qty]] : [];
+        rice.forEach(([vn, vq]) => {
+          const rk = byLoose.get(chefLooseName(vn)) || "sub:" + chefLooseName(vn);
+          add(rk, { category: SUB_BRANCH, name: chefNormName(vn), base: "", rank: 9999, sort: 9999 }, { key: "g", qty: Number(m[2]) * vq }, 0);
+        });
+      }
+    });
+    meals.forEach((n, key) => { if (rows.get(key).parts[SUB_BRANCH].some(p => p.key === "g")) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
+  }
   const list = [...rows.values()].map(r => ({
     ...r, size: [...r.sizes].join("، "),
     total: chefTotalText(Object.values(r.parts).flat()), notes: r.notes.join(" · "),
