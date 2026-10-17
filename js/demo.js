@@ -12,7 +12,7 @@
   if (!on) return;
 
   const AJL = "عبداللطيف جميل";
-  const DB_KEY = "ph_demo_db_v5";
+  const DB_KEY = "ph_demo_db_v6";
   const riyadh = (offset) => {
     const d = new Date(Date.now() + offset * 86400000);
     return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(d);
@@ -56,7 +56,7 @@
     });
     return {
       items, daily_entries, tabsense_sales,
-      day_meta: [], tomorrow_orders: [], waste_log: [], juice_counts: [], juice_sales: [],
+      day_meta: [], tomorrow_orders: [], waste_log: [], juice_counts: [], juice_sales: [], salad_checks: [],
       juices: [["سنكرز بروتين بار", "سنكرز بروتين بار|بروتين بار سنيكرس"], ["بورن وينر", "بورن وينر|بروتين بار بورن وينر"], ["جرينيد", "جرينيد|بروتين بار جرينيد"], ["مارس بروتين بار", "مارس بروتين بار|بروتين بار مارس"]]
         .map(([name, ts], i) => ({ id: "snack_" + (i + 1), name, unit: "حبة", tabsense_name: ts, branches: "الروضة,الشاطئ," + AJL, kind: "snack", active: true, sort_order: i + 1 }))
         .concat([["سانتي برتقال", AJL], ["سانتي مانجو الفونسو", AJL], ["سانتي (كل النكهات)", "الروضة,الشاطئ", "سانتي"]]
@@ -116,7 +116,7 @@
 
   const KEYS = {
     daily_entries: ["date", "branch", "item_id"], day_meta: ["date", "branch"], items: ["id"], settings: ["key"], juices: ["id"],
-    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], purchase_invoices: ["id"], purchase_suppliers: ["name"], inv_materials: ["id"], inv_movements: ["id"],
+    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], salad_checks: ["date", "branch"], purchase_invoices: ["id"], purchase_suppliers: ["name"], inv_materials: ["id"], inv_movements: ["id"],
     push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"], tabsense_payments: ["date", "branch", "channel"]
   };
 

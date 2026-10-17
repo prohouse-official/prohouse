@@ -605,6 +605,8 @@ async function exportExcel() {
 let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
 let tomorrowReportCombined = false; // ورقة مجمعة لكل الفروع (اختيار لحاله — أوراق الفروع ما تتغير)
 let lastTomorrowReportDate = "";
+let lastSaladChecks = {};   // {فرع: صف salad_checks} لصفحة السلطات
+let lastSaladBranches = []; // الفروع اللي تطلع بصفحة السلطات
 
 // مقاسات ملف الإكسل الأصلي (عرض الأعمدة بوحدة الإكسل، ارتفاع الصفوف بالنقطة)
 const CHEF_SHEET = {
@@ -781,6 +783,12 @@ async function runTomorrowReport() {
     lastTomorrowReportSheets = combined.rows.length ? [combined] : [];
   }
 
+  // صفحة السلطات (لحالها بنفس الملف): فروع الطلبية + اللي محفوظ لهاليوم
+  lastSaladBranches = branches.filter(b => typeof SALAD_BRANCH_KEY !== "undefined" && SALAD_BRANCH_KEY[b]);
+  lastSaladChecks = {};
+  try { (await SupaEngine.getSaladChecks(date)).forEach(c => { lastSaladChecks[c.branch] = c; }); } catch (e) { /* بدونها تطلع فاضية */ }
+  if (run !== tomorrowReportRun) return;
+
   renderTomorrowReport();
 }
 
@@ -915,11 +923,12 @@ function chefSheetHtml(sheet, date) {
 
 function renderTomorrowReport() {
   const view = document.getElementById("tomorrowReportView");
-  if (!lastTomorrowReportSheets.length) {
+  if (!lastTomorrowReportSheets.length && !lastSaladBranches.length) {
     view.innerHTML = '<div class="empty-state">ما فيه طلبية محفوظة لهذا اليوم/الفرع بعد.<br>ابدأ بتعبئة تاب "طلبية الغد".</div>';
     return;
   }
-  view.innerHTML = lastTomorrowReportSheets.map(s => `<div class="chef-page"><img class="chef-logo" src="assets/logo.png" alt="Pro House"><div class="chef-sheet-frame">${chefSheetHtml(s, lastTomorrowReportDate)}</div></div>`).join("");
+  view.innerHTML = lastTomorrowReportSheets.map(s => `<div class="chef-page"><img class="chef-logo" src="assets/logo.png" alt="Pro House"><div class="chef-sheet-frame">${chefSheetHtml(s, lastTomorrowReportDate)}</div></div>`).join("")
+    + (lastSaladBranches.length ? `<div class="chef-page"><img class="chef-logo" src="assets/logo.png" alt="Pro House"><div class="chef-sheet-frame">${saladSheetHtml(lastSaladBranches, lastTomorrowReportDate, lastSaladChecks)}</div></div>` : "");
   fitChefSheets();
 }
 // النص الطويل يصغر لين يدخل بالخلية (متل "تصغير للاحتواء" بالإكسل) بدل ما ينكسر على سطرين
@@ -948,7 +957,7 @@ function fitChefSheets() {
 window.addEventListener("resize", () => { if (lastTomorrowReportSheets.length) fitChefSheets(); });
 
 async function exportTomorrowReportExcel() {
-  if (!lastTomorrowReportSheets.length) { showToast("اضغط «عرض» أول"); return; }
+  if (!lastTomorrowReportSheets.length && !lastSaladBranches.length) { showToast("اضغط «عرض» أول"); return; }
   await loadReportLibs();
   if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel ما تحمّلت — تأكد من الاتصال بالنت"); return; }
   const S = CHEF_SHEET;
@@ -1051,6 +1060,18 @@ async function buildTomorrowReportPdf() {
       const ratio = Math.min(maxW / canvas.width, maxH / canvas.height);
       const w = canvas.width * ratio, h = canvas.height * ratio;
       if (i) pdf.addPage();
+      pdf.addImage(img, "JPEG", (pageW - w) / 2, mY, w, h);
+      if (logo) { const lh = mY - 6, lw = lh * 197 / 132; pdf.addImage(logo, "PNG", (pageW - lw) / 2, 3, lw, lh); }
+    }
+    // صفحة السلطات لحالها بآخر الملف
+    if (lastSaladBranches.length) {
+      stage.innerHTML = saladSheetHtml(lastSaladBranches, lastTomorrowReportDate, lastSaladChecks);
+      const canvas = await html2canvas(stage.firstElementChild, { scale: 1.5, backgroundColor: "#ffffff", logging: false });
+      const img = canvas.toDataURL("image/jpeg", 0.92);
+      const maxW = pageW - 2 * mX, maxH = pageH - 2 * mY;
+      const ratio = Math.min(maxW / canvas.width, maxH / canvas.height);
+      const w = canvas.width * ratio, h = canvas.height * ratio;
+      if (lastTomorrowReportSheets.length) pdf.addPage();
       pdf.addImage(img, "JPEG", (pageW - w) / 2, mY, w, h);
       if (logo) { const lh = mY - 6, lw = lh * 197 / 132; pdf.addImage(logo, "PNG", (pageW - lw) / 2, 3, lw, lh); }
     }
