@@ -796,7 +796,12 @@ async function runTomorrowReport() {
         size: r.size || "—", qty: fmt(r.qty), total: fmt(r.qty), rec: "", rem: "", notes: "", rank: 9999, sort: 9999
       }));
     // تطلع كأنها فرع (كميات تصنيع) — التوزيع بعدين على الموظف المسؤول
-    const comb = lastTomorrowReportSheets.find(s => s.combined);
+    let comb = lastTomorrowReportSheets.find(s => s.combined);
+    // الورقة المجمعة مفتوحة بس ما فيها طلبات فروع: منعمل ورقة وحدة فيها الاشتراكات
+    if (!comb && tomorrowReportCombined && branches.length > 1) {
+      comb = { combined: true, branch: "كل الفروع", branches: [], rows: [] };
+      lastTomorrowReportSheets = [comb];
+    }
     if (comb) {
       comb.branches = comb.branches.concat("اشتراكات");
       comb.rows = comb.rows.map(r => ({ ...r, byBranch: r.byBranch.concat("") }))
