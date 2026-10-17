@@ -856,9 +856,9 @@ function renderRemainingView(receivingData, salesData) {
         <div class="category-body">
           <div>
             ${cardsHtml}
-            <button type="button" class="rec-add-item-btn" onclick="${usesChefSlots(cat) ? "openRemainingChefPicker" : "openAddRemainingItemModal"}('${String(cat).replace(/'/g, "\\'")}')">
+            ${canAddToCategory(cat) ? `<button type="button" class="rec-add-item-btn" onclick="${usesChefSlots(cat) ? "openRemainingChefPicker" : "openAddRemainingItemModal"}('${String(cat).replace(/'/g, "\\'")}')">
               ➕ ${usesChefSlots(cat) ? "إضافة صنف " + cat : "إضافة صنف في قسم (" + cat + ")"}
-            </button>
+            </button>` : ""}
           </div>
         </div>
       </div>
