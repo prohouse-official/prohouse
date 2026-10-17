@@ -1,9 +1,10 @@
 // تكرار (techrar) عن طريق API token (قراءة بس) — بدل الدخول بالمتصفح (الدخول صار OTP).
-// السر TAKRAR_CONFIG_JSON: التوكن لحاله، أو {"token": "...", "appId"?: "...", "base"?: "...", "ordersPath"?: "..."}
+// السر TAKRAR_CONFIG_JSON: {"token": "...", "appId": "<Merchant ID>", "base"?: "...", "ordersPath"?: "..."}
+// التوكن من panel.techrar.com ← API Tokens بصلاحية get_merchant_orders (قراءة بس)
 // أوضاع التشغيل (TAKRAR_EXPLORE):
 //   docs  → يطبع فهرس وثائق تكرار العامة (docs.techrar.com) عن الطلبات والاشتراكات — وثائق عامة، ما فيها بياناتنا
 //   probe → يجرب مسار (TAKRAR_PATH) بالتوكن ويطبع الحالة وأسماء الحقول بس (بدون أي قيم)
-//   (فاضي) → السحب العادي (يتركّب بعد ما نعرف شكل الرد)
+//   (فاضي) → السحب العادي: طلبات آخر أيام (BACKFILL_DAYS، الافتراضي ٣) → الموقع كفرع «تكرار» (جدول طرق الدفع)
 // المستودع عام: ما ينطبع أي رقم مبيعات ولا بيانات عملاء ولا التوكن.
 const raw = (process.env.TAKRAR_CONFIG || "").trim();
 let cfg = {};
@@ -59,8 +60,96 @@ async function probe() {
   }
 }
 
+const SUPA_URL = "https://sadtinfdwucwrxlmwxov.supabase.co";
+const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhZHRpbmZkd3Vjd3J4bG13eG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NTM4MDgsImV4cCI6MjEwNTEyOTgwOH0.jMtjOIBQIuv0N0Q4ms9LJ5ys3h3lfakND4pVQXNbU2w";
+const BRANCH = "تكرار";
+// حسب التوثيق: /public-api/v1/orders/ (وبعض الصفحات بتقول inventory/v1) — أول واحد يرد 200 هو المعتمد
+const ORDER_PATHS = cfg.ordersPath ? [cfg.ordersPath] : ["/public-api/v1/orders/", "/inventory/v1/orders/"];
+
+async function oidcToken() {
+  const url = process.env.ACTIONS_ID_TOKEN_REQUEST_URL, bearer = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN;
+  if (!url || !bearer) throw new Error("ما في هوية GitHub (OIDC)");
+  const res = await fetch(url + "&audience=prohouse-ingest", { headers: { Authorization: "bearer " + bearer } });
+  if (!res.ok) throw new Error("GitHub OIDC [" + res.status + "]");
+  return (await res.json()).value;
+}
+
+async function sendDay(date, rows) {
+  const res = await fetch(SUPA_URL + "/functions/v1/tabsense-ingest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: ANON, Authorization: "Bearer " + ANON, "x-github-oidc": await oidcToken() },
+    body: JSON.stringify({ rpc: "import_payments", date, branch: BRANCH, rows })
+  });
+  if (!res.ok) throw new Error("إرسال يوم فشل [" + res.status + "]");
+}
+
+// تاريخ اليوم بتوقيت الرياض (+03:00)
+const riyadh = (ms) => new Date(ms + 3 * 3600000).toISOString().slice(0, 10);
+
+async function getJson(url) {
+  const headers = { Authorization: "Bearer " + TOKEN, Accept: "application/json", "app-id": String(cfg.appId) };
+  const res = await fetch(url, { headers });
+  const body = await res.text();
+  let j = null; try { j = JSON.parse(body); } catch (e) {}
+  return { status: res.status, j };
+}
+
+// كل الطلبات بين تاريخين (الرد قائمة، أو صفحات {results, next})
+async function fetchOrders(from, to) {
+  for (const p of ORDER_PATHS) {
+    let url = BASE + p + "?from_date=" + from + "&to_date=" + to + "&page_size=10000";
+    const out = [];
+    let first = true;
+    while (url) {
+      const { status, j } = await getJson(url);
+      if (status !== 200 || !j) {
+        if (first) { console.log("TAKRAR_PATH", p, status); break; }
+        throw new Error("صفحة طلبات فشلت [" + status + "]");
+      }
+      first = false;
+      if (Array.isArray(j)) { out.push(...j); url = null; }
+      else { out.push(...(j.results || [])); url = j.next || null; }
+    }
+    if (!first) return out;
+  }
+  throw new Error("ولا مسار طلبات اشتغل — تأكد من التوكن والصلاحية get_merchant_orders وال appId");
+}
+
+const CH = { tamara: "اشتراكات تكرار — تمارا", tabby: "اشتراكات تكرار — تابي" };
+function channelOf(o) {
+  const p = String(o.payment_provider || o.payment_method || (o.payment && (o.payment.provider || o.payment.method)) || "").toLowerCase();
+  for (const k of Object.keys(CH)) if (p.includes(k)) return CH[k];
+  return "اشتراكات تكرار — بطاقة";
+}
+
+async function sync() {
+  if (!TOKEN || !cfg.appId) throw new Error("السر ناقص: لازم token و appId");
+  const n = Math.min(Math.max(parseInt(process.env.BACKFILL_DAYS || "3", 10) || 3, 1), 120);
+  const now = Date.now();
+  const to = riyadh(now), from = riyadh(now - (n - 1) * 86400000);
+  const orders = await fetchOrders(from, to);
+  const days = {};
+  for (let i = 0; i < n; i++) days[riyadh(now - i * 86400000)] = {};
+  for (const o of orders) {
+    const amt = Number(o.total_amount) || 0;
+    if (amt <= 0 || o.is_paid === false) continue;
+    const d = String(o.created_at || "").slice(0, 10); // الوقت بتوقيت الرياض (+03:00) بالرد
+    if (!days[d]) continue;
+    const c = channelOf(o);
+    const r = days[d][c] || (days[d][c] = { channel: c, transactions: 0, amount: 0 });
+    r.transactions++; r.amount += amt;
+  }
+  let sent = 0;
+  for (const [d, chs] of Object.entries(days)) {
+    await sendDay(d, Object.values(chs).map(r => ({ ...r, amount: Math.round(r.amount * 100) / 100 })));
+    sent++;
+  }
+  // المستودع عام: بس عدد الأيام، بلا أرقام مبيعات
+  console.log("TAKRAR_OK days_sent=" + sent);
+}
+
 (async () => {
   if (MODE === "docs") return docs();
   if (MODE === "probe") return probe();
-  console.log("Takrar API sync: endpoints not configured yet — run with explore=docs / probe first");
+  return sync();
 })().catch(e => { console.error("ERROR:", e.message); process.exit(1); });
