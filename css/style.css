@@ -3280,8 +3280,8 @@ html[dir="ltr"] .sidebar-nav .tab-btn { white-space: normal; }
 .chef-page { background: #fff; border: 1px solid var(--line, #e5e2d8); border-radius: 12px; margin-bottom: 16px; padding: 8px 8px 10px; }
 .chef-logo { display: block; height: 34px; width: auto; margin: 0 auto 6px; }
 .chef-sheet-frame { overflow: hidden; background: #fff; }
-.chef-sheet { direction: rtl; background: #fff; color: #000; transform-origin: top right; }
-html[dir="ltr"] .chef-sheet { transform-origin: top left; }
+.chef-sheet, .salad-sheet { direction: rtl; background: #fff; color: #000; transform-origin: top right; }
+html[dir="ltr"] .chef-sheet, html[dir="ltr"] .salad-sheet { transform-origin: top left; }
 .chef-sheet table { border-collapse: collapse; table-layout: fixed; font-size: 35px; font-weight: 400; }
 .chef-sheet td { text-align: center; vertical-align: middle; padding: 0 8px; overflow: hidden; line-height: 1.15; white-space: nowrap; }
 .chef-sheet .chef-title td { font-size: 63px; border: 0 !important; white-space: nowrap; }

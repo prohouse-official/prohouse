@@ -17,7 +17,7 @@ const ALLOWED_WORKFLOWS = new Set([
 ]);
 // ملفات تقارير عبداللطيف جميل اليومية (نفس ملفات تابسنس) → مخزن خاص alj-reports
 const ALJ_FILE = /^\d{4}-\d{2}\/\d{4}-\d{2}-\d{2}\/(Summary \d{1,2} [a-z]{3}\.pdf|Orders \(\d{1,2} [a-z]{3}\)\.xlsx)$/;
-const ALLOWED = new Set(["import_sales", "import_product_sales", "import_modifier_sales", "import_payments", "import_juice_sales"]);
+const ALLOWED = new Set(["import_sales", "import_product_sales", "import_modifier_sales", "import_payments", "import_juice_sales", "import_takrar_boq"]);
 
 const JWKS = createRemoteJWKSet(new URL(`${ISSUER}/.well-known/jwks`));
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

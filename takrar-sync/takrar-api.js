@@ -132,6 +132,32 @@ function channelOf(o) {
   return "اشتراكات تكرار — بطاقة";
 }
 
+// كميات التصنيع (تقرير BoQ) لليوم وبكرا وبعده → جدول takrar_boq (عمود «اشتراكات» بطلبية الغد للشيف)
+async function syncBoq() {
+  const now = Date.now();
+  for (let i = 0; i < 3; i++) {
+    const day = riyadh(now + i * 86400000);
+    const res = await fetch(BASE + "/public-api/v1/operations/boq-report/", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + TOKEN, Accept: "application/json", "Content-Type": "application/json", "app-id": String(cfg.appId) },
+      body: JSON.stringify({ status: "confirmed", from_date: day, to_date: day, grouped_by_size: true, group_by_plan: false, group_by_description: false, group_by_reference: false, cities_ids: [], corporates_ids: [], delivery_window_id: null })
+    });
+    if (res.status !== 200) { console.log("TAKRAR_BOQ", res.status); continue; }
+    const list = await res.json();
+    const rows = (Array.isArray(list) ? list : list.results || []).map(r => ({
+      name: r.name_ar || r.name_en, category: r.category_name_ar || "", size: r.size_title || "", qty: Number(r.quantity) || 0,
+      variants: (r.variants || []).map(v => ({ name: v.variant_combo_name_ar || v.variant_combo_name_en, qty: Number(v.quantity) || 0 }))
+    }));
+    const up = await fetch(SUPA_URL + "/functions/v1/tabsense-ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: ANON, Authorization: "Bearer " + ANON, "x-github-oidc": await oidcToken() },
+      body: JSON.stringify({ rpc: "import_takrar_boq", date: day, branch: BRANCH, rows })
+    });
+    if (!up.ok) throw new Error("إرسال الكميات فشل [" + up.status + "]");
+  }
+  console.log("TAKRAR_BOQ_OK days=3");
+}
+
 async function sync() {
   if (!TOKEN) throw new Error("السر ناقص: لازم token");
   const n = Math.min(Math.max(parseInt(process.env.BACKFILL_DAYS || "3", 10) || 3, 1), 120);
@@ -156,6 +182,7 @@ async function sync() {
   }
   // المستودع عام: بس عدد الأيام، بلا أرقام مبيعات
   console.log("TAKRAR_OK days_sent=" + sent);
+  await syncBoq();
 }
 
 (async () => {

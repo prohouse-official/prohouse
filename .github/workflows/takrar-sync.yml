@@ -6,6 +6,8 @@ name: Takrar Daily Sync
 on:
   schedule:
     - cron: '20 20 * * *'
+    # كميات الاشتراكات (BoQ) تتحدّث كمان العصر قبل ما يطبع الشيف طلبية الغد
+    - cron: '0 13 * * *'
   workflow_dispatch:
     inputs:
       backfill_days:
