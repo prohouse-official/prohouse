@@ -605,7 +605,9 @@ async function loadTomorrowOrder(dateStr) {
   // الأصناف المشالة (✕) محفوظة بالسيرفر — اللي رجع له طلب بعدين يضل ظاهر
   const removed = await Sync.get("getTomorrowRemoved", { date: dateStr, branch: currentTomorrowBranch }, "tomremoved:" + dateStr + ":" + currentTomorrowBranch).catch(() => null);
   if (seq !== tomorrowLoadSeq) return;
-  currentTomorrowRemovedIds = new Set((Array.isArray(removed) ? removed : []).filter(id => !currentTomorrowOrder[id]));
+  // صنف مشال وصفّه بدون كمية (انشال من المنيو) يضل مخفي
+  const hasQty = (id) => currentTomorrowOrder[id] && currentTomorrowOrder[id].qty !== "" && currentTomorrowOrder[id].qty != null;
+  currentTomorrowRemovedIds = new Set((Array.isArray(removed) ? removed : []).filter(id => !hasQty(id)));
 
   // استلام ومتبقي اليوم اللي قبل الطلبية (مو دايماً "اليوم" — لو فتحت طلبية بعد بكرة أو يوم قديم)
   const today = addDaysStr(dateStr, -1);
