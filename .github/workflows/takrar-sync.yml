@@ -1,13 +1,17 @@
 name: Takrar Daily Sync
 
 # مبيعات اشتراكات تكرار → الموقع (فرع «تكرار»). كل يوم الساعة ١١:٢٠ مساءً بتوقيت الرياض.
-# الإعدادات بسر TAKRAR_CONFIG_JSON: توكن API (قراءة بس) — الدخول بالمتصفح انلغى لأنه صار OTP.
+# الإعدادات بسر TAKRAR_CONFIG_JSON: {"token", "appId"} — توكن API (قراءة بس، get_merchant_orders).
 # المستودع عام: السجل ما فيه أرقام مبيعات ولا بيانات عملاء.
 on:
   schedule:
     - cron: '20 20 * * *'
   workflow_dispatch:
     inputs:
+      backfill_days:
+        description: "Pull this many past days (default 3, max 120)"
+        required: false
+        default: ""
       explore:
         description: "docs = print Takrar public API docs index; probe = try TAKRAR paths (status + field names only)"
         required: false
@@ -36,4 +40,5 @@ jobs:
           TAKRAR_CONFIG: ${{ secrets.TAKRAR_CONFIG_JSON }}
           TAKRAR_EXPLORE: ${{ github.event.inputs.explore }}
           TAKRAR_PATH: ${{ github.event.inputs.path }}
+          BACKFILL_DAYS: ${{ github.event.inputs.backfill_days }}
         run: node takrar-api.js
