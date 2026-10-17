@@ -1006,6 +1006,22 @@ const SupaEngine = (() => {
 
 
   // --- إغلاق العهدة ---
+  // تجهيز السلطات: قائمة يومية لكل فرع
+  async function getSaladCheck(date, branch) {
+    const rows = await query(`salad_checks?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
+    return (rows && rows[0]) || null;
+  }
+  async function getSaladChecks(date) {
+    return (await query(`salad_checks?select=*&date=eq.${date}`)) || [];
+  }
+  async function saveSaladCheck(row) {
+    await query("salad_checks?on_conflict=date,branch", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(row)
+    });
+  }
+
   async function getCustody(date, branch) {
     const rows = await query(`custody_closings?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`);
     return (rows && rows[0]) || null;
@@ -1128,6 +1144,9 @@ const SupaEngine = (() => {
 
 
   return {
+    getSaladCheck,
+    getSaladChecks,
+    saveSaladCheck,
     rpc,
     login,
     changePin,

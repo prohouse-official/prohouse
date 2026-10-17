@@ -44,12 +44,13 @@ async function runDailyReport() {
 }
 
 async function loadDailyBranch(date, branch) {
-  const [day, sales, waste, custody, pays] = await Promise.all([
+  const [day, sales, waste, custody, pays, salad] = await Promise.all([
     SupaEngine.getDay(date, branch).catch(() => null),
     SupaEngine.getSalesByCategory(date, date, branch).catch(() => []),
     SupaEngine.getWasteReport(date, branch).catch(() => null),
     SupaEngine.getCustody(date, branch).catch(() => null),
-    SupaEngine.getPayments(date, branch).catch(() => [])
+    SupaEngine.getPayments(date, branch).catch(() => []),
+    SupaEngine.getSaladCheck(date, branch).catch(() => null)
   ]);
   const salesMap = {};
   (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
@@ -86,7 +87,7 @@ async function loadDailyBranch(date, branch) {
     hasRemaining: items.some(x => x.remaining != null || x.remainingWeight != null || x.remainingSauce != null),
     hasSales: (sales || []).length > 0,
     hasWaste: wasteItems.length > 0,
-    custody, pays: pays || []
+    custody, pays: pays || [], salad
   };
 }
 
@@ -160,6 +161,19 @@ function drGapHtml(s) {
   return `<span class="dr-gap ${cls}">${s.gap > 0 ? "عجز" : "مباع أكثر"}<b>${drNum(Math.abs(s.gap))}</b>${g}</span>`;
 }
 
+// سطر تجهيز السلطات: كم جاهز من كم، الناقص، مين جهّز، وتأكيد استلام الفرع
+function saladDailyLine(c) {
+  if (typeof SALAD_BRANCH_KEY === "undefined" || !SALAD_BRANCH_KEY[c.branch]) return "";
+  const s = c.salad;
+  const sum = saladSummary(s, c.branch);
+  if (!s || !sum.started) return `<div class="dr-cash no">🥗 السلطات: القائمة ما انعبّت لهاليوم</div>`;
+  const miss = sum.miss.length ? ` · ناقص: ${sum.miss.map(escHtml).join("، ")}` : "";
+  const recv = SALAD_NO_DISPATCH.includes(c.branch) ? "" : s.received_status
+    ? ` · الفرع: ${s.received_status === "ok" ? "✅ وصل كامل" : "❌ وصل في نقص" + (s.received_note ? " (" + escHtml(s.received_note) + ")" : "")}`
+    : " · الفرع لسا ما أكّد الاستلام";
+  return `<div class="dr-cash${sum.miss.length ? " no" : ""}">🥗 السلطات: ${sum.ok} من ${sum.total} جاهز${miss}<span class="dr-cash-sub">${escHtml(s.chef_name || "")}${recv}</span></div>`;
+}
+
 function dailyBranchHtml(c, date) {
   const chip = (ok, label) => `<span class="dr-check ${ok ? "ok" : "no"}">${ok ? "✅" : "⚠️"} ${label}</span>`;
   const closed = !!(c.custody && c.custody.closed_at);
@@ -194,5 +208,6 @@ function dailyBranchHtml(c, date) {
     </table></div>
     <div class="dr-note">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم) · الفرق = المستلم − المتبقي − الهدر − المباع · «مباع أكثر» يعني غالباً إن الاستلام ما انسجل كامل · 🟢 ≤5% 🟡 ≤10% 🔴 أكثر</div>`}
     ${cash}
+    ${saladDailyLine(c)}
   </section>`;
 }
