@@ -1014,6 +1014,11 @@ const SupaEngine = (() => {
   async function getSaladChecks(date) {
     return (await query(`salad_checks?select=*&date=eq.${date}`)) || [];
   }
+  // كميات اشتراكات تكرار لليوم (تقرير BoQ) — قراءة بس
+  async function getTakrarBoq(date) {
+    const r = (await query(`takrar_boq?select=items&date=eq.${date}`)) || [];
+    return (r[0] && r[0].items) || [];
+  }
   async function saveSaladCheck(row) {
     await query("salad_checks?on_conflict=date,branch", {
       method: "POST",
@@ -1146,6 +1151,7 @@ const SupaEngine = (() => {
   return {
     getSaladCheck,
     getSaladChecks,
+    getTakrarBoq,
     saveSaladCheck,
     rpc,
     login,

@@ -783,6 +783,27 @@ async function runTomorrowReport() {
     lastTomorrowReportSheets = combined.rows.length ? [combined] : [];
   }
 
+  // اشتراكات تكرار (تقرير BoQ): عمود «اشتراكات» بالورقة المجمعة، أو ورقة فرع لحالها لو أوراق فروع
+  let boq = [];
+  if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(date); } catch (e) { /* بدونها */ } }
+  if (run !== tomorrowReportRun) return;
+  if (boq.length) {
+    const fmt = (q) => String(Number(q) || 0);
+    const subRows = boq.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), "ar") || String(a.size).localeCompare(String(b.size)))
+      .map(r => ({
+        category: "اشتراكات",
+        name: r.name + ((r.variants || []).length ? " (" + r.variants.map(v => `${v.name} ×${fmt(v.qty)}`).join("، ") + ")" : ""),
+        size: r.size || "—", qty: fmt(r.qty), total: fmt(r.qty), rec: "", rem: "", notes: "", rank: 9999, sort: 9999
+      }));
+    // تطلع كأنها فرع (كميات تصنيع) — التوزيع بعدين على الموظف المسؤول
+    const comb = lastTomorrowReportSheets.find(s => s.combined);
+    if (comb) {
+      comb.branches = comb.branches.concat("اشتراكات");
+      comb.rows = comb.rows.map(r => ({ ...r, byBranch: r.byBranch.concat("") }))
+        .concat(subRows.map(r => ({ ...r, byBranch: comb.branches.map((b, i) => i === comb.branches.length - 1 ? r.qty : "") })));
+    } else lastTomorrowReportSheets.push({ branch: "اشتراكات", rows: subRows });
+  }
+
   // صفحة السلطات (لحالها بنفس الملف): فروع الطلبية + اللي محفوظ لهاليوم
   lastSaladBranches = branches.filter(b => typeof SALAD_BRANCH_KEY !== "undefined" && SALAD_BRANCH_KEY[b]);
   lastSaladChecks = {};
