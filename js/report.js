@@ -845,7 +845,7 @@ const CHEF_COMBINED_ALIASES = { "رز بخاري": "رز الشيف", "سمك ف
 const chefNormName = (n) => String(n || "").replace(/\s*\(.*\)\s*$/, "").replace(/[ة]$/, "ه").replace(/\s+/g, " ").trim();
 
 // اسم الطبق بدون «مع رز أبيض…» وبدون فروق الهمزة — لمطابقة أصناف تكرار مع أصناف الفروع
-const chefLooseName = (n) => chefNormName(n).replace(/[أإآ]/g, "ا").replace(/\s+مع\s+.*$/, "").trim();
+const chefLooseName = (n) => chefNormName(n).replace(/\s+مع\s+.*$/, "").replace(/ة/g, "ه").replace(/[أإآ]/g, "ا").trim();
 const SUB_BRANCH = "اشتراكات";  // عمودها بالورقة المجمعة = كميات اشتراكات اليوم اللي بعده
 
 function chefCombinedSheet(branches, perBranch, order, boq = []) {
@@ -887,7 +887,14 @@ function chefCombinedSheet(branches, perBranch, order, boq = []) {
   // والرز الأبيض (الكارب C) ينضاف لسطر «رز أبيض». الطبق اللي مو موجود عند الفروع سطر جديد بالعدد.
   if (boq.length) {
     branches = branches.concat(SUB_BRANCH);
-    const byLoose = new Map([...rows.entries()].filter(([k]) => k.startsWith("n:")).map(([k, r]) => [chefLooseName(r.name), k]));
+    // أصناف الفروع: بالاسم، وكمان باسم الفئة قدّامه (فرع: «بخاري مع الكشنة» = تكرار: «دجاج بخاري»، «مندي» = «دجاج مندي»)
+    const byLoose = new Map();
+    [...rows.entries()].filter(([k]) => k.startsWith("n:")).forEach(([k, r]) => {
+      const l = chefLooseName(r.name);
+      if (!byLoose.has(l)) byLoose.set(l, k);
+      const pre = { "دجاج": "دجاج", "لحم": "لحم" }[r.category];
+      if (pre && !l.startsWith(pre + " ") && !byLoose.has(pre + " " + l)) byLoose.set(pre + " " + l, k);
+    });
     const meals = new Map(); // key → عدد الوجبات
     const add = (key, init, part, count) => {
       if (!rows.has(key)) rows.set(key, { ...init, sizes: new Set(), parts: {}, notes: [] });
