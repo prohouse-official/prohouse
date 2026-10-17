@@ -1,5 +1,5 @@
 // تكرار (techrar) عن طريق API token (قراءة بس) — بدل الدخول بالمتصفح (الدخول صار OTP).
-// السر TAKRAR_CONFIG_JSON: {"token": "...", "appId": "<Merchant ID>", "base"?: "...", "ordersPath"?: "..."}
+// السر TAKRAR_CONFIG_JSON: التوكن لحاله، أو {"token": "...", "appId"?: "<Merchant ID>", "base"?: "...", "ordersPath"?: "..."}
 // التوكن من panel.techrar.com ← API Tokens بصلاحية get_merchant_orders (قراءة بس)
 // أوضاع التشغيل (TAKRAR_EXPLORE):
 //   docs  → يطبع فهرس وثائق تكرار العامة (docs.techrar.com) عن الطلبات والاشتراكات — وثائق عامة، ما فيها بياناتنا
@@ -87,7 +87,8 @@ async function sendDay(date, rows) {
 const riyadh = (ms) => new Date(ms + 3 * 3600000).toISOString().slice(0, 10);
 
 async function getJson(url) {
-  const headers = { Authorization: "Bearer " + TOKEN, Accept: "application/json", "app-id": String(cfg.appId) };
+  const headers = { Authorization: "Bearer " + TOKEN, Accept: "application/json" };
+  if (cfg.appId) headers["app-id"] = String(cfg.appId); // رقم التاجر — اختياري، التوكن نفسه مربوط بالمتجر
   const res = await fetch(url, { headers });
   const body = await res.text();
   let j = null; try { j = JSON.parse(body); } catch (e) {}
@@ -123,7 +124,7 @@ function channelOf(o) {
 }
 
 async function sync() {
-  if (!TOKEN || !cfg.appId) throw new Error("السر ناقص: لازم token و appId");
+  if (!TOKEN) throw new Error("السر ناقص: لازم token");
   const n = Math.min(Math.max(parseInt(process.env.BACKFILL_DAYS || "3", 10) || 3, 1), 120);
   const now = Date.now();
   const to = riyadh(now), from = riyadh(now - (n - 1) * 86400000);

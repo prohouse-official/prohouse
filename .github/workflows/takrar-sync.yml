@@ -1,7 +1,7 @@
 name: Takrar Daily Sync
 
 # مبيعات اشتراكات تكرار → الموقع (فرع «تكرار»). كل يوم الساعة ١١:٢٠ مساءً بتوقيت الرياض.
-# الإعدادات بسر TAKRAR_CONFIG_JSON: {"token", "appId"} — توكن API (قراءة بس، get_merchant_orders).
+# الإعدادات بسر TAKRAR_CONFIG_JSON: التوكن لحاله (أو {"token","appId"}) — توكن API قراءة بس (get_merchant_orders).
 # المستودع عام: السجل ما فيه أرقام مبيعات ولا بيانات عملاء.
 on:
   schedule:
