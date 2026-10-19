@@ -198,6 +198,7 @@ function attPrintSheet() {
   ov.className = "att-print-overlay";
   ov.innerHTML = `<div class="att-print-bar">
       <button type="button" class="btn btn-ghost" id="attPrintClose">→ رجوع للتطبيق</button>
+      <button type="button" class="btn btn-ghost" id="attPrintShare">📤 مشاركة</button>
       <button type="button" class="btn" id="attPrintGo">🖨 اطبع</button>
     </div>
     <div class="att-print-page">
@@ -211,4 +212,44 @@ function attPrintSheet() {
   const close = () => { ov.remove(); document.body.classList.remove("att-printing"); };
   document.getElementById("attPrintClose").addEventListener("click", close);
   document.getElementById("attPrintGo").addEventListener("click", () => window.print());
+  document.getElementById("attPrintShare").addEventListener("click", attShareSheet);
+}
+
+// الورقة PDF صفحة وحدة (A4) — بالجوال بتفتح المشاركة (واتساب)، بالكمبيوتر بتنزل
+async function attShareSheet() {
+  const btn = document.getElementById("attPrintShare");
+  const page = document.querySelector("#attPrintOverlay .att-print-page");
+  if (!btn || !page) return;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳ جاري التجهيز…";
+  try {
+    if (typeof loadPdfLibs === "function") await loadPdfLibs();
+    if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
+    // نصوّر الورقة بعرض ثابت عشان تطلع نفس الشكل من أي جهاز
+    const stage = document.createElement("div");
+    stage.style.cssText = "position:fixed;left:-99999px;top:0;width:794px;background:#fff;";
+    stage.innerHTML = `<div class="att-print-page att-print-fixed">${page.innerHTML}</div>`;
+    document.body.appendChild(stage);
+    let canvas;
+    try { canvas = await html2canvas(stage.firstElementChild, { scale: 2, backgroundColor: "#ffffff", logging: false }); }
+    finally { stage.remove(); }
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    const m = 8, maxW = 210 - 2 * m, maxH = 297 - 2 * m;
+    const r = Math.min(maxW / canvas.width, maxH / canvas.height);
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", (210 - canvas.width * r) / 2, m, canvas.width * r, canvas.height * r);
+    const blob = pdf.output("blob");
+    const name = `ورقة_الحضور_${attPlace}.pdf`.replace(/\s+/g, "_");
+    const file = new File([blob], name, { type: "application/pdf" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "ورقة الحضور والانصراف" }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) {
+    showToast("⚠ " + (e.message || e));
+  } finally { btn.disabled = false; btn.textContent = label; }
 }
