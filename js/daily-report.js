@@ -177,6 +177,7 @@ function saladDailyLine(c) {
 
 // سطر الحضور والانصراف: مين حضر ومين انصرف ووقته (الوقت من السيرفر)
 function attendanceDailyLine(c) {
+  if (typeof isAttendanceOffBranch === "function" && isAttendanceOffBranch(c.branch)) return "";
   const rows = c.attendance || [];
   if (!rows.length) return `<div class="dr-cash no">🕘 الحضور والانصراف: ما انسجّل حدا اليوم</div>`;
   const t = (r) => new Date(r.recorded_at).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" });

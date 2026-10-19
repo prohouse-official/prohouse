@@ -384,6 +384,21 @@ function isPhotoOffBranch(branch) {
   return !!branch && raw.split(",").map(s => s.trim()).includes(branch);
 }
 
+// مين المسؤول عن كل مهمة بكل فرع (إعداد task_owners: {"الفرع": {"tab": "الاسم"}})
+function taskOwner(branch, tab) {
+  try {
+    const raw = typeof currentSettings !== "undefined" && currentSettings.task_owners;
+    const map = typeof raw === "string" ? JSON.parse(raw || "{}") : (raw || {});
+    return (map[branch] && map[branch][tab]) || "";
+  } catch (e) { return ""; }
+}
+
+// فروع منشال منها الحضور والانصراف مبدئيًا (إعداد attendance_off_branches)
+function isAttendanceOffBranch(branch) {
+  const raw = (typeof currentSettings !== "undefined" && currentSettings.attendance_off_branches) || "";
+  return !!branch && raw.split(",").map(s => s.trim()).includes(branch);
+}
+
 function isPanOrderBranch(branch) {
   const raw = (typeof currentSettings !== "undefined" && currentSettings.pan_order_branches) || "";
   return !!branch && raw.split(",").map(s => s.trim()).includes(branch);

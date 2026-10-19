@@ -1,5 +1,5 @@
 // ==================== الحضور والانصراف ====================
-// الموظف بيكتب اسمه، بيوقّع على الشاشة، وبيصوّر ورقة الحضور. الوقت من السيرفر (ما بيتغيّر من الجهاز).
+// الموظف بيوقّع على الورقة المطبوعة، وبالموقع بيكتب اسمه ولازم يصوّر الورقة. الوقت من السيرفر (ما بيتغيّر من الجهاز).
 // ورقتين لكل فرع (حضور / انصراف) + المطبخ المركزي، والمالك بيشوف كل الفروع مع بعض.
 
 const ATT_KITCHEN = "المطبخ المركزي";
@@ -11,11 +11,37 @@ let attLoadSeq = 0;
 let attForm = null; // { kind, photo }
 
 function attPlaces() {
-  const all = branchList().concat(ATT_KITCHEN);
+  const all = branchList().concat(ATT_KITCHEN).filter(b => !(typeof isAttendanceOffBranch === "function" && isAttendanceOffBranch(b)));
   if (Auth.canSeeAllBranches()) return all;
   const mine = Auth.branches();
   const list = all.filter(b => mine.includes(b));
   return list.length ? list : all.filter(b => b === Branch.get());
+}
+
+// وقت دوام كل فريق (إعداد shift_times: {"الروضة": "11:45"}) — الفروع اللي مو موجودة بدون وقت
+function attShift(place) {
+  try {
+    const raw = typeof currentSettings !== "undefined" && currentSettings.shift_times;
+    const map = typeof raw === "string" ? JSON.parse(raw || "{}") : (raw || {});
+    return map[place] || "";
+  } catch (e) { return ""; }
+}
+function attShiftLabel(hm) {
+  if (!hm) return "";
+  const [h, m] = hm.split(":").map(Number);
+  if (h === 0 && m === 0) return "12:00 الليل";
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, "0")} ${h < 11 ? "الصبح" : h < 16 ? "الضهر" : "المسا"}`;
+}
+// دقايق التأخير عن بداية الدوام (أقرب دوام قبل/بعد، لأن دوام ١٢ الليل بيلف على اليوم)
+function attLateMin(iso, hm) {
+  if (!iso || !hm) return 0;
+  const d = new Date(iso);
+  const [h, m] = hm.split(":").map(Number);
+  let diff = (d.getHours() * 60 + d.getMinutes()) - (h * 60 + m);
+  if (diff > 720) diff -= 1440;
+  if (diff < -720) diff += 1440;
+  return diff > 0 ? diff : 0;
 }
 
 const attTime = (iso) => (iso ? new Date(iso).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" }) : "—");
@@ -46,10 +72,9 @@ function attSheetHtml(kind, showPlace) {
   const title = kind === "in" ? "📥 ورقة الحضور" : "📤 ورقة الانصراف";
   if (!rows.length) return `<div class="item-card"><div class="att-sheet-title">${title}</div><div class="empty-state">ما في تسجيلات لهاليوم</div></div>`;
   return `<div class="item-card"><div class="att-sheet-title">${title} <small>(${rows.length})</small></div>
-    <table class="att-table"><thead><tr><th>#</th><th>الاسم</th>${showPlace ? "<th>الفرع</th>" : ""}<th>الوقت</th><th>التوقيع</th><th>الورقة</th></tr></thead><tbody>
+    <table class="att-table"><thead><tr><th>#</th><th>الاسم</th>${showPlace ? "<th>الفرع</th>" : ""}<th>الوقت</th><th>الورقة</th></tr></thead><tbody>
     ${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${escHtml(r.employee_name)}</td>${showPlace ? `<td>${escHtml(r.branch)}</td>` : ""}
-      <td><b>${attTime(r.recorded_at)}</b></td>
-      <td>${r.signature_path ? `<img class="att-sig" data-att-path="${escHtml(r.signature_path)}" alt="توقيع">` : "—"}</td>
+      <td><b>${attTime(r.recorded_at)}</b>${kind === "in" && attLateMin(r.recorded_at, attShift(r.branch)) > 5 ? `<div class="att-late">متأخر ${attLateMin(r.recorded_at, attShift(r.branch))} د</div>` : ""}</td>
       <td>${r.photo_path ? `<img class="att-photo" data-att-path="${escHtml(r.photo_path)}" alt="صورة الورقة">` : "—"}</td></tr>`).join("")}
     </tbody></table></div>`;
 }
@@ -67,10 +92,12 @@ function renderAttendanceView(places, canAll) {
           ? `<select id="attPlaceSelect">${opts.map(([v, t]) => `<option value="${escHtml(v)}" ${v === attPlace ? "selected" : ""}>${escHtml(t)}</option>`).join("")}</select>`
           : `<div class="readonly-field">${escHtml(attPlace || "—")}</div>`}</div>
       </div>
+      ${!showPlace && attShift(attPlace) ? `<div class="att-now">⏰ الدوام: ${attShiftLabel(attShift(attPlace))}</div>` : ""}
       ${showPlace ? "" : `<div class="att-actions">
         <button class="btn att-btn att-in" id="attInBtn">🟢 تسجيل حضور</button>
         <button class="btn att-btn att-out" id="attOutBtn">🔴 تسجيل انصراف</button>
-      </div>`}
+      </div>
+      <button class="btn btn-ghost att-small" id="attPrintBtn" type="button">🖨 اطبع ورقة الحضور</button>`}
     </div>
     <div id="attFormBox"></div>
     ${attSheetHtml("in", showPlace)}
@@ -90,6 +117,8 @@ function bindAttendanceView() {
   if (s) s.addEventListener("change", () => { attPlace = s.value; attForm = null; loadAttendanceView(); });
   const inB = document.getElementById("attInBtn"), outB = document.getElementById("attOutBtn");
   if (inB) inB.addEventListener("click", () => { attForm = { kind: "in", photo: null }; renderAttForm(); });
+  const pr = document.getElementById("attPrintBtn");
+  if (pr) pr.addEventListener("click", attPrintSheet);
   if (outB) outB.addEventListener("click", () => { attForm = { kind: "out", photo: null }; renderAttForm(); });
   document.querySelectorAll("#attendanceView img[data-att-path]").forEach(img =>
     img.addEventListener("click", () => { if (img.src) window.open(img.src, "_blank"); }));
@@ -102,26 +131,12 @@ function renderAttForm() {
   box.innerHTML = `<div class="item-card att-form ${isIn ? "att-in-card" : "att-out-card"}">
     <div class="att-sheet-title">${isIn ? "🟢 تسجيل حضور" : "🔴 تسجيل انصراف"} — ${escHtml(attPlace)}</div>
     <div class="field"><label>اسم الموظف</label><input type="text" id="attName" placeholder="اكتب اسمك" autocomplete="off"></div>
-    <div class="field"><label>التوقيع</label>
-      <canvas id="attSig" class="att-sig-pad" width="600" height="200"></canvas>
-      <button class="btn btn-ghost att-small" id="attSigClear" type="button">مسح التوقيع</button></div>
-    <div class="field"><label>صورة الورقة</label>
+    <div class="field"><label>صورة الورقة (إجباري — بعد ما توقّع عليها)</label>
       <label class="btn att-small att-cam">📷 صوّر الورقة<input type="file" id="attPhoto" accept="image/*" capture="environment" hidden></label>
       <img id="attPhotoPreview" class="att-preview hidden" alt=""></div>
-    <div class="att-now">الوقت بينسجّل تلقائي من السيرفر لحظة الحفظ</div>
+    <div class="att-now">الوقت بينسجّل تلقائي لحظة الحفظ</div>
     <div class="att-actions"><button class="btn" id="attSave">💾 حفظ</button><button class="btn btn-ghost" id="attCancel">إلغاء</button></div>
   </div>`;
-  const pad = document.getElementById("attSig");
-  const ctx = pad.getContext("2d");
-  const clear = () => { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, pad.width, pad.height); pad.dataset.signed = ""; };
-  clear();
-  ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.strokeStyle = "#111";
-  let drawing = false;
-  const pos = (e) => { const r = pad.getBoundingClientRect(); return [(e.clientX - r.left) * pad.width / r.width, (e.clientY - r.top) * pad.height / r.height]; };
-  pad.addEventListener("pointerdown", e => { drawing = true; pad.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(...pos(e)); });
-  pad.addEventListener("pointermove", e => { if (!drawing) return; ctx.lineTo(...pos(e)); ctx.stroke(); pad.dataset.signed = "1"; });
-  ["pointerup", "pointercancel", "pointerleave"].forEach(t => pad.addEventListener(t, () => { drawing = false; }));
-  document.getElementById("attSigClear").addEventListener("click", clear);
   document.getElementById("attPhoto").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
@@ -154,18 +169,13 @@ function attCompress(file) {
 async function attSave() {
   const btn = document.getElementById("attSave");
   const name = (document.getElementById("attName").value || "").trim();
-  const pad = document.getElementById("attSig");
   if (!name) { showToast("اكتب اسم الموظف"); return; }
-  if (!pad.dataset.signed) { showToast("لازم توقّع"); return; }
-  if (!attForm.photo) { showToast("صوّر الورقة"); return; }
+  if (!attForm.photo) { showToast("لازم تصوّر الورقة عشان ينسجّل حضورك"); return; }
   btn.disabled = true; btn.textContent = "جاري الحفظ…";
   try {
-    const [sig, photo] = await Promise.all([
-      SupaEngine.uploadReceipt(attDate, attPlace, pad.toDataURL("image/png")),
-      SupaEngine.uploadReceipt(attDate, attPlace, attForm.photo)
-    ]);
+    const photo = await SupaEngine.uploadReceipt(attDate, attPlace, attForm.photo);
     const emp = Auth.getEmployee() || {};
-    const row = await SupaEngine.addAttendance({ date: attDate, branch: attPlace, kind: attForm.kind, employee_name: name, signature_path: sig, photo_path: photo, recorded_by: emp.name || "" });
+    const row = await SupaEngine.addAttendance({ date: attDate, branch: attPlace, kind: attForm.kind, employee_name: name, signature_path: null, photo_path: photo, recorded_by: emp.name || "" });
     showToast(`${attForm.kind === "in" ? "✅ انسجّل الحضور" : "✅ انسجّل الانصراف"} — ${row && row.recorded_at ? attTime(row.recorded_at) : ""}`);
     attForm = null;
     loadAttendanceView();
@@ -173,4 +183,24 @@ async function attSave() {
     showToast("⚠ ما انحفظ: " + (e.message || e));
     btn.disabled = false; btn.textContent = "💾 حفظ";
   }
+}
+
+// ورقة للطباعة: حضور وانصراف، كل سطر اسم وتوقيع (الوقت من صورة الموقع)
+function attPrintSheet() {
+  const shift = attShiftLabel(attShift(attPlace));
+  const rows = (n) => Array.from({ length: n }, (_, i) => `<tr><td>${i + 1}</td><td></td><td></td></tr>`).join("");
+  const table = (t) => `<h2>${t}</h2><table><thead><tr><th style="width:8%">#</th><th style="width:52%">الاسم</th><th>التوقيع</th></tr></thead><tbody>${rows(12)}</tbody></table>`;
+  const w = window.open("", "_blank");
+  if (!w) { showToast("اسمح بالنوافذ المنبثقة للطباعة"); return; }
+  w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>ورقة الحضور — ${escHtml(attPlace)}</title>
+    <style>body{font-family:Tahoma,Arial,sans-serif;margin:14mm;color:#000}h1{margin:0;font-size:22px}h2{font-size:17px;margin:14px 0 6px}
+    .meta{display:flex;justify-content:space-between;font-size:14px;margin-top:6px;border-bottom:2px solid #000;padding-bottom:6px}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;height:30px;padding:2px 6px;font-size:14px;text-align:center}
+    th{background:#eee}@page{size:A4;margin:0}</style></head><body>
+    <h1>Pro House — ورقة الحضور والانصراف</h1>
+    <div class="meta"><span>الفرع: <b>${escHtml(attPlace)}</b></span><span>التاريخ: ____ / ____ / ________</span>${shift ? `<span>الدوام: <b>${shift}</b></span>` : ""}</div>
+    ${table("📥 الحضور")}${table("📤 الانصراف")}
+    <p style="font-size:12px;margin-top:8px">بعد التوقيع صوّر الورقة من الموقع (الحضور والانصراف) — ما بينسجّل الحضور بدون صورة.</p>
+    <script>window.onload=()=>{window.print()}<\/script></body></html>`);
+  w.document.close();
 }
