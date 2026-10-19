@@ -44,13 +44,14 @@ async function runDailyReport() {
 }
 
 async function loadDailyBranch(date, branch) {
-  const [day, sales, waste, custody, pays, salad] = await Promise.all([
+  const [day, sales, waste, custody, pays, salad, attendance] = await Promise.all([
     SupaEngine.getDay(date, branch).catch(() => null),
     SupaEngine.getSalesByCategory(date, date, branch).catch(() => []),
     SupaEngine.getWasteReport(date, branch).catch(() => null),
     SupaEngine.getCustody(date, branch).catch(() => null),
     SupaEngine.getPayments(date, branch).catch(() => []),
-    SupaEngine.getSaladCheck(date, branch).catch(() => null)
+    SupaEngine.getSaladCheck(date, branch).catch(() => null),
+    SupaEngine.getAttendance(date, branch).catch(() => [])
   ]);
   const salesMap = {};
   (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
@@ -87,7 +88,7 @@ async function loadDailyBranch(date, branch) {
     hasRemaining: items.some(x => x.remaining != null || x.remainingWeight != null || x.remainingSauce != null),
     hasSales: (sales || []).length > 0,
     hasWaste: wasteItems.length > 0,
-    custody, pays: pays || [], salad
+    custody, pays: pays || [], salad, attendance: attendance || []
   };
 }
 
@@ -174,6 +175,16 @@ function saladDailyLine(c) {
   return `<div class="dr-cash${sum.miss.length ? " no" : ""}">🥗 السلطات: ${sum.ok} من ${sum.total} جاهز${miss}<span class="dr-cash-sub">${escHtml(s.chef_name || "")}${recv}</span></div>`;
 }
 
+// سطر الحضور والانصراف: مين حضر ومين انصرف ووقته (الوقت من السيرفر)
+function attendanceDailyLine(c) {
+  const rows = c.attendance || [];
+  if (!rows.length) return `<div class="dr-cash no">🕘 الحضور والانصراف: ما انسجّل حدا اليوم</div>`;
+  const t = (r) => new Date(r.recorded_at).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" });
+  const ins = rows.filter(r => r.kind === "in"), outs = rows.filter(r => r.kind === "out");
+  const list = (arr) => arr.map(r => `${escHtml(r.employee_name)} ${t(r)}`).join("، ") || "—";
+  return `<div class="dr-cash${outs.length < ins.length ? " no" : ""}">🕘 الحضور: ${ins.length} · الانصراف: ${outs.length}<span class="dr-cash-sub">حضور: ${list(ins)}<br>انصراف: ${list(outs)}</span></div>`;
+}
+
 function dailyBranchHtml(c, date) {
   const chip = (ok, label) => `<span class="dr-check ${ok ? "ok" : "no"}">${ok ? "✅" : "⚠️"} ${label}</span>`;
   const closed = !!(c.custody && c.custody.closed_at);
@@ -209,5 +220,6 @@ function dailyBranchHtml(c, date) {
     <div class="dr-note">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم) · الفرق = المستلم − المتبقي − الهدر − المباع · «مباع أكثر» يعني غالباً إن الاستلام ما انسجل كامل · 🟢 ≤5% 🟡 ≤10% 🔴 أكثر</div>`}
     ${cash}
     ${saladDailyLine(c)}
+    ${attendanceDailyLine(c)}
   </section>`;
 }

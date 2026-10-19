@@ -161,6 +161,12 @@ async function loadBranchStatus(branch, dash) {
     } catch (e) { photoRound = null; }
   }
   const custody = typeof Custody !== "undefined" ? await Custody.statusFor(today, branch) : null;
+  // الحضور والانصراف: كم حضور وكم انصراف انسجّل اليوم
+  let attIn = 0, attOut = 0;
+  try {
+    const att = (SupaEngine.getAttendance && await SupaEngine.getAttendance(today, branch)) || [];
+    attIn = att.filter(r => r.kind === "in").length; attOut = att.filter(r => r.kind === "out").length;
+  } catch (e) { /* بدونها */ }
 
   return {
     branch, total, confirmed, touched, status,
@@ -172,7 +178,7 @@ async function loadBranchStatus(branch, dash) {
     mealsToday: mealsFromDayItems(items),
     mealsYesterday: mealsFromDayItems((yesterdayData && yesterdayData.items) || []),
     tomorrowSaved: !!(tomorrowOrder && tomorrowOrder.length),
-    juicesTotal, juicesCounted,
+    juicesTotal, juicesCounted, attIn, attOut,
     checklistComplete, checklistPercent
   };
 }
@@ -186,6 +192,11 @@ function dayStepsFor(s) {
   const fraction = (done, total) => (total > 0 ? `${done}/${total}` : "—");
   const state = (done, total) => (total > 0 && done >= total ? "done" : done > 0 ? "partial" : "todo");
 
+  if (tabAllowed("attendance")) {
+    steps.push({ tab: "attendance", icon: "🕘", title: "الحضور والانصراف",
+      state: s.attIn > 0 && s.attOut >= s.attIn ? "done" : s.attIn > 0 ? "partial" : "todo",
+      note: s.attIn > 0 ? `${s.attIn} حضور · ${s.attOut} انصراف` : "باقي" });
+  }
   steps.push({ tab: "receiving", icon: "📦", title: "استلام الصبح", state: state(s.touched, s.total), note: fraction(s.touched, s.total) });
   if (tabAllowed("opening") && !(typeof isPhotoOffBranch === "function" && isPhotoOffBranch(s.branch))) {
     const r = s.photoRound;
@@ -197,6 +208,10 @@ function dayStepsFor(s) {
     }
   }
   steps.push({ tab: "remaining", icon: "📊", title: "جرد المتبقي", state: state(s.remainingCounted, s.remainingTotal), note: fraction(s.remainingCounted, s.remainingTotal) });
+  // جرد الثلاجة (بروتين بار ومشروبات) — عبداللطيف جميل
+  if (s.branch === "عبداللطيف جميل" && tabAllowed("juices") && s.juicesTotal > 0) {
+    steps.push({ tab: "juices", icon: "🧊", title: "جرد الثلاجة", state: state(s.juicesCounted, s.juicesTotal), note: fraction(s.juicesCounted, s.juicesTotal) });
+  }
   if (tabAllowed("tomorrow")) {
     steps.push({ tab: "tomorrow", icon: "📝", title: "طلبية الغد", state: s.tomorrowSaved ? "done" : "todo", note: s.tomorrowSaved ? "تم" : "باقي" });
   }
