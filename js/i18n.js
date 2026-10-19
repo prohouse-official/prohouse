@@ -31,7 +31,7 @@ if (PhLang !== "ar") {
   document.documentElement.lang = PhLang;
   document.documentElement.dir = "ltr";
   // القاموس بينحمّل بس لما تكون اللغة مش عربي
-  document.write('<script src="js/i18n-dict.js?v=6.4.12"><\/script>');
+  document.write('<script src="js/i18n-dict.js?v=6.4.13"><\/script>');
   if (PhLang === "bn") document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap">');
 }
 
@@ -42,6 +42,7 @@ if (PhLang !== "ar") {
   const idx = PhLang === "en" ? 0 : 1;
   let exact = null, phraseRe = null, phraseMap = null;
 
+  const PH_I18N_EXACT_ONLY = new Set(["في", "من", "ص", "م", "لا", "عام", "عرض", "الكل", "أحد", "تمام", "نعم", "تم", "الوقت", "الاسم", "الورقة", "الملخص", "المنتج", "المطلوب"]);
   function norm(s) { return s.replace(/\s+/g, " ").trim(); }
   function build() {
     if (exact || typeof PH_I18N_DICT === "undefined") return !!exact;
@@ -51,6 +52,8 @@ if (PhLang !== "ar") {
       const k = norm(ar), v = tr[idx];
       if (!v) continue;
       exact.set(k, v);
+      // كلمات صغيرة (في، من، لا…) معناها بيتغيّر حسب الجملة — بتنترجم بس لما تكون النص كله
+      if (PH_I18N_EXACT_ONLY.has(k)) continue;
       phraseMap.set(k, v);
       keys.push(k);
     }
@@ -64,6 +67,9 @@ if (PhLang !== "ar") {
   function tr(text) {
     if (!text || !AR.test(text) || !build()) return text;
     const lead = text.match(/^\s*/)[0], trail = text.match(/\s*$/)[0];
+    // «3 من 8» = 3/8 (من هون معناها «من أصل»)
+    text = text.replace(/(\d+)\s*من\s*(\d+)/g, "$1/$2");
+    text = text.replace(/(\d)\s*و(\d)/g, "$1, $2");
     const core = norm(text);
     const edge = core.match(/^([\s|·—:-]*)(.*?)([\s|·—:-]*)$/);
     const hit = exact.get(core) || (edge && exact.get(edge[2]) && edge[1] + exact.get(edge[2]) + edge[3]);

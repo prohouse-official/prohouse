@@ -3725,3 +3725,17 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .prod-need{ font-weight:800; white-space:nowrap; }
 .prod-cell{ display:flex; gap:4px; align-items:center; }
 .prod-full{ border:1px solid #1a8f3c; color:#1a8f3c; background:#fff; border-radius:8px; padding:4px 8px; font-weight:800; cursor:pointer; }
+/* الإنتاج: متل صفحة الاستلام — صنف بكرت، والإجمالي، وخانة لكل فرع */
+.prod-cat{ margin:10px 0; }
+.prod-cat-head{ display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#fff7e0; border-radius:12px; font-weight:800; cursor:pointer; list-style:none; }
+.prod-cat-head::-webkit-details-marker{ display:none; }
+.prod-cat-count{ background:#fff; border-radius:10px; padding:2px 10px; font-size:13px; }
+.prod-item-head{ display:flex; flex-wrap:wrap; gap:6px; align-items:baseline; margin-bottom:8px; }
+.prod-total{ margin-inline-start:auto; font-size:14px; background:#f4f4f4; border-radius:8px; padding:2px 8px; }
+.prod-branch-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(100px, 1fr)); gap:8px; }
+.prod-branch{ border:1px solid var(--line, #eee); border-radius:10px; padding:8px; }
+.prod-branch-name{ font-weight:800; font-size:13px; }
+.prod-branch-need{ font-size:12px; color:var(--muted, #777); margin:2px 0 6px; }
+.prod-branch .prod-input{ width:100%; min-width:0; }
+.prod-diff-slot{ margin-top:4px; }
+.prod-save-bar{ position:sticky; bottom:8px; }
