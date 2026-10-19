@@ -30,7 +30,7 @@ async function loadUsersData() {
 
   if (data && Array.isArray(data) && data.length > 0) {
     usersListState = data.map(u => {
-      const isBranchStaff = u.id === "emp_6" || u.id === "emp_7" || u.name === "محمد البلول" || u.name === "غالب";
+      const isBranchStaff = u.id === "emp_6" || u.name === "محمد البلول";
       return {
         ...u,
         name: ROSTER_NAMES[u.id] || u.name,
