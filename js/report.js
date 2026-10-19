@@ -670,6 +670,7 @@ function initTomorrowReportControls() {
 // من الإعدادات: chef_report_employees (أرقام الموظفين مفصولة بفاصلة، مثل emp_5)
 function isChefReportOnlyUser() {
   if (typeof Auth === "undefined" || Auth.role() === "owner") return false;
+  if (["chef", "kitchen"].includes(Auth.role())) return true; // فريق الشيف بيطبع طلبية الفروع
   const e = Auth.getEmployee();
   const raw = (typeof currentSettings !== "undefined" && currentSettings.chef_report_employees) || "";
   return !!e && raw.split(",").map(x => x.trim()).includes(e.id);
@@ -1015,7 +1016,7 @@ window.addEventListener("resize", () => { if (lastTomorrowReportSheets.length) f
 
 async function exportTomorrowReportExcel() {
   if (!lastTomorrowReportSheets.length && !lastSaladBranches.length) { showToast("اضغط «عرض» أول"); return; }
-  if (typeof markProductionPrinted === "function" && lastTomorrowReportDate) markProductionPrinted(lastTomorrowReportDate);
+  if (typeof markProductionPrinted === "function" && lastTomorrowReportDate && !document.getElementById("tomorrowReportBranch").value) markProductionPrinted(lastTomorrowReportDate);
   await loadReportLibs();
   if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel ما تحمّلت — تأكد من الاتصال بالنت"); return; }
   const S = CHEF_SHEET;
@@ -1139,7 +1140,7 @@ async function buildTomorrowReportPdf() {
 
 async function shareTomorrowReportPdf() {
   if (!lastTomorrowReportSheets.length) { showToast("اضغط «عرض» أول"); return; }
-  if (typeof markProductionPrinted === "function" && lastTomorrowReportDate) markProductionPrinted(lastTomorrowReportDate);
+  if (typeof markProductionPrinted === "function" && lastTomorrowReportDate && !document.getElementById("tomorrowReportBranch").value) markProductionPrinted(lastTomorrowReportDate);
   const btn = document.getElementById("tomorrowReportPdfBtn");
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = "⏳ جاري تجهيز PDF…";

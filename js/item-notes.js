@@ -23,7 +23,14 @@ const inoteCanEdit = (branch) => !Auth.isReadOnly() && Auth.role() !== "kitchen"
 // أصناف طلبية الفرع لليوم (الكمية الفاضية ما بتنحسب)
 async function inoteItemsFor(date, branch) {
   await Items.load();
-  const rows = await SupaEngine.getTomorrowOrder(date, branch).catch(() => []);
+  const [ordered, day] = await Promise.all([
+    SupaEngine.getTomorrowOrder(date, branch).catch(() => []),
+    SupaEngine.getDay(date, branch).catch(() => null)
+  ]);
+  // اللي وصل وما انطلب (الشيف بعته بداله) كمان بينكتب عليه ملاحظة
+  const got = ((day && day.items) || []).filter(d => Number(d.received) > 0)
+    .map(d => ({ itemId: d.itemId, itemName: d.itemName, qty: d.received, cookName: d.cookName || "" }));
+  const rows = ordered.concat(got);
   const seen = new Set();
   const order = new Map(Items.current.map((it, i) => [it.id, i]));
   return rows.filter(r => Number(r.qty) > 0 && !seen.has(r.itemId) && seen.add(r.itemId)).map(r => {
@@ -45,7 +52,9 @@ async function itemNotesStatus(date, branch) {
   return { saved, issues: inoteIssues(row), none: !!(row && row.none) };
 }
 
+let inoteDatePicked = false;
 async function loadItemNotesView() {
+  if (!inoteDatePicked) inoteDate = todayStr();
   const view = document.getElementById("itemnotesView");
   if (!view) return;
   const branches = inoteBranches();
@@ -123,7 +132,7 @@ function renderItemNotesView(branches, canAll) {
   }
   view.innerHTML = head + body;
   const d = document.getElementById("inoteDateInput");
-  if (d) d.addEventListener("change", () => { inoteDate = d.value || todayStr(); loadItemNotesView(); });
+  if (d) d.addEventListener("change", () => { inoteDate = d.value || todayStr(); inoteDatePicked = true; loadItemNotesView(); });
   const s = document.getElementById("inoteBranchSelect");
   if (s) s.addEventListener("change", () => { inoteBranch = s.value; if (s.value !== INOTE_ALL) Branch.set(s.value); loadItemNotesView(); });
   view.querySelectorAll(".inote-tag").forEach(b => b.addEventListener("click", () => b.classList.toggle("on")));
@@ -134,6 +143,7 @@ function renderItemNotesView(branches, canAll) {
 }
 
 async function saveItemNotes(none) {
+  if (none && inoteIssues(inoteRow) && !confirm("في ملاحظات مسجّلة — «ما في ملاحظات» بيمسحها. متأكد؟")) return;
   const items = {};
   if (!none) {
     document.querySelectorAll("#itemnotesView .inote-item").forEach(el => {

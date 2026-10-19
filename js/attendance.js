@@ -46,9 +46,11 @@ function attLateMin(iso, hm) {
 
 const attTime = (iso) => (iso ? new Date(iso).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" }) : "—");
 
+let attDatePicked = false;
 async function loadAttendanceView() {
   const view = document.getElementById("attendanceView");
   if (!view) return;
+  if (!attDatePicked) attDate = todayStr();
   const places = attPlaces();
   const canAll = Auth.canSeeAllBranches();
   if (attPlace !== ATT_ALL || !canAll) {
@@ -93,7 +95,8 @@ function renderAttendanceView(places, canAll) {
           : `<div class="readonly-field">${escHtml(attPlace || "—")}</div>`}</div>
       </div>
       ${!showPlace && attShift(attPlace) ? `<div class="att-now">⏰ الدوام: ${attShiftLabel(attShift(attPlace))}</div>` : ""}
-      ${showPlace ? "" : `<div class="att-actions">
+      ${!showPlace && attDate !== todayStr() ? `<div class="att-now">📅 التسجيل بيكون لليوم بس — هون بتشوف تسجيلات يوم ${escHtml(attDate)}</div>` : ""}
+      ${showPlace || attDate !== todayStr() ? "" : `<div class="att-actions">
         <button class="btn att-btn att-in" id="attInBtn">🟢 تسجيل حضور</button>
         <button class="btn att-btn att-out" id="attOutBtn">🔴 تسجيل انصراف</button>
       </div>
@@ -112,7 +115,7 @@ function renderAttendanceView(places, canAll) {
 
 function bindAttendanceView() {
   const d = document.getElementById("attDateInput");
-  if (d) d.addEventListener("change", () => { attDate = d.value || todayStr(); attForm = null; loadAttendanceView(); });
+  if (d) d.addEventListener("change", () => { attDate = d.value || todayStr(); attDatePicked = attDate !== todayStr(); attForm = null; loadAttendanceView(); });
   const s = document.getElementById("attPlaceSelect");
   if (s) s.addEventListener("change", () => { attPlace = s.value; attForm = null; loadAttendanceView(); });
   const inB = document.getElementById("attInBtn"), outB = document.getElementById("attOutBtn");
@@ -171,6 +174,10 @@ async function attSave() {
   const name = (document.getElementById("attName").value || "").trim();
   if (!name) { showToast("اكتب اسم الموظف"); return; }
   if (!attForm.photo) { showToast("لازم تصوّر الورقة عشان ينسجّل حضورك"); return; }
+  if (attDate !== todayStr()) { showToast("التسجيل لليوم بس"); return; }
+  const same = (r) => r.employee_name.replace(/\s+/g, "") === name.replace(/\s+/g, "");
+  if (attRows.some(r => r.kind === attForm.kind && same(r)) && !confirm(`${name} ${attForm.kind === "in" ? "سجّل حضور" : "سجّل انصراف"} قبل اليوم. تسجّل مرة تانية؟`)) return;
+  if (attForm.kind === "out" && !attRows.some(r => r.kind === "in" && same(r)) && !confirm(`ما في حضور مسجّل لـ ${name} اليوم. تسجّل انصراف؟`)) return;
   btn.disabled = true; btn.textContent = "جاري الحفظ…";
   try {
     const photo = await SupaEngine.uploadReceipt(attDate, attPlace, attForm.photo);

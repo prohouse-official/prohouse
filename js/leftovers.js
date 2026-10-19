@@ -51,9 +51,11 @@ async function leftoverForProduction(orderDate) {
   return lines.filter(l => !l.sauce).map(l => ({ ...l, confirmed: leftConfirmed(saved, l) })).filter(l => l.confirmed > 0);
 }
 
+let leftDatePicked = false;
 async function loadLeftoversView() {
   const view = document.getElementById("leftoversView");
   if (!view) return;
+  if (!leftDatePicked) leftDate = new Date().getHours() >= 12 ? todayStr() : addDaysStr(todayStr(), -1);
   const seq = ++leftLoadSeq;
   view.innerHTML = '<div class="loader">جاري التحميل…</div>';
   try {
@@ -113,7 +115,7 @@ function renderLeftoversView() {
     ${leftLines.length && !ro ? `<div class="att-actions prod-save-bar"><button class="btn" id="leftSaveBtn">💾 حفظ الاستلام</button></div>` : ""}
     ${leftSaved && leftSaved.checked_by ? `<div class="att-now">آخر حفظ: ${escHtml(leftSaved.checked_by)} · ${new Date(leftSaved.checked_at).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" })}</div>` : ""}`;
   const d = document.getElementById("leftDateInput");
-  if (d) d.addEventListener("change", () => { leftDate = d.value || todayStr(); loadLeftoversView(); });
+  if (d) d.addEventListener("change", () => { leftDate = d.value || todayStr(); leftDatePicked = true; loadLeftoversView(); });
   view.querySelectorAll(".left-item").forEach(card => {
     const l = leftLines.find(x => x.key === card.dataset.leftKey);
     const ok = card.querySelector(".left-ok"), inp = card.querySelector(".left-qty"), st = card.querySelector(".left-state");
@@ -127,14 +129,19 @@ function renderLeftoversView() {
 
 async function saveLeftovers() {
   const btn = document.getElementById("leftSaveBtn");
-  const items = {};
-  document.querySelectorAll("#leftoversView .left-item").forEach(card => {
-    const ok = card.querySelector(".left-ok"), inp = card.querySelector(".left-qty");
-    if (ok.classList.contains("on")) items[card.dataset.leftKey] = { ok: true };
-    else if (inp.value !== "") items[card.dataset.leftKey] = { qty: Number(inp.value) };
-  });
   btn.disabled = true; btn.textContent = "جاري الحفظ…";
   try {
+    // أكتر من موظف ممكن يأكّد: منبلّش من آخر نسخة بالسيرفر ومنغيّر بس اللي انتعدّل هون
+    const before = (leftSaved && leftSaved.items) || {};
+    const latest = await SupaEngine.getLeftoverCheck(leftDate);
+    const items = { ...((latest && latest.items) || {}) };
+    document.querySelectorAll("#leftoversView .left-item").forEach(card => {
+      const k = card.dataset.leftKey;
+      const ok = card.querySelector(".left-ok"), inp = card.querySelector(".left-qty");
+      const v = ok.classList.contains("on") ? { ok: true } : inp.value !== "" ? { qty: Math.max(0, Number(inp.value)) } : null;
+      if (JSON.stringify(v) === JSON.stringify(before[k] || null)) return;
+      if (v) items[k] = v; else delete items[k];
+    });
     const emp = Auth.getEmployee() || {};
     const row = { date: leftDate, items, checked_by: emp.name || "", checked_at: new Date().toISOString() };
     await SupaEngine.saveLeftoverCheck(row);

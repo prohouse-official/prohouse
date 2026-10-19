@@ -1,6 +1,6 @@
 // ==================== تسجيل الإنتاج (المطبخ المركزي) ====================
 // فريق الشيف بيكتب الكمية اللي انتجها من كل صنف، والشاشة بتطابقها مع مجموع طلبية الفروع لنفس اليوم.
-// صف واحد لكل يوم بجدول production_checks: items = { item_id: الكمية المنتجة }.
+// صف واحد لكل يوم بجدول production_checks: items = { "الفئة|الصنف": { فرع: الكمية المنتجة } }.
 
 let prodDate = new Date().getHours() >= 12 ? addDaysStr(todayStr(), 1) : todayStr();
 let prodLoadSeq = 0;
@@ -55,20 +55,22 @@ async function markProductionPrinted(date) {
   } catch (e) { /* الطباعة أهم من التسجيل */ }
 }
 
+let prodDatePicked = false; // اختار يوم بإيده؟ وإلا منمشي مع الساعة (التطبيق ممكن يضل مفتوح ليوم تاني)
 async function loadProductionView() {
   const view = document.getElementById("productionView");
   if (!view) return;
+  if (!prodDatePicked) prodDate = prodDefaultDate();
   const seq = ++prodLoadSeq;
   view.innerHTML = '<div class="loader">جاري تحميل الطلبية…</div>';
   try {
     const [lines, saved, left] = await Promise.all([prodOrderLines(prodDate), SupaEngine.getProduction(prodDate),
       typeof leftoverForProduction === "function" ? leftoverForProduction(prodDate).catch(() => []) : []]);
+    if (seq !== prodLoadSeq) return;
     prodLeft = {};
     left.filter(x => isWeightUnit(x.unit)).forEach(x => {
       const k = x.branch + "|" + chefNormName(x.name);
       prodLeft[k] = (prodLeft[k] || 0) + x.confirmed;
     });
-    if (seq !== prodLoadSeq) return;
     prodLines = lines; prodSaved = saved;
   } catch (e) {
     if (seq !== prodLoadSeq) return;
@@ -141,7 +143,7 @@ function renderProductionView() {
     ${prodLines.length && !ro ? `<div class="att-actions prod-save-bar"><button class="btn" id="prodSaveBtn">💾 حفظ الإنتاج</button></div>` : ""}
     ${prodSaved && prodSaved.saved_at && prodSaved.chef_name ? `<div class="att-now">آخر حفظ: ${escHtml(prodSaved.chef_name)} · ${new Date(prodSaved.saved_at).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" })}</div>` : ""}`;
   const d = document.getElementById("prodDateInput");
-  if (d) d.addEventListener("change", () => { prodDate = d.value || todayStr(); loadProductionView(); });
+  if (d) d.addEventListener("change", () => { prodDate = d.value || todayStr(); prodDatePicked = true; loadProductionView(); });
   const refresh = (inp) => {
     const l = prodLines.find(x => x.key === inp.dataset.prodKey);
     const o = l && l.perBranch[inp.dataset.prodBranch];
@@ -167,13 +169,20 @@ function renderProductionView() {
 
 async function saveProductionView() {
   const btn = document.getElementById("prodSaveBtn");
-  const items = {};
-  document.querySelectorAll("#productionView .prod-input").forEach(inp => {
-    if (inp.value.trim() === "") return;
-    (items[inp.dataset.prodKey] = items[inp.dataset.prodKey] || {})[inp.dataset.prodBranch] = inp.type === "number" ? Number(inp.value) : inp.value.trim();
-  });
   btn.disabled = true; btn.textContent = "جاري الحفظ…";
   try {
+    // أكتر من موظف ممكن يسجّل بنفس الوقت: منبلّش من آخر نسخة بالسيرفر ومنغيّر بس الخانات اللي انتعدّلت هون
+    const before = (prodSaved && prodSaved.items) || {};
+    const latest = await SupaEngine.getProduction(prodDate);
+    const items = JSON.parse(JSON.stringify((latest && latest.items) || {}));
+    document.querySelectorAll("#productionView .prod-input").forEach(inp => {
+      const k = inp.dataset.prodKey, b = inp.dataset.prodBranch;
+      const raw = inp.value.trim();
+      const val = raw === "" ? undefined : inp.type === "number" ? Math.max(0, Number(raw)) : raw;
+      if (String(val ?? "") === String(prodVal(before, k, b) ?? "")) return; // ما انلمست
+      if (!items[k] || typeof items[k] !== "object") items[k] = {};
+      if (val === undefined) delete items[k][b]; else items[k][b] = val;
+    });
     const emp = Auth.getEmployee() || {};
     const row = { date: prodDate, items, chef_name: emp.name || "", saved_at: new Date().toISOString() };
     await SupaEngine.saveProduction(row);
