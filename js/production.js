@@ -6,6 +6,15 @@ let prodDate = new Date().getHours() >= 12 ? addDaysStr(todayStr(), 1) : todaySt
 let prodLoadSeq = 0;
 let prodLines = [];   // [{ key, itemId, name, category, unit, ordered, perBranch: {فرع: كمية} }]
 let prodSaved = null; // صف production_checks
+let prodLeft = {};    // «فرع|اسم الصنف» → المتبقي المأكَّد من فريق الشيف (بينقص من المطلوب إنتاجه)
+
+// المطلوب إنتاجه لفرع = طلبيته − المتبقي اللي رجع منه وانأكّد (نفس الوحدة بس)
+function prodNeed(l, b) {
+  const o = l.perBranch[b];
+  if (!o || !o.num) return { need: null, left: 0 };
+  const left = prodLeft[b + "|" + chefNormName(l.name)] || 0;
+  return { need: Math.max(0, o.num.qty - left), left };
+}
 
 // طلبية الفروع بس (بدون اشتراكات التوصيل) — سطر لكل صنف: الإجمالي وكم طالب كل فرع
 const prodNum = (t) => {
@@ -52,7 +61,13 @@ async function loadProductionView() {
   const seq = ++prodLoadSeq;
   view.innerHTML = '<div class="loader">جاري تحميل الطلبية…</div>';
   try {
-    const [lines, saved] = await Promise.all([prodOrderLines(prodDate), SupaEngine.getProduction(prodDate)]);
+    const [lines, saved, left] = await Promise.all([prodOrderLines(prodDate), SupaEngine.getProduction(prodDate),
+      typeof leftoverForProduction === "function" ? leftoverForProduction(prodDate).catch(() => []) : []]);
+    prodLeft = {};
+    left.filter(x => isWeightUnit(x.unit)).forEach(x => {
+      const k = x.branch + "|" + chefNormName(x.name);
+      prodLeft[k] = (prodLeft[k] || 0) + x.confirmed;
+    });
     if (seq !== prodLoadSeq) return;
     prodLines = lines; prodSaved = saved;
   } catch (e) {
@@ -101,10 +116,10 @@ function renderProductionView() {
             const v = prodVal(items, l.key, b);
             return `<div class="prod-branch">
               <div class="prod-branch-name">${escHtml(b)}</div>
-              <div class="prod-branch-need">طلب: ${escHtml(o.text)}</div>
+              <div class="prod-branch-need">طلب: ${escHtml(o.text)}${prodNeed(l, b).left ? `<br><span class="prod-left">♻️ متبقي: ${prodFmt(prodNeed(l, b).left)} — أنتج <b>${prodFmt(prodNeed(l, b).need)}</b></span>` : ""}</div>
               <div class="prod-cell"><input type="${o.num ? "number" : "text"}" inputmode="decimal" min="0" step="any" class="prod-input" data-prod-key="${escHtml(l.key)}" data-prod-branch="${escHtml(b)}" value="${escHtml(v ?? "")}" placeholder="المنتج" ${ro ? "disabled" : ""}>
                 ${ro ? "" : `<button type="button" class="prod-full" title="انعمل كامل">✓</button>`}</div>
-              <div class="prod-diff-slot">${prodDiffHtml(o.num ? o.num.qty : null, v)}</div>
+              <div class="prod-diff-slot">${prodDiffHtml(prodNeed(l, b).need, v)}</div>
             </div>`;
           }).join("")}</div>
         </div>`).join("")}
@@ -118,7 +133,7 @@ function renderProductionView() {
     const l = prodLines.find(x => x.key === inp.dataset.prodKey);
     const o = l && l.perBranch[inp.dataset.prodBranch];
     const slot = inp.closest(".prod-branch").querySelector(".prod-diff-slot");
-    if (o && slot) slot.innerHTML = prodDiffHtml(o.num ? o.num.qty : null, inp.value);
+    if (o && slot) slot.innerHTML = prodDiffHtml(prodNeed(l, inp.dataset.prodBranch).need, inp.value);
   };
   view.querySelectorAll(".prod-input").forEach(inp => inp.addEventListener("input", () => refresh(inp)));
   view.querySelectorAll(".prod-full").forEach(btn => btn.addEventListener("click", () => {
@@ -126,7 +141,7 @@ function renderProductionView() {
     const l = prodLines.find(x => x.key === inp.dataset.prodKey);
     const o = l && l.perBranch[inp.dataset.prodBranch];
     if (!o) return;
-    inp.value = o.num ? o.num.qty : o.text;
+    inp.value = o.num ? prodNeed(l, inp.dataset.prodBranch).need : o.text;
     refresh(inp);
   }));
   const pb = document.getElementById("prodPrintBtn");
