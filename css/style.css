@@ -3677,3 +3677,20 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .att-table{ width:100%; border-collapse:collapse; font-size:13px; } .att-table th, .att-table td{ border-bottom:1px solid var(--line, #eee); padding:6px 4px; text-align:right; vertical-align:middle; }
 .att-sig{ height:34px; background:#fff; border:1px solid var(--line, #eee); border-radius:4px; cursor:pointer; }
 .att-photo{ height:44px; width:44px; object-fit:cover; border-radius:6px; cursor:pointer; }
+/* ورقة الحضور للطباعة: شاشة كاملة جوّا التطبيق، وبالطباعة بس الورقة */
+.att-print-overlay{ position:fixed; inset:0; z-index:9999; background:#fff; color:#000; overflow:auto; direction:rtl; }
+.att-print-bar{ position:sticky; top:0; display:flex; gap:10px; justify-content:space-between; padding:calc(10px + env(safe-area-inset-top)) 16px 10px; background:#f4f4f4; border-bottom:1px solid #ddd; }
+.att-print-page{ max-width:800px; margin:0 auto; padding:16px; font-family:Tahoma, Arial, sans-serif; }
+.att-print-page h1{ margin:0; font-size:22px; }
+.att-print-page h2{ font-size:17px; margin:14px 0 6px; }
+.att-print-page .meta{ display:flex; flex-wrap:wrap; gap:8px; justify-content:space-between; font-size:14px; margin-top:6px; border-bottom:2px solid #000; padding-bottom:6px; }
+.att-print-page table{ width:100%; border-collapse:collapse; }
+.att-print-page th, .att-print-page td{ border:1px solid #000; height:30px; padding:2px 6px; font-size:14px; text-align:center; }
+.att-print-page th{ background:#eee; }
+.att-print-foot{ font-size:12px; margin-top:8px; }
+@media print{
+  body.att-printing > *:not(#attPrintOverlay){ display:none !important; }
+  body.att-printing .att-print-overlay{ position:static; overflow:visible; }
+  body.att-printing .att-print-bar{ display:none; }
+  body.att-printing .att-print-page{ max-width:none; padding:10mm; }
+}
