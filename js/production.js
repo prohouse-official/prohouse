@@ -88,6 +88,19 @@ function prodDiffHtml(ordered, produced) {
   return d < 0 ? `<span class="prod-diff short">ناقص ${prodFmt(-d)}</span>` : `<span class="prod-diff over">زيادة ${prodFmt(d)}</span>`;
 }
 
+// إجمالي الصنف: المطلوب إنتاجه (كل الفروع، بعد خصم المتبقي) والمنتج (مجموع خانات الفروع)
+function prodItemTotalsHtml(l, valOf) {
+  const bs = Object.keys(l.perBranch);
+  const numeric = bs.every(b => l.perBranch[b].num);
+  const unit = numeric && bs.length ? l.perBranch[bs[0]].num.unit : "";
+  const need = numeric ? bs.reduce((t, b) => t + prodNeed(l, b).need, 0) : null;
+  const vals = bs.map(valOf).filter(v => v !== undefined && v !== null && v !== "");
+  const made = vals.reduce((t, v) => t + (Number(v) || 0), 0);
+  const cls = !vals.length ? "" : need === null ? "ok" : made >= need - Math.max(need * 0.05, 0.01) ? "ok" : "short";
+  return `<span class="prod-total">📋 المطلوب: <b>${need === null ? escHtml(l.totalText) : `${prodFmt(need)} ${escHtml(unit)}`}</b></span>
+    <span class="prod-total prod-made ${cls}">🏭 المنتج: <b>${vals.length ? `${prodFmt(made)} ${escHtml(unit)}` : "—"}</b></span>`;
+}
+
 function renderProductionView() {
   const view = document.getElementById("productionView");
   const items = (prodSaved && prodSaved.items) || {};
@@ -111,7 +124,7 @@ function renderProductionView() {
         <span class="prod-cat-count" data-prod-cat="${escHtml(cat)}">${lines.filter(l => prodLineDone(items, l)).length}/${lines.length}</span></summary>
         ${lines.map(l => `<div class="item-card prod-item" data-prod-line="${escHtml(l.key)}">
           <div class="prod-item-head"><b>${escHtml(l.name)}</b>${l.size ? ` <small class="prod-size">(${escHtml(l.size)})</small>` : ""}
-            <span class="prod-total">📋 الإجمالي: <b>${escHtml(l.totalText)}</b></span></div>
+            <span class="prod-totals" data-prod-totals="${escHtml(l.key)}">${prodItemTotalsHtml(l, b => prodVal(items, l.key, b))}</span></div>
           <div class="prod-branch-grid">${Object.entries(l.perBranch).map(([b, o]) => {
             const v = prodVal(items, l.key, b);
             return `<div class="prod-branch">
@@ -134,6 +147,8 @@ function renderProductionView() {
     const o = l && l.perBranch[inp.dataset.prodBranch];
     const slot = inp.closest(".prod-branch").querySelector(".prod-diff-slot");
     if (o && slot) slot.innerHTML = prodDiffHtml(prodNeed(l, inp.dataset.prodBranch).need, inp.value);
+    const card = inp.closest(".prod-item"), tot = card && card.querySelector(".prod-totals");
+    if (l && tot) tot.innerHTML = prodItemTotalsHtml(l, b => { const x = card.querySelector(`.prod-input[data-prod-branch="${CSS.escape(b)}"]`); return x ? x.value : undefined; });
   };
   view.querySelectorAll(".prod-input").forEach(inp => inp.addEventListener("input", () => refresh(inp)));
   view.querySelectorAll(".prod-full").forEach(btn => btn.addEventListener("click", () => {

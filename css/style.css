@@ -3745,3 +3745,7 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .left-ok.on{ background:#1a8f3c; color:#fff; }
 .left-qty{ flex:1; min-width:120px; }
 .prod-left{ color:#1a6f8f; font-weight:700; }
+.prod-totals{ margin-inline-start:auto; display:flex; flex-wrap:wrap; gap:6px; }
+.prod-totals .prod-total{ margin:0; }
+.prod-made.ok{ background:#e6f6ea; color:#1a8f3c; }
+.prod-made.short{ background:#fde8e6; color:#c0392b; }
