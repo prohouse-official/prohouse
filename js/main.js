@@ -7,6 +7,8 @@ const TAB_ROLE_ACCESS = {
   attendance: ["owner", "manager", "chef", "kitchen", "branch_staff", "employee", "accountant"],
   // تسجيل الإنتاج بالمطبخ المركزي ومطابقته مع طلبية الفروع
   production: ["owner", "chef", "kitchen", "accountant"],
+  // ملاحظات الأصناف: الفرع بيسجّل، والشيف والمطبخ بيتابعوا
+  itemnotes: ["owner", "manager", "chef", "kitchen", "branch_staff", "employee", "accountant"],
   help: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
   assistant: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
   branches: ["owner", "manager", "chef", "accountant"],
@@ -79,7 +81,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "saladsView", "attendanceView", "productionView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "saladsView", "attendanceView", "productionView", "itemnotesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -147,6 +149,7 @@ function setActiveTab(tab) {
   if (tab === "salads") { loadSaladsView(); }
   if (tab === "attendance") { loadAttendanceView(); }
   if (tab === "production") { loadProductionView(); }
+  if (tab === "itemnotes") { loadItemNotesView(); }
   if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
   if (tab === "users") { renderUsersView(); }
   if (tab === "audit") { renderAuditView(); }

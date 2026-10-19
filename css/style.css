@@ -3712,3 +3712,16 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .prod-diff{ font-size:12px; font-weight:800; white-space:nowrap; }
 .prod-diff.ok{ color:#1a8f3c; } .prod-diff.short{ color:#c0392b; } .prod-diff.over{ color:#b7791f; } .prod-diff.todo{ color:var(--muted, #999); }
 .prod-short-count{ color:#c0392b; }
+/* ملاحظات الأصناف */
+.inote-item{ padding:10px 0; border-bottom:1px solid var(--line, #eee); }
+.inote-name{ font-weight:800; margin-bottom:6px; }
+.inote-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px; }
+.inote-tag{ border:1px solid var(--line, #ddd); background:#fff; border-radius:16px; padding:4px 10px; font-size:13px; cursor:pointer; color:var(--ink, #222); }
+.inote-tag.on{ background:#fff3d6; border-color:#d9a400; font-weight:700; }
+.inote-text{ width:100%; box-sizing:border-box; }
+.inote-line{ display:flex; flex-direction:column; gap:2px; padding:6px 0; border-bottom:1px solid var(--line, #eee); font-size:14px; }
+.inote-ok{ color:#1a8f3c; font-weight:700; }
+.prod-size{ color:var(--muted, #777); font-weight:600; }
+.prod-need{ font-weight:800; white-space:nowrap; }
+.prod-cell{ display:flex; gap:4px; align-items:center; }
+.prod-full{ border:1px solid #1a8f3c; color:#1a8f3c; background:#fff; border-radius:8px; padding:4px 8px; font-weight:800; cursor:pointer; }
