@@ -273,6 +273,7 @@ async function loadKitchenStatus(k, day) {
   // الإنتاج والطباعة على طلبية الليلة: بعد الضهر طلبية بكرا
   const prodDay = day === todayStr() && typeof prodDefaultDate === "function" ? prodDefaultDate() : day;
   try { if (typeof productionStatus === "function") st.prod = await productionStatus(prodDay); } catch (e) {}
+  try { if (typeof leftoverStatus === "function") st.left = await leftoverStatus(addDaysStr(prodDay, -1)); } catch (e) {}
   try {
     const rows = typeof SupaEngine.getItemNotes === "function" ? await SupaEngine.getItemNotes(day, null) : [];
     st.notes = { branches: rows.length, issues: rows.reduce((t, r) => t + (typeof inoteIssues === "function" ? inoteIssues(r) : 0), 0) };
@@ -291,6 +292,12 @@ function kitchenCardHtml(k, st) {
     note: st.attIn > 0 ? `${st.attIn} حضور · ${st.attOut} انصراف` : "باقي" });
   if (tabAllowed("report") || tabAllowed("production")) steps.push({ tab: tabAllowed("report") ? "report" : "production", icon: "🖨", title: "طباعة طلبية الفروع", extra: `data-chef-print="1"`,
     state: p.printedAt ? "done" : "todo", note: p.printedAt ? "تم" : "باقي" });
+  if (tabAllowed("leftovers")) {
+    const lf = st.left || { total: 0, done: 0 };
+    steps.push({ tab: "leftovers", icon: "♻️", title: "استلام المتبقي من الروضة", extra: "",
+      state: lf.total > 0 && lf.done >= lf.total ? "done" : lf.done > 0 ? "partial" : lf.total ? "todo" : "done",
+      note: lf.total ? `${lf.done}/${lf.total}` : "ما في متبقي" });
+  }
   if (tabAllowed("production")) steps.push({ tab: "production", icon: "🏭", title: "تسجيل الإنتاج ومطابقته مع الطلبية", extra: "",
     state: p.total > 0 && p.done >= p.total ? "done" : p.done > 0 ? "partial" : "todo",
     note: p.total > 0 ? `${p.done}/${p.total}` : "—" });
@@ -453,6 +460,7 @@ function openScreensOnDay(day) {
   if (typeof attDate !== "undefined") attDate = day;
   if (typeof prodDate !== "undefined") prodDate = day === todayStr() && typeof prodDefaultDate === "function" ? prodDefaultDate() : day;
   if (typeof inoteDate !== "undefined") inoteDate = day;
+  if (typeof leftDate !== "undefined") leftDate = addDaysStr(day === todayStr() && typeof prodDefaultDate === "function" ? prodDefaultDate() : day, -1);
   if (typeof currentOpeningDate !== "undefined") { currentOpeningDate = day; setInput("openingDateInput", day); }
   // طلبية الغد = اليوم اللي بعد يوم الرئيسية
   if (typeof currentTomorrowDate !== "undefined") { currentTomorrowDate = addDaysStr(day, 1); setInput("tomorrowDateInput", currentTomorrowDate); }

@@ -1036,6 +1036,18 @@ const SupaEngine = (() => {
       body: JSON.stringify(row)
     });
   }
+  // استلام المتبقي من الفروع (فريق الشيف) — صف لكل يوم
+  async function getLeftoverCheck(date) {
+    const r = (await query(`leftover_checks?select=*&date=eq.${date}`)) || [];
+    return r[0] || null;
+  }
+  async function saveLeftoverCheck(row) {
+    await query("leftover_checks?on_conflict=date", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(row)
+    });
+  }
   // تسجيل الإنتاج بالمطبخ المركزي (صف لكل يوم: الكمية المنتجة لكل صنف + وقت طباعة الطلبية)
   async function getProduction(date) {
     const r = (await query(`production_checks?select=*&date=eq.${date}`)) || [];
@@ -1189,6 +1201,8 @@ const SupaEngine = (() => {
     getAttendance,
     addAttendance,
     getProduction,
+    getLeftoverCheck,
+    saveLeftoverCheck,
     getItemNotes,
     saveItemNotes,
     saveProduction,
