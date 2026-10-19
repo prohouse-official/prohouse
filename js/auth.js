@@ -113,18 +113,8 @@ const Auth = (() => {
         const emp = res.ok ? await res.json() : null;
 
         if (emp && emp.id) {
-          const ROSTER_NAMES = {
-            emp_1: "أ.يزيد",
-            emp_2: "حسن",
-            emp_3: "الشيف اسلام",
-            emp_4: "أبو يونس",
-            emp_5: "العامودي",
-            emp_6: "محمد البلول",
-            emp_7: "غالب",
-            emp_8: "محمد الشرقاوي",
-            emp_9: "شكيل"
-          };
-          const finalName = ROSTER_NAMES[emp.id] || (emp.name && !emp.name.includes("?") ? emp.name : "موظف");
+          // الاسم من جدول الموظفين (قبل كانت قائمة ثابتة هون وثانية بتسجيل الدخول، وكل وحدة باسم مختلف للشيف)
+          const finalName = (emp.name && !emp.name.includes("?") ? emp.name : "موظف");
           // موظفو فرع عبداللطيف جميل (محمد البلول) صلاحيته محصورة بالتشغيل وتسجيل البيانات فقط
           const isBranchUser = emp.id === "emp_6" || emp.role === "employee" || emp.role === "branch_staff";
           const finalRole = isBranchUser ? "branch_staff" : emp.role;
@@ -132,9 +122,8 @@ const Auth = (() => {
             id: emp.id,
             name: finalName,
             role: finalRole,
-            // محمد البلول: عبداللطيف جميل دايماً. أي موظف فرع ثاني: فروعه المسجلة له
-            branches: (emp.id === "emp_6") ? ["عبداللطيف جميل"]
-              : ((emp.branches || "").split(",").map(s => s.trim()).filter(Boolean).length ? (emp.branches || "").split(",").map(s => s.trim()).filter(Boolean) : (isBranchUser ? ["عبداللطيف جميل"] : []))
+            // الفروع من جدول الموظفين (نفس تسجيل الدخول)
+            branches: (emp.branches || "").split(",").map(s => s.trim()).filter(Boolean)
           };
           setSession(token, formatted);
           return true;

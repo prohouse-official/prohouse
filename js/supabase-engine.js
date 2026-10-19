@@ -120,18 +120,8 @@ const SupaEngine = (() => {
     });
     if (!data || !data.token) throw new Error("تعذر تسجيل الدخول");
     const emp = data.employee || {};
-    const ROSTER_NAMES = {
-      emp_1: "أ.يزيد",
-      emp_2: "حسن",
-      emp_3: "الشيف عصام",
-      emp_4: "أبو يونس",
-      emp_5: "العامودي",
-      emp_6: "محمد البلول",
-      emp_7: "غالب",
-            emp_8: "محمد الشرقاوي",
-            emp_9: "شكيل"
-    };
-    const finalName = ROSTER_NAMES[emp.id] || (emp.name && !emp.name.includes("?") ? emp.name : "موظف");
+    // الأسماء من جدول الموظفين (كانت مكتوبة هون ثابتة وتغطّي على أي تعديل)
+    const finalName = (emp.name && !emp.name.includes("?") ? emp.name : "موظف");
     const isBranchUser = emp.id === "emp_6" || emp.role === "employee" || emp.role === "branch_staff";
     const finalRole = isBranchUser ? "branch_staff" : emp.role;
     return {
@@ -141,8 +131,8 @@ const SupaEngine = (() => {
         name: finalName,
         role: finalRole,
         // محمد البلول: عبداللطيف جميل دايماً. أي موظف فرع ثاني: فروعه المسجلة له
-            branches: (emp.id === "emp_6") ? ["عبداللطيف جميل"]
-              : ((emp.branches || "").split(",").map(s => s.trim()).filter(Boolean).length ? (emp.branches || "").split(",").map(s => s.trim()).filter(Boolean) : (isBranchUser ? ["عبداللطيف جميل"] : []))
+            // الفروع من جدول الموظفين — موظف بدون فرع ما بينحط تلقائي بعبداللطيف
+            branches: (emp.branches || "").split(",").map(s => s.trim()).filter(Boolean)
       }
     };
   }

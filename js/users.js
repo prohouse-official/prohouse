@@ -16,24 +16,14 @@ let usersListState = [];
 
 async function loadUsersData() {
   const data = await Sync.get("getEmployees", {}, "employees");
-  const ROSTER_NAMES = {
-    emp_1: "أ.يزيد",
-    emp_2: "حسن",
-    emp_3: "الشيف عصام",
-    emp_4: "أبو يونس",
-    emp_5: "العامودي",
-    emp_6: "محمد البلول",
-    emp_7: "غالب",
-            emp_8: "محمد الشرقاوي",
-            emp_9: "شكيل"
-  };
+  // الأسماء من جدول الموظفين (كانت مكتوبة هون ثابتة وتغطّي على أي تعديل)
 
   if (data && Array.isArray(data) && data.length > 0) {
     usersListState = data.map(u => {
       const isBranchStaff = u.id === "emp_6" || u.name === "محمد البلول";
       return {
         ...u,
-        name: ROSTER_NAMES[u.id] || u.name,
+        name: u.name,
         role: isBranchStaff ? "branch_staff" : u.role,
         branches: isBranchStaff ? "عبداللطيف جميل" : u.branches
       };

@@ -213,18 +213,8 @@ function applyRoleUiGating() {
   });
 
   const emp = Auth.getEmployee();
-  const ROSTER_NAMES = {
-    emp_1: "أ.يزيد",
-    emp_2: "حسن",
-    emp_3: "الشيف عصام",
-    emp_4: "أبو يونس",
-    emp_5: "العامودي",
-    emp_6: "محمد البلول",
-    emp_7: "غالب",
-            emp_8: "محمد الشرقاوي",
-            emp_9: "شكيل"
-  };
-  const displayName = emp ? (ROSTER_NAMES[emp.id] || (emp.name && !emp.name.includes("?") ? emp.name : "موظف")) : "";
+  // الأسماء من جدول الموظفين (كانت مكتوبة هون ثابتة وتغطّي على أي تعديل)
+  const displayName = emp ? ((emp.name && !emp.name.includes("?") ? emp.name : "موظف")) : "";
   document.getElementById("userBarName").textContent = displayName;
   const roleEl = document.getElementById("userBarRole");
   if (roleEl) roleEl.textContent = "";

@@ -363,6 +363,8 @@ async function renderDashboard() {
   if (typeof currentSettings !== "undefined" && !Object.keys(currentSettings).length && typeof loadSettings === "function") { try { await loadSettings(); } catch (e) {} }
   const kitchen = centralKitchen();
   const kitchenSt = kitchen ? await loadKitchenStatus(kitchen, today) : null;
+  // الشيف تبع المطبخ المركزي: كرت المطبخ أول شي بالرئيسية
+  const chefFirst = !!kitchen && Auth.role() === "chef";
   if (Auth.role() === "kitchen") {
     view.innerHTML = `
       <div class="home-hello">${greeting}، ${escHtml(name)} 👋</div>
@@ -402,10 +404,11 @@ async function renderDashboard() {
       <div class="home-sub">${dateLabel}</div>
       ${dayBar}
       <div class="home-swiper" id="homeSwiper">
+        ${chefFirst ? `<div class="home-slide">${kitchenCardHtml(kitchen, kitchenSt)}</div>` : ""}
         ${statuses.map(s => `<div class="home-slide">${stepsCardHtml(s, true)}</div>`).join("")}
-        ${kitchen ? `<div class="home-slide">${kitchenCardHtml(kitchen, kitchenSt)}</div>` : ""}
+        ${kitchen && !chefFirst ? `<div class="home-slide">${kitchenCardHtml(kitchen, kitchenSt)}</div>` : ""}
       </div>
-      ${statuses.length + (kitchen ? 1 : 0) > 1 ? `<div class="home-dots">${[...statuses.map(s => s.branch), ...(kitchen ? [kitchen.name] : [])].map((b, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${escHtml(b)}"></button>`).join("")}</div>` : ""}
+      ${statuses.length + (kitchen ? 1 : 0) > 1 ? `<div class="home-dots">${(chefFirst ? [kitchen.name, ...statuses.map(s => s.branch)] : [...statuses.map(s => s.branch), ...(kitchen ? [kitchen.name] : [])]).map((b, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${escHtml(b)}"></button>`).join("")}</div>` : ""}
       ${flagged.length ? `<button type="button" class="home-flag" data-tab="report">⚠ ${flagged.length} صنف إرجاعه مرتفع هالشهر ‹</button>` : ""}
       ${tabAllowed("custody") && !Auth.isReadOnly() ? `<button type="button" class="home-scan" data-tab="custody" data-scan="1">📷 سكان فاتورة مصروف / مشتريات</button>` : ""}
       ${Auth.isReadOnly() ? `<div class="home-past-note">👁 حساب المحاسب: تقدر تشوف كل البيانات والتقارير، بدون تعديل.</div>` : ""}
@@ -457,10 +460,11 @@ function openScreensOnDay(day) {
   currentReceivingDate = day; setInput("receivingDateInput", day);
   currentRemainingDate = day; setInput("remainingDateInput", day);
   if (typeof currentCustodyDate !== "undefined") { currentCustodyDate = day; setInput("custodyDateInput", day); }
-  if (typeof attDate !== "undefined") attDate = day;
-  if (typeof prodDate !== "undefined") prodDate = day === todayStr() && typeof prodDefaultDate === "function" ? prodDefaultDate() : day;
-  if (typeof inoteDate !== "undefined") inoteDate = day;
-  if (typeof leftDate !== "undefined") leftDate = addDaysStr(day === todayStr() && typeof prodDefaultDate === "function" ? prodDefaultDate() : day, -1);
+  const past = day !== todayStr();
+  if (typeof attDate !== "undefined") { attDate = day; attDatePicked = past; }
+  if (typeof prodDate !== "undefined") { prodDate = past ? day : prodDefaultDate(); prodDatePicked = past; }
+  if (typeof inoteDate !== "undefined") { inoteDate = day; inoteDatePicked = past; }
+  if (typeof leftDate !== "undefined") { leftDate = addDaysStr(past ? day : prodDefaultDate(), -1); leftDatePicked = past; }
   if (typeof currentOpeningDate !== "undefined") { currentOpeningDate = day; setInput("openingDateInput", day); }
   // طلبية الغد = اليوم اللي بعد يوم الرئيسية
   if (typeof currentTomorrowDate !== "undefined") { currentTomorrowDate = addDaysStr(day, 1); setInput("tomorrowDateInput", currentTomorrowDate); }
