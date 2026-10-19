@@ -192,7 +192,7 @@ function dayStepsFor(s) {
   const fraction = (done, total) => (total > 0 ? `${done}/${total}` : "—");
   const state = (done, total) => (total > 0 && done >= total ? "done" : done > 0 ? "partial" : "todo");
 
-  if (tabAllowed("attendance")) {
+  if (tabAllowed("attendance") && !(typeof isAttendanceOffBranch === "function" && isAttendanceOffBranch(s.branch))) {
     steps.push({ tab: "attendance", icon: "🕘", title: "الحضور والانصراف",
       state: s.attIn > 0 && s.attOut >= s.attIn ? "done" : s.attIn > 0 ? "partial" : "todo",
       note: s.attIn > 0 ? `${s.attIn} حضور · ${s.attOut} انصراف` : "باقي" });
@@ -224,10 +224,11 @@ function dayStepsFor(s) {
 
 function stepRowHtml(step, branch, isNext) {
   const label = step.state === "done" ? "✓ تم" : step.note === "باقي" ? "باقي" : step.note;
+  const owner = taskOwner(branch, step.tab);
   return `
     <button type="button" class="day-step ${step.state}${isNext ? " next" : ""}" data-tab="${step.tab}" data-branch="${branch}">
       <span class="day-step-icon">${step.icon}</span>
-      <span class="day-step-title">${step.title}</span>
+      <span class="day-step-title">${step.title}${owner ? `<small class="day-step-owner">👤 ${escHtml(owner)}</small>` : ""}</span>
       <span class="day-step-status">${label}</span>
       <span class="day-step-go">‹</span>
     </button>`;
