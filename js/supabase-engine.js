@@ -132,7 +132,7 @@ const SupaEngine = (() => {
             emp_9: "شكيل"
     };
     const finalName = ROSTER_NAMES[emp.id] || (emp.name && !emp.name.includes("?") ? emp.name : "موظف");
-    const isBranchUser = emp.id === "emp_6" || emp.id === "emp_7" || emp.role === "employee" || emp.role === "branch_staff";
+    const isBranchUser = emp.id === "emp_6" || emp.role === "employee" || emp.role === "branch_staff";
     const finalRole = isBranchUser ? "branch_staff" : emp.role;
     return {
       token: data.token,
@@ -140,8 +140,8 @@ const SupaEngine = (() => {
         id: emp.id,
         name: finalName,
         role: finalRole,
-        // محمد البلول وغالب: عبداللطيف جميل دايماً. أي موظف فرع ثاني: فروعه المسجلة له
-            branches: (emp.id === "emp_6" || emp.id === "emp_7") ? ["عبداللطيف جميل"]
+        // محمد البلول: عبداللطيف جميل دايماً. أي موظف فرع ثاني: فروعه المسجلة له
+            branches: (emp.id === "emp_6") ? ["عبداللطيف جميل"]
               : ((emp.branches || "").split(",").map(s => s.trim()).filter(Boolean).length ? (emp.branches || "").split(",").map(s => s.trim()).filter(Boolean) : (isBranchUser ? ["عبداللطيف جميل"] : []))
       }
     };
