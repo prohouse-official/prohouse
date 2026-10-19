@@ -7,25 +7,26 @@ let prodLoadSeq = 0;
 let prodLines = [];   // [{ key, itemId, name, category, unit, ordered, perBranch: {فرع: كمية} }]
 let prodSaved = null; // صف production_checks
 
-// نفس الورقة المجمعة اللي بيستلمها الشيف (طلبية الفروع + الاشتراكات): سطر لكل صنف بإجمالي المطلوب
+// طلبية الفروع بس (بدون اشتراكات التوصيل) — سطر لكل صنف: الإجمالي وكم طالب كل فرع
+const prodNum = (t) => {
+  const m = /^([\d.]+)(?:\s*(جم))?(?:\s*\((.+)\))?$/.exec(String(t || "").trim());
+  return m ? { qty: Number(m[1]), unit: m[2] || m[3] || "" } : null;
+};
 async function prodOrderLines(date) {
   await Items.load();
   const branches = branchList();
-  const [perBranch, boq] = await Promise.all([
-    Promise.all(branches.map(b => SupaEngine.getTomorrowOrder(date, b).catch(() => []))),
-    SupaEngine.getTakrarBoq ? SupaEngine.getTakrarBoq(addDaysStr(date, 1)).catch(() => []) : []
-  ]);
+  const perBranch = await Promise.all(branches.map(b => SupaEngine.getTomorrowOrder(date, b).catch(() => [])));
   const order = new Map(Items.current.map((it, i) => [it.id, i]));
-  const sheet = chefCombinedSheet(branches, perBranch, order, boq || []);
+  const sheet = chefCombinedSheet(branches, perBranch, order, []);
   return sheet.rows.map(r => {
-    // المطلوب رقم واحد (جم أو عدد) → منطابق عليه. لو مخلوط (جم + سفنديشات) بس بينكتب
-    const m = /^([\d.]+)(?:\s*(جم))?(?:\s*\((.+)\))?$/.exec(String(r.total || "").trim());
     const parts = {};
-    sheet.branches.forEach((b, i) => { if (r.byBranch[i]) parts[b] = r.byBranch[i]; });
-    return { key: `${r.category}|${r.name}`, name: r.name, category: r.category, size: r.size || "",
-      totalText: r.total, ordered: m ? Number(m[1]) : null, unit: m ? (m[2] || m[3] || "") : "", perBranch: parts };
+    sheet.branches.forEach((b, i) => { if (r.byBranch[i]) parts[b] = { text: r.byBranch[i], num: prodNum(r.byBranch[i]) }; });
+    return { key: `${r.category}|${r.name}`, name: r.name, category: r.category, size: r.size || "", totalText: r.total, perBranch: parts };
   });
 }
+// الصنف خلص تسجيله لما ينكتب المنتج لكل فرع طالبه
+const prodVal = (items, key, b) => { const v = items[key]; return v && typeof v === "object" ? v[b] : undefined; };
+const prodLineDone = (items, l) => Object.keys(l.perBranch).every(b => { const v = prodVal(items, l.key, b); return v !== undefined && v !== ""; });
 
 // يوم الطلبية الافتراضي: الشيف بيشتغل على طلبية بكرا (بعد نص الليل صارت طلبية اليوم)
 const prodDefaultDate = () => (new Date().getHours() >= 12 ? addDaysStr(todayStr(), 1) : todayStr());
@@ -34,7 +35,7 @@ const prodDefaultDate = () => (new Date().getHours() >= 12 ? addDaysStr(todayStr
 async function productionStatus(date) {
   const [lines, saved] = await Promise.all([prodOrderLines(date), SupaEngine.getProduction(date)]);
   const items = (saved && saved.items) || {};
-  const done = lines.filter(l => items[l.key] !== undefined && items[l.key] !== null && items[l.key] !== "").length;
+  const done = lines.filter(l => prodLineDone(items, l)).length;
   return { total: lines.length, done, printedAt: saved && saved.printed_at };
 }
 
@@ -76,8 +77,7 @@ function renderProductionView() {
   const view = document.getElementById("productionView");
   const items = (prodSaved && prodSaved.items) || {};
   const ro = Auth.isReadOnly();
-  const done = prodLines.filter(l => items[l.key] !== undefined && items[l.key] !== "").length;
-  const short = prodLines.filter(l => items[l.key] !== undefined && items[l.key] !== "" && l.ordered !== null && Number(items[l.key]) < l.ordered - Math.max(l.ordered * 0.05, 0.01)).length;
+  const done = prodLines.filter(l => prodLineDone(items, l)).length;
   const cats = [];
   prodLines.forEach(l => { if (!cats.includes(l.category)) cats.push(l.category); });
   view.innerHTML = `
@@ -85,39 +85,49 @@ function renderProductionView() {
     <div class="item-card">
       <div class="inputs-row">
         <div class="field"><label>طلبية يوم</label><input type="date" id="prodDateInput" value="${prodDate}"></div>
-        <div class="field"><label>الملخص</label><div class="readonly-field">${done}/${prodLines.length} صنف${short ? ` · <b class="prod-short-count">${short} ناقص</b>` : ""}</div></div>
+        <div class="field"><label>الملخص</label><div class="readonly-field" id="prodSummary">${done}/${prodLines.length} صنف</div></div>
       </div>
       ${prodSaved && prodSaved.printed_at ? `<div class="att-now">🖨 انطبعت الطلبية ${new Date(prodSaved.printed_at).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" })}</div>` : ""}
       ${tabAllowed("report") ? `<button type="button" class="btn btn-ghost att-small" id="prodPrintBtn">🖨 اطبع طلبية الفروع</button>` : ""}
     </div>
-    ${!prodLines.length ? `<div class="empty-state">ما في طلبية فروع لهاليوم</div>` : cats.map(cat => `
-      <div class="item-card">
-        <div class="att-sheet-title">${escHtml(cat || "أصناف")}</div>
-        <table class="prod-table"><thead><tr><th>الصنف</th><th>المطلوب</th><th>المنتج</th><th>المطابقة</th></tr></thead><tbody>
-        ${prodLines.filter(l => l.category === cat).map(l => `<tr>
-          <td><b>${escHtml(l.name)}</b>${l.size ? ` <small class="prod-size">${escHtml(l.size)}</small>` : ""}<div class="prod-branches">${Object.entries(l.perBranch).map(([b, q]) => `${escHtml(b)} ${escHtml(q)}`).join(" · ")}</div></td>
-          <td class="prod-need">${escHtml(l.totalText)}</td>
-          <td><div class="prod-cell"><input type="${l.ordered === null ? "text" : "number"}" inputmode="decimal" min="0" step="any" class="prod-input" data-prod-key="${escHtml(l.key)}" value="${escHtml(items[l.key] ?? "")}" ${ro ? "disabled" : ""}>
-            ${ro ? "" : `<button type="button" class="prod-full" data-prod-full="${escHtml(l.key)}" title="انعمل كامل">✓</button>`}</div></td>
-          <td data-prod-diff="${escHtml(l.key)}">${prodDiffHtml(l.ordered, items[l.key])}</td>
-        </tr>`).join("")}
-        </tbody></table>
-      </div>`).join("")}
-    ${prodLines.length && !ro ? `<div class="att-actions"><button class="btn" id="prodSaveBtn">💾 حفظ الإنتاج</button></div>` : ""}
+    ${!prodLines.length ? `<div class="empty-state">ما في طلبية فروع لهاليوم</div>` : cats.map(cat => {
+      const lines = prodLines.filter(l => l.category === cat);
+      return `<details class="prod-cat" open><summary class="prod-cat-head"><span>${escHtml(cat || "أصناف")}</span>
+        <span class="prod-cat-count" data-prod-cat="${escHtml(cat)}">${lines.filter(l => prodLineDone(items, l)).length}/${lines.length}</span></summary>
+        ${lines.map(l => `<div class="item-card prod-item" data-prod-line="${escHtml(l.key)}">
+          <div class="prod-item-head"><b>${escHtml(l.name)}</b>${l.size ? ` <small class="prod-size">(${escHtml(l.size)})</small>` : ""}
+            <span class="prod-total">📋 الإجمالي: <b>${escHtml(l.totalText)}</b></span></div>
+          <div class="prod-branch-grid">${Object.entries(l.perBranch).map(([b, o]) => {
+            const v = prodVal(items, l.key, b);
+            return `<div class="prod-branch">
+              <div class="prod-branch-name">${escHtml(b)}</div>
+              <div class="prod-branch-need">طلب: ${escHtml(o.text)}</div>
+              <div class="prod-cell"><input type="${o.num ? "number" : "text"}" inputmode="decimal" min="0" step="any" class="prod-input" data-prod-key="${escHtml(l.key)}" data-prod-branch="${escHtml(b)}" value="${escHtml(v ?? "")}" placeholder="المنتج" ${ro ? "disabled" : ""}>
+                ${ro ? "" : `<button type="button" class="prod-full" title="انعمل كامل">✓</button>`}</div>
+              <div class="prod-diff-slot">${prodDiffHtml(o.num ? o.num.qty : null, v)}</div>
+            </div>`;
+          }).join("")}</div>
+        </div>`).join("")}
+      </details>`;
+    }).join("")}
+    ${prodLines.length && !ro ? `<div class="att-actions prod-save-bar"><button class="btn" id="prodSaveBtn">💾 حفظ الإنتاج</button></div>` : ""}
     ${prodSaved && prodSaved.saved_at && prodSaved.chef_name ? `<div class="att-now">آخر حفظ: ${escHtml(prodSaved.chef_name)} · ${new Date(prodSaved.saved_at).toLocaleTimeString(phLocale(), { hour: "2-digit", minute: "2-digit" })}</div>` : ""}`;
   const d = document.getElementById("prodDateInput");
   if (d) d.addEventListener("change", () => { prodDate = d.value || todayStr(); loadProductionView(); });
-  view.querySelectorAll(".prod-input").forEach(inp => inp.addEventListener("input", () => {
+  const refresh = (inp) => {
     const l = prodLines.find(x => x.key === inp.dataset.prodKey);
-    const cell = view.querySelector(`[data-prod-diff="${CSS.escape(inp.dataset.prodKey)}"]`);
-    if (l && cell) cell.innerHTML = prodDiffHtml(l.ordered, inp.value);
-  }));
-  view.querySelectorAll(".prod-full").forEach(b => b.addEventListener("click", () => {
-    const l = prodLines.find(x => x.key === b.dataset.prodFull);
-    const inp = view.querySelector(`.prod-input[data-prod-key="${CSS.escape(b.dataset.prodFull)}"]`);
-    if (!l || !inp) return;
-    inp.value = l.ordered !== null ? l.ordered : l.totalText;
-    inp.dispatchEvent(new Event("input"));
+    const o = l && l.perBranch[inp.dataset.prodBranch];
+    const slot = inp.closest(".prod-branch").querySelector(".prod-diff-slot");
+    if (o && slot) slot.innerHTML = prodDiffHtml(o.num ? o.num.qty : null, inp.value);
+  };
+  view.querySelectorAll(".prod-input").forEach(inp => inp.addEventListener("input", () => refresh(inp)));
+  view.querySelectorAll(".prod-full").forEach(btn => btn.addEventListener("click", () => {
+    const inp = btn.parentElement.querySelector(".prod-input");
+    const l = prodLines.find(x => x.key === inp.dataset.prodKey);
+    const o = l && l.perBranch[inp.dataset.prodBranch];
+    if (!o) return;
+    inp.value = o.num ? o.num.qty : o.text;
+    refresh(inp);
   }));
   const pb = document.getElementById("prodPrintBtn");
   if (pb) pb.addEventListener("click", () => { if (typeof openChefReportFor === "function") openChefReportFor(prodDate, ""); });
@@ -129,7 +139,8 @@ async function saveProductionView() {
   const btn = document.getElementById("prodSaveBtn");
   const items = {};
   document.querySelectorAll("#productionView .prod-input").forEach(inp => {
-    if (inp.value.trim() !== "") items[inp.dataset.prodKey] = inp.type === "number" ? Number(inp.value) : inp.value.trim();
+    if (inp.value.trim() === "") return;
+    (items[inp.dataset.prodKey] = items[inp.dataset.prodKey] || {})[inp.dataset.prodBranch] = inp.type === "number" ? Number(inp.value) : inp.value.trim();
   });
   btn.disabled = true; btn.textContent = "جاري الحفظ…";
   try {
