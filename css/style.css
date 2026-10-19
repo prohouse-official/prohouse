@@ -3688,9 +3688,27 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .att-print-page th, .att-print-page td{ border:1px solid #000; height:30px; padding:2px 6px; font-size:14px; text-align:center; }
 .att-print-page th{ background:#eee; }
 .att-print-foot{ font-size:12px; margin-top:8px; }
+/* ثابتة لصورة الـ PDF */
+.att-print-fixed{ max-width:none; width:794px; padding:28px 36px; box-sizing:border-box; }
+.att-print-fixed th, .att-print-fixed td{ height:26px; }
 @media print{
+  @page{ size:A4 portrait; margin:8mm; }
   body.att-printing > *:not(#attPrintOverlay){ display:none !important; }
-  body.att-printing .att-print-overlay{ position:static; overflow:visible; }
+  body.att-printing .att-print-overlay{ position:static; overflow:visible; inset:auto; }
   body.att-printing .att-print-bar{ display:none; }
-  body.att-printing .att-print-page{ max-width:none; padding:10mm; }
+  /* كلها بصفحة وحدة */
+  body.att-printing .att-print-page{ max-width:none; padding:0; page-break-inside:avoid; break-inside:avoid; }
+  body.att-printing .att-print-page h1{ font-size:18px; }
+  body.att-printing .att-print-page h2{ font-size:14px; margin:8px 0 4px; }
+  body.att-printing .att-print-page th, body.att-printing .att-print-page td{ height:22px; padding:1px 6px; font-size:12px; }
+  html, body{ height:auto !important; overflow:visible !important; }
 }
+/* تسجيل الإنتاج */
+.prod-table{ width:100%; border-collapse:collapse; font-size:14px; }
+.prod-table th, .prod-table td{ border-bottom:1px solid var(--line, #eee); padding:6px 4px; text-align:right; vertical-align:middle; }
+.prod-table th{ font-size:12px; color:var(--muted, #777); }
+.prod-branches{ font-size:11px; color:var(--muted, #777); margin-top:2px; }
+.prod-input{ width:80px; padding:6px; font-size:15px; }
+.prod-diff{ font-size:12px; font-weight:800; white-space:nowrap; }
+.prod-diff.ok{ color:#1a8f3c; } .prod-diff.short{ color:#c0392b; } .prod-diff.over{ color:#b7791f; } .prod-diff.todo{ color:var(--muted, #999); }
+.prod-short-count{ color:#c0392b; }

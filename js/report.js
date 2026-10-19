@@ -1015,6 +1015,7 @@ window.addEventListener("resize", () => { if (lastTomorrowReportSheets.length) f
 
 async function exportTomorrowReportExcel() {
   if (!lastTomorrowReportSheets.length && !lastSaladBranches.length) { showToast("اضغط «عرض» أول"); return; }
+  if (typeof markProductionPrinted === "function" && lastTomorrowReportDate) markProductionPrinted(lastTomorrowReportDate);
   await loadReportLibs();
   if (typeof ExcelJS === "undefined") { showToast("مكتبة Excel ما تحمّلت — تأكد من الاتصال بالنت"); return; }
   const S = CHEF_SHEET;
@@ -1138,6 +1139,7 @@ async function buildTomorrowReportPdf() {
 
 async function shareTomorrowReportPdf() {
   if (!lastTomorrowReportSheets.length) { showToast("اضغط «عرض» أول"); return; }
+  if (typeof markProductionPrinted === "function" && lastTomorrowReportDate) markProductionPrinted(lastTomorrowReportDate);
   const btn = document.getElementById("tomorrowReportPdfBtn");
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = "⏳ جاري تجهيز PDF…";
