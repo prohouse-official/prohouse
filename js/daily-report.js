@@ -44,14 +44,15 @@ async function runDailyReport() {
 }
 
 async function loadDailyBranch(date, branch) {
-  const [day, sales, waste, custody, pays, salad, attendance] = await Promise.all([
+  const [day, sales, waste, custody, pays, salad, attendance, inotes] = await Promise.all([
     SupaEngine.getDay(date, branch).catch(() => null),
     SupaEngine.getSalesByCategory(date, date, branch).catch(() => []),
     SupaEngine.getWasteReport(date, branch).catch(() => null),
     SupaEngine.getCustody(date, branch).catch(() => null),
     SupaEngine.getPayments(date, branch).catch(() => []),
     SupaEngine.getSaladCheck(date, branch).catch(() => null),
-    SupaEngine.getAttendance(date, branch).catch(() => [])
+    SupaEngine.getAttendance(date, branch).catch(() => []),
+    SupaEngine.getItemNotes(date, branch).catch(() => null)
   ]);
   const salesMap = {};
   (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
@@ -88,7 +89,7 @@ async function loadDailyBranch(date, branch) {
     hasRemaining: items.some(x => x.remaining != null || x.remainingWeight != null || x.remainingSauce != null),
     hasSales: (sales || []).length > 0,
     hasWaste: wasteItems.length > 0,
-    custody, pays: pays || [], salad, attendance: attendance || []
+    custody, pays: pays || [], salad, attendance: attendance || [], inotes
   };
 }
 
@@ -175,6 +176,15 @@ function saladDailyLine(c) {
   return `<div class="dr-cash${sum.miss.length ? " no" : ""}">🥗 السلطات: ${sum.ok} من ${sum.total} جاهز${miss}<span class="dr-cash-sub">${escHtml(s.chef_name || "")}${recv}</span></div>`;
 }
 
+// سطر ملاحظات الأصناف: الأصناف اللي عليها ملاحظة
+function itemNotesDailyLine(c) {
+  const r = c.inotes;
+  if (!r) return `<div class="dr-cash no">📝 ملاحظات الأصناف: ما انسجّلت</div>`;
+  const list = Object.values(r.items || {}).filter(n => (n.tags || []).length || (n.text || "").trim());
+  if (!list.length) return `<div class="dr-cash">📝 ملاحظات الأصناف: ما في ملاحظات</div>`;
+  return `<div class="dr-cash">📝 ملاحظات الأصناف: ${list.length}<span class="dr-cash-sub">${list.map(n => `${escHtml(n.name || "")}: ${[...(n.tags || []), (n.text || "").trim()].filter(Boolean).map(escHtml).join("، ")}`).join("<br>")}</span></div>`;
+}
+
 // سطر الحضور والانصراف: مين حضر ومين انصرف ووقته (الوقت من السيرفر)
 function attendanceDailyLine(c) {
   if (typeof isAttendanceOffBranch === "function" && isAttendanceOffBranch(c.branch)) return "";
@@ -222,5 +232,6 @@ function dailyBranchHtml(c, date) {
     ${cash}
     ${saladDailyLine(c)}
     ${attendanceDailyLine(c)}
+    ${itemNotesDailyLine(c)}
   </section>`;
 }

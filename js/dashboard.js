@@ -162,6 +162,8 @@ async function loadBranchStatus(branch, dash) {
   }
   const custody = typeof Custody !== "undefined" ? await Custody.statusFor(today, branch) : null;
   // الحضور والانصراف: كم حضور وكم انصراف انسجّل اليوم
+  let inotes = { saved: false, issues: 0 };
+  try { if (typeof itemNotesStatus === "function") inotes = await itemNotesStatus(today, branch); } catch (e) {}
   let attIn = 0, attOut = 0;
   try {
     const att = (SupaEngine.getAttendance && await SupaEngine.getAttendance(today, branch)) || [];
@@ -178,7 +180,7 @@ async function loadBranchStatus(branch, dash) {
     mealsToday: mealsFromDayItems(items),
     mealsYesterday: mealsFromDayItems((yesterdayData && yesterdayData.items) || []),
     tomorrowSaved: !!(tomorrowOrder && tomorrowOrder.length),
-    juicesTotal, juicesCounted, attIn, attOut,
+    juicesTotal, juicesCounted, attIn, attOut, inotes,
     checklistComplete, checklistPercent
   };
 }
@@ -211,6 +213,11 @@ function dayStepsFor(s) {
   // جرد الثلاجة (بروتين بار ومشروبات) — عبداللطيف جميل
   if (s.branch === "عبداللطيف جميل" && tabAllowed("juices") && s.juicesTotal > 0) {
     steps.push({ tab: "juices", icon: "🧊", title: "جرد الثلاجة", state: state(s.juicesCounted, s.juicesTotal), note: fraction(s.juicesCounted, s.juicesTotal) });
+  }
+  if (tabAllowed("itemnotes")) {
+    const n = s.inotes || {};
+    steps.push({ tab: "itemnotes", icon: "📝", title: "ملاحظات الأصناف", state: n.saved ? "done" : "todo",
+      note: n.saved ? (n.issues ? `${n.issues} ملاحظة` : "تم") : "باقي" });
   }
   if (tabAllowed("tomorrow")) {
     steps.push({ tab: "tomorrow", icon: "📝", title: "طلبية الغد", state: s.tomorrowSaved ? "done" : "todo", note: s.tomorrowSaved ? "تم" : "باقي" });
@@ -263,7 +270,13 @@ async function loadKitchenStatus(k, day) {
     const att = (await SupaEngine.getAttendance(day, k.name)) || [];
     st.attIn = att.filter(r => r.kind === "in").length; st.attOut = att.filter(r => r.kind === "out").length;
   } catch (e) {}
-  try { if (typeof productionStatus === "function") st.prod = await productionStatus(day); } catch (e) {}
+  // الإنتاج والطباعة على طلبية الليلة: بعد الضهر طلبية بكرا
+  const prodDay = day === todayStr() && typeof prodDefaultDate === "function" ? prodDefaultDate() : day;
+  try { if (typeof productionStatus === "function") st.prod = await productionStatus(prodDay); } catch (e) {}
+  try {
+    const rows = typeof SupaEngine.getItemNotes === "function" ? await SupaEngine.getItemNotes(day, null) : [];
+    st.notes = { branches: rows.length, issues: rows.reduce((t, r) => t + (typeof inoteIssues === "function" ? inoteIssues(r) : 0), 0) };
+  } catch (e) {}
   return st;
 }
 
@@ -281,6 +294,12 @@ function kitchenCardHtml(k, st) {
   if (tabAllowed("production")) steps.push({ tab: "production", icon: "🏭", title: "تسجيل الإنتاج ومطابقته مع الطلبية", extra: "",
     state: p.total > 0 && p.done >= p.total ? "done" : p.done > 0 ? "partial" : "todo",
     note: p.total > 0 ? `${p.done}/${p.total}` : "—" });
+  if (tabAllowed("itemnotes")) {
+    const n = st.notes || { branches: 0, issues: 0 }, total = branchList().length;
+    steps.push({ tab: "itemnotes", icon: "📝", title: "متابعة ملاحظات الفروع على الأصناف", extra: `data-inote-all="1"`,
+      state: n.branches >= total ? "done" : n.branches > 0 ? "partial" : "todo",
+      note: n.branches ? `${n.branches}/${total} فروع${n.issues ? ` · ${n.issues} ملاحظة` : ""}` : "باقي" });
+  }
   const next = steps.findIndex(x => x.state !== "done");
   return `
     <div class="day-steps-card kitchen-card">
@@ -413,8 +432,9 @@ async function renderDashboard() {
 
   view.querySelectorAll("[data-tab]").forEach(btn => {
     btn.addEventListener("click", () => {
-      if (btn.dataset.chefPrint && typeof openChefReportFor === "function" && tabAllowed("report")) { openChefReportFor(dashDay(), ""); return; }
+      if (btn.dataset.chefPrint && typeof openChefReportFor === "function" && tabAllowed("report")) { openChefReportFor(dashDay() === todayStr() && typeof prodDefaultDate === "function" ? prodDefaultDate() : dashDay(), ""); return; }
       if (btn.dataset.attPlace && typeof attPlace !== "undefined") attPlace = btn.dataset.attPlace;
+      if (typeof inoteBranch !== "undefined") inoteBranch = btn.dataset.inoteAll ? "__all" : (btn.dataset.branch || inoteBranch);
       if (btn.dataset.branch) Branch.set(btn.dataset.branch);
       // مهمة من يوم فات: الشاشة تنفتح على نفس اليوم
       if (btn.classList.contains("day-step") || btn.classList.contains("home-next")) openScreensOnDay(dashDay());
@@ -431,7 +451,8 @@ function openScreensOnDay(day) {
   currentRemainingDate = day; setInput("remainingDateInput", day);
   if (typeof currentCustodyDate !== "undefined") { currentCustodyDate = day; setInput("custodyDateInput", day); }
   if (typeof attDate !== "undefined") attDate = day;
-  if (typeof prodDate !== "undefined") prodDate = day;
+  if (typeof prodDate !== "undefined") prodDate = day === todayStr() && typeof prodDefaultDate === "function" ? prodDefaultDate() : day;
+  if (typeof inoteDate !== "undefined") inoteDate = day;
   if (typeof currentOpeningDate !== "undefined") { currentOpeningDate = day; setInput("openingDateInput", day); }
   // طلبية الغد = اليوم اللي بعد يوم الرئيسية
   if (typeof currentTomorrowDate !== "undefined") { currentTomorrowDate = addDaysStr(day, 1); setInput("tomorrowDateInput", currentTomorrowDate); }

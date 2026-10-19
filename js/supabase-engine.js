@@ -1023,6 +1023,19 @@ const SupaEngine = (() => {
     const r = await query("attendance_log", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(row) });
     return Array.isArray(r) ? r[0] : r;
   }
+  // ملاحظات الأصناف (branch = null → كل الفروع)
+  async function getItemNotes(date, branch) {
+    if (!branch) return (await query(`item_notes?select=*&date=eq.${date}`)) || [];
+    const r = (await query(`item_notes?select=*&date=eq.${date}&branch=eq.${encodeURIComponent(branch)}`)) || [];
+    return r[0] || null;
+  }
+  async function saveItemNotes(row) {
+    await query("item_notes?on_conflict=date,branch", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(row)
+    });
+  }
   // تسجيل الإنتاج بالمطبخ المركزي (صف لكل يوم: الكمية المنتجة لكل صنف + وقت طباعة الطلبية)
   async function getProduction(date) {
     const r = (await query(`production_checks?select=*&date=eq.${date}`)) || [];
@@ -1176,6 +1189,8 @@ const SupaEngine = (() => {
     getAttendance,
     addAttendance,
     getProduction,
+    getItemNotes,
+    saveItemNotes,
     saveProduction,
     saveSaladCheck,
     rpc,
