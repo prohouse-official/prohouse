@@ -1023,6 +1023,18 @@ const SupaEngine = (() => {
     const r = await query("attendance_log", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(row) });
     return Array.isArray(r) ? r[0] : r;
   }
+  // تسجيل الإنتاج بالمطبخ المركزي (صف لكل يوم: الكمية المنتجة لكل صنف + وقت طباعة الطلبية)
+  async function getProduction(date) {
+    const r = (await query(`production_checks?select=*&date=eq.${date}`)) || [];
+    return r[0] || null;
+  }
+  async function saveProduction(row) {
+    await query("production_checks?on_conflict=date", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(row)
+    });
+  }
   // كميات اشتراكات تكرار لليوم (تقرير BoQ) — قراءة بس
   async function getTakrarBoq(date) {
     const r = (await query(`takrar_boq?select=items&date=eq.${date}`)) || [];
@@ -1163,6 +1175,8 @@ const SupaEngine = (() => {
     getTakrarBoq,
     getAttendance,
     addAttendance,
+    getProduction,
+    saveProduction,
     saveSaladCheck,
     rpc,
     login,

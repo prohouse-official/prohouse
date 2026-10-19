@@ -256,20 +256,49 @@ function centralKitchen() {
   try { const k = typeof raw === "string" ? JSON.parse(raw) : raw; return k && k.name ? k : null; } catch (e) { return null; }
 }
 
-function kitchenCardHtml(k) {
-  const tasks = Array.isArray(k.tasks) ? k.tasks.filter(Boolean) : [];
+// حالة مهام فريق الشيف لليوم: الحضور، طباعة طلبية الفروع، وتسجيل الإنتاج
+async function loadKitchenStatus(k, day) {
+  const st = { attIn: 0, attOut: 0, prod: { total: 0, done: 0, printedAt: null } };
+  try {
+    const att = (await SupaEngine.getAttendance(day, k.name)) || [];
+    st.attIn = att.filter(r => r.kind === "in").length; st.attOut = att.filter(r => r.kind === "out").length;
+  } catch (e) {}
+  try { if (typeof productionStatus === "function") st.prod = await productionStatus(day); } catch (e) {}
+  return st;
+}
+
+function kitchenCardHtml(k, st) {
   const staff = Array.isArray(k.staff) ? k.staff.filter(Boolean) : [];
+  st = st || { attIn: 0, attOut: 0, prod: { total: 0, done: 0 } };
+  const p = st.prod || {};
+  const team = "فريق الشيف";
+  const steps = [];
+  if (tabAllowed("attendance")) steps.push({ tab: "attendance", icon: "🕘", title: "الحضور والانصراف", extra: `data-att-place="${escHtml(k.name)}"`,
+    state: st.attIn > 0 && st.attOut >= st.attIn ? "done" : st.attIn > 0 ? "partial" : "todo",
+    note: st.attIn > 0 ? `${st.attIn} حضور · ${st.attOut} انصراف` : "باقي" });
+  if (tabAllowed("report") || tabAllowed("production")) steps.push({ tab: tabAllowed("report") ? "report" : "production", icon: "🖨", title: "طباعة طلبية الفروع", extra: `data-chef-print="1"`,
+    state: p.printedAt ? "done" : "todo", note: p.printedAt ? "تم" : "باقي" });
+  if (tabAllowed("production")) steps.push({ tab: "production", icon: "🏭", title: "تسجيل الإنتاج ومطابقته مع الطلبية", extra: "",
+    state: p.total > 0 && p.done >= p.total ? "done" : p.done > 0 ? "partial" : "todo",
+    note: p.total > 0 ? `${p.done}/${p.total}` : "—" });
+  const next = steps.findIndex(x => x.state !== "done");
   return `
     <div class="day-steps-card kitchen-card">
       <div class="day-steps-head">
         <span class="day-steps-branch">🍳 ${escHtml(k.name)}</span>
-        <span class="day-steps-count">${staff.length} موظفين</span>
+        <span class="day-steps-count">${steps.filter(x => x.state === "done").length}/${steps.length}</span>
       </div>
       ${k.lead ? `<div class="kitchen-line">👨‍🍳 المسؤول: <b>${escHtml(k.lead)}</b></div>` : ""}
       ${staff.length ? `<div class="kitchen-line">👥 ${staff.map(x => escHtml(x)).join(" · ")}</div>` : ""}
-      ${tasks.length
-        ? tasks.map(t => `<div class="day-step todo"><span class="day-step-icon">📋</span><span class="day-step-title">${escHtml(t)}</span></div>`).join("")
-        : `<div class="kitchen-line kitchen-soon">📋 المهام بتنضاف هون أول ما يوصل الوصف الوظيفي من الشيف</div>`}
+      ${steps.map((x, i) => {
+        const label = x.state === "done" ? "✓ تم" : x.note;
+        return `<button type="button" class="day-step ${x.state}${i === next ? " next" : ""}" data-tab="${x.tab}" ${x.extra}>
+          <span class="day-step-icon">${x.icon}</span>
+          <span class="day-step-title">${x.title}<small class="day-step-owner">👤 ${escHtml(taskOwner(k.name, x.tab) || team)}</small></span>
+          <span class="day-step-status">${label}</span>
+          <span class="day-step-go">‹</span>
+        </button>`;
+      }).join("")}
     </div>`;
 }
 
@@ -307,11 +336,12 @@ async function renderDashboard() {
 
   if (typeof currentSettings !== "undefined" && !Object.keys(currentSettings).length && typeof loadSettings === "function") { try { await loadSettings(); } catch (e) {} }
   const kitchen = centralKitchen();
+  const kitchenSt = kitchen ? await loadKitchenStatus(kitchen, today) : null;
   if (Auth.role() === "kitchen") {
     view.innerHTML = `
       <div class="home-hello">${greeting}، ${escHtml(name)} 👋</div>
       <div class="home-sub">${dateLabel}</div>
-      ${kitchen ? kitchenCardHtml(kitchen) : ""}
+      ${kitchen ? kitchenCardHtml(kitchen, kitchenSt) : ""}
       <button type="button" class="home-help-link" data-tab="assistant">💬 عندك سؤال؟ اسأل المساعد</button>
     `;
   } else if (Auth.isBranchStaff()) {
@@ -347,7 +377,7 @@ async function renderDashboard() {
       ${dayBar}
       <div class="home-swiper" id="homeSwiper">
         ${statuses.map(s => `<div class="home-slide">${stepsCardHtml(s, true)}</div>`).join("")}
-        ${kitchen ? `<div class="home-slide">${kitchenCardHtml(kitchen)}</div>` : ""}
+        ${kitchen ? `<div class="home-slide">${kitchenCardHtml(kitchen, kitchenSt)}</div>` : ""}
       </div>
       ${statuses.length + (kitchen ? 1 : 0) > 1 ? `<div class="home-dots">${[...statuses.map(s => s.branch), ...(kitchen ? [kitchen.name] : [])].map((b, i) => `<button type="button" class="home-dot${i ? "" : " active"}" data-slide="${i}" aria-label="${escHtml(b)}"></button>`).join("")}</div>` : ""}
       ${flagged.length ? `<button type="button" class="home-flag" data-tab="report">⚠ ${flagged.length} صنف إرجاعه مرتفع هالشهر ‹</button>` : ""}
@@ -383,6 +413,8 @@ async function renderDashboard() {
 
   view.querySelectorAll("[data-tab]").forEach(btn => {
     btn.addEventListener("click", () => {
+      if (btn.dataset.chefPrint && typeof openChefReportFor === "function" && tabAllowed("report")) { openChefReportFor(dashDay(), ""); return; }
+      if (btn.dataset.attPlace && typeof attPlace !== "undefined") attPlace = btn.dataset.attPlace;
       if (btn.dataset.branch) Branch.set(btn.dataset.branch);
       // مهمة من يوم فات: الشاشة تنفتح على نفس اليوم
       if (btn.classList.contains("day-step") || btn.classList.contains("home-next")) openScreensOnDay(dashDay());
@@ -398,6 +430,8 @@ function openScreensOnDay(day) {
   currentReceivingDate = day; setInput("receivingDateInput", day);
   currentRemainingDate = day; setInput("remainingDateInput", day);
   if (typeof currentCustodyDate !== "undefined") { currentCustodyDate = day; setInput("custodyDateInput", day); }
+  if (typeof attDate !== "undefined") attDate = day;
+  if (typeof prodDate !== "undefined") prodDate = day;
   if (typeof currentOpeningDate !== "undefined") { currentOpeningDate = day; setInput("openingDateInput", day); }
   // طلبية الغد = اليوم اللي بعد يوم الرئيسية
   if (typeof currentTomorrowDate !== "undefined") { currentTomorrowDate = addDaysStr(day, 1); setInput("tomorrowDateInput", currentTomorrowDate); }

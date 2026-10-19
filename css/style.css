@@ -3694,3 +3694,12 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
   body.att-printing .att-print-bar{ display:none; }
   body.att-printing .att-print-page{ max-width:none; padding:10mm; }
 }
+/* تسجيل الإنتاج */
+.prod-table{ width:100%; border-collapse:collapse; font-size:14px; }
+.prod-table th, .prod-table td{ border-bottom:1px solid var(--line, #eee); padding:6px 4px; text-align:right; vertical-align:middle; }
+.prod-table th{ font-size:12px; color:var(--muted, #777); }
+.prod-branches{ font-size:11px; color:var(--muted, #777); margin-top:2px; }
+.prod-input{ width:80px; padding:6px; font-size:15px; }
+.prod-diff{ font-size:12px; font-weight:800; white-space:nowrap; }
+.prod-diff.ok{ color:#1a8f3c; } .prod-diff.short{ color:#c0392b; } .prod-diff.over{ color:#b7791f; } .prod-diff.todo{ color:var(--muted, #999); }
+.prod-short-count{ color:#c0392b; }
