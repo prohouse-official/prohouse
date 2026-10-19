@@ -3662,3 +3662,17 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .salad-b{ width:46px; height:38px; border-radius:10px; border:1.5px solid var(--line, #ddd); background:var(--card, #fff); font-size:18px; cursor:pointer; opacity:.45; }
 .salad-b.on{ opacity:1; border-color:var(--black, #000); } .salad-b.ok.on{ background:var(--green-bg, #E6F7F0); } .salad-b.miss.on{ background:var(--red-bg, #FFECEC); }
 .salad-ro{ font-size:18px; }
+
+/* الحضور والانصراف */
+.att-actions{ display:flex; gap:8px; margin-top:10px; } .att-actions .btn{ flex:1; }
+.att-btn{ font-size:16px; padding:14px; font-weight:800; }
+.att-in{ background:var(--green, #1FA971); color:#fff; } .att-out{ background:var(--red, #D62F2F); color:#fff; }
+.att-in-card{ border-inline-start:4px solid var(--green, #1FA971); } .att-out-card{ border-inline-start:4px solid var(--red, #D62F2F); }
+.att-sheet-title{ font-weight:900; font-size:15px; margin-bottom:8px; } .att-sheet-title small{ color:var(--muted, #777); }
+.att-sig-pad{ width:100%; max-width:600px; height:auto; aspect-ratio:3/1; border:1.5px dashed var(--line, #ccc); border-radius:10px; background:#fff; touch-action:none; display:block; }
+.att-small{ margin-top:6px; padding:6px 12px; font-size:13px; } .att-cam{ display:inline-block; cursor:pointer; }
+.att-preview{ display:block; max-width:220px; margin-top:8px; border-radius:8px; border:1px solid var(--line, #ddd); }
+.att-now{ font-size:12px; color:var(--muted, #777); margin-top:8px; }
+.att-table{ width:100%; border-collapse:collapse; font-size:13px; } .att-table th, .att-table td{ border-bottom:1px solid var(--line, #eee); padding:6px 4px; text-align:right; vertical-align:middle; }
+.att-sig{ height:34px; background:#fff; border:1px solid var(--line, #eee); border-radius:4px; cursor:pointer; }
+.att-photo{ height:44px; width:44px; object-fit:cover; border-radius:6px; cursor:pointer; }

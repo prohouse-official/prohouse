@@ -1014,6 +1014,15 @@ const SupaEngine = (() => {
   async function getSaladChecks(date) {
     return (await query(`salad_checks?select=*&date=eq.${date}`)) || [];
   }
+  // الحضور والانصراف (branch = null → كل الفروع). الوقت recorded_at من السيرفر
+  async function getAttendance(date, branch) {
+    const b = branch ? `&branch=eq.${encodeURIComponent(branch)}` : "";
+    return (await query(`attendance_log?select=*&date=eq.${date}${b}&order=recorded_at.asc`)) || [];
+  }
+  async function addAttendance(row) {
+    const r = await query("attendance_log", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(row) });
+    return Array.isArray(r) ? r[0] : r;
+  }
   // كميات اشتراكات تكرار لليوم (تقرير BoQ) — قراءة بس
   async function getTakrarBoq(date) {
     const r = (await query(`takrar_boq?select=items&date=eq.${date}`)) || [];
@@ -1152,6 +1161,8 @@ const SupaEngine = (() => {
     getSaladCheck,
     getSaladChecks,
     getTakrarBoq,
+    getAttendance,
+    addAttendance,
     saveSaladCheck,
     rpc,
     login,
