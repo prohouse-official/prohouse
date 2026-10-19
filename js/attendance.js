@@ -186,21 +186,29 @@ async function attSave() {
 }
 
 // ورقة للطباعة: حضور وانصراف، كل سطر اسم وتوقيع (الوقت من صورة الموقع)
+// بتفتح جوّا التطبيق (مو نافذة جديدة) عشان يكون فيه زر رجوع — بالتطبيق المثبّت ما في أزرار متصفح
 function attPrintSheet() {
   const shift = attShiftLabel(attShift(attPlace));
   const rows = (n) => Array.from({ length: n }, (_, i) => `<tr><td>${i + 1}</td><td></td><td></td></tr>`).join("");
   const table = (t) => `<h2>${t}</h2><table><thead><tr><th style="width:8%">#</th><th style="width:52%">الاسم</th><th>التوقيع</th></tr></thead><tbody>${rows(12)}</tbody></table>`;
-  const w = window.open("", "_blank");
-  if (!w) { showToast("اسمح بالنوافذ المنبثقة للطباعة"); return; }
-  w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>ورقة الحضور — ${escHtml(attPlace)}</title>
-    <style>body{font-family:Tahoma,Arial,sans-serif;margin:14mm;color:#000}h1{margin:0;font-size:22px}h2{font-size:17px;margin:14px 0 6px}
-    .meta{display:flex;justify-content:space-between;font-size:14px;margin-top:6px;border-bottom:2px solid #000;padding-bottom:6px}
-    table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;height:30px;padding:2px 6px;font-size:14px;text-align:center}
-    th{background:#eee}@page{size:A4;margin:0}</style></head><body>
-    <h1>Pro House — ورقة الحضور والانصراف</h1>
-    <div class="meta"><span>الفرع: <b>${escHtml(attPlace)}</b></span><span>التاريخ: ____ / ____ / ________</span>${shift ? `<span>الدوام: <b>${shift}</b></span>` : ""}</div>
-    ${table("📥 الحضور")}${table("📤 الانصراف")}
-    <p style="font-size:12px;margin-top:8px">بعد التوقيع صوّر الورقة من الموقع (الحضور والانصراف) — ما بينسجّل الحضور بدون صورة.</p>
-    <script>window.onload=()=>{window.print()}<\/script></body></html>`);
-  w.document.close();
+  const old = document.getElementById("attPrintOverlay");
+  if (old) old.remove();
+  const ov = document.createElement("div");
+  ov.id = "attPrintOverlay";
+  ov.className = "att-print-overlay";
+  ov.innerHTML = `<div class="att-print-bar">
+      <button type="button" class="btn btn-ghost" id="attPrintClose">→ رجوع للتطبيق</button>
+      <button type="button" class="btn" id="attPrintGo">🖨 اطبع</button>
+    </div>
+    <div class="att-print-page">
+      <h1>Pro House — ورقة الحضور والانصراف</h1>
+      <div class="meta"><span>الفرع: <b>${escHtml(attPlace)}</b></span><span>التاريخ: ____ / ____ / ________</span>${shift ? `<span>الدوام: <b>${shift}</b></span>` : ""}</div>
+      ${table("📥 الحضور")}${table("📤 الانصراف")}
+      <p class="att-print-foot">بعد التوقيع صوّر الورقة من الموقع (الحضور والانصراف) — ما بينسجّل الحضور بدون صورة.</p>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.classList.add("att-printing");
+  const close = () => { ov.remove(); document.body.classList.remove("att-printing"); };
+  document.getElementById("attPrintClose").addEventListener("click", close);
+  document.getElementById("attPrintGo").addEventListener("click", () => window.print());
 }
