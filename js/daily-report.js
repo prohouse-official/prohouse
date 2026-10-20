@@ -232,6 +232,5 @@ function dailyBranchHtml(c, date) {
     ${cash}
     ${saladDailyLine(c)}
     ${attendanceDailyLine(c)}
-    ${itemNotesDailyLine(c)}
   </section>`;
 }

@@ -3749,3 +3749,34 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 .prod-totals .prod-total{ margin:0; }
 .prod-made.ok{ background:#e6f6ea; color:#1a8f3c; }
 .prod-made.short{ background:#fde8e6; color:#c0392b; }
+/* ملصقات القيم الغذائية 6×4 سم */
+.lbl-modes{ display:flex; gap:8px; margin-bottom:10px; }
+.lbl-mode{ flex:1; border:1px solid var(--line, #ddd); background:#fff; border-radius:10px; padding:8px; font-weight:800; cursor:pointer; }
+.lbl-mode.on{ background:#fff3d6; border-color:#d9a400; }
+.lbl-sizes{ display:flex; flex-wrap:wrap; gap:8px; }
+.lbl-size{ display:flex; flex-direction:column; gap:4px; border:1px solid var(--line, #eee); border-radius:10px; padding:6px 8px; font-size:12px; min-width:110px; flex:1; }
+.lbl-size input{ width:100%; }
+.lbl{ width:60mm; height:40mm; padding:2mm 2.4mm; box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; gap:1mm; background:#fff; color:#000; direction:rtl; font-family:inherit; }
+.lbl-hd{ display:flex; align-items:center; gap:1.6mm; }
+.lbl-hd img{ height:8mm; }
+.lbl-nm{ display:flex; flex-direction:column; line-height:1.15; min-width:0; }
+.lbl-nm b{ font-size:10pt; }
+.lbl-nm span{ font-size:6.5pt; direction:ltr; text-align:right; }
+.lbl-sz{ font-size:7.5pt; font-weight:700; min-height:3mm; }
+.lbl-t{ width:100%; border-collapse:collapse; font-size:8.5pt; text-align:center; }
+.lbl-t th{ font-size:6.5pt; font-weight:700; background:#eee; border:.25mm solid #000; line-height:1.1; padding:.4mm; }
+.lbl-t th i{ display:block; font-style:normal; font-size:5.5pt; }
+.lbl-t td{ direction:ltr; border:.25mm solid #000; padding:.7mm; }
+.lbl-ft{ font-size:6.5pt; margin-top:auto; }
+.lbl-pages{ display:flex; flex-wrap:wrap; gap:6px; padding:12px; justify-content:center; background:#f4f4f4; }
+.lbl-pages .lbl{ box-shadow:0 0 0 1px #ccc; }
+@media print{
+  body.lbl-printing > *:not(#lblPrintOverlay){ display:none !important; }
+  body.lbl-printing .att-print-overlay{ position:static; overflow:visible; inset:auto; }
+  body.lbl-printing .att-print-bar{ display:none; }
+  body.lbl-printing .lbl-pages{ display:block; padding:0; background:#fff; }
+  body.lbl-printing .lbl-pages .lbl{ box-shadow:none; page-break-after:always; break-after:page; }
+  body.lbl-printing .lbl-pages .lbl:last-child{ page-break-after:auto; break-after:auto; }
+  body.lbl-printing .lbl-pages .lbl{ height:39.5mm; }
+  html, body.lbl-printing{ height:auto !important; min-height:0 !important; padding:0 !important; margin:0 !important; }
+}

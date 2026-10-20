@@ -1,0 +1,182 @@
+// ==================== ملصقات القيم الغذائية (اشتراكات تكرار) ====================
+// ملصق 6×4 سم (عرضي) لكل وجبة: الاسم، الحجم، السعرات والبروتين والكارب والدهون، والتاريخ.
+// القيم من منيو تكرار (جدول takrar_products). وضعين: «طلبات يوم» من تقرير BoQ (عدد الملصقات = عدد الوجبات)،
+// أو «كل الأصناف» — بتختار أي صنف وأي حجم وكم ملصق.
+
+let lblMode = "day";
+let lblDate = new Date().getHours() >= 12 ? addDaysStr(todayStr(), 1) : todayStr();
+let lblProducts = [];
+let lblBoq = [];
+let lblCounts = {}; // «id|الحجم» → عدد (وضع كل الأصناف)
+let lblLoadSeq = 0;
+
+const LBL_SIZES = { "100P - 100C": "100 جم بروتين · 100 جم كارب", "150P - 150C": "150 جم بروتين · 150 جم كارب", "200P - 200C": "200 جم بروتين · 200 جم كارب" };
+const lblNorm = (s) => String(s || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/\s+/g, " ").trim();
+const lblNum = (x) => (Math.round(Number(x) * 10) / 10).toString();
+
+async function loadLabelsView() {
+  const view = document.getElementById("labelsView");
+  if (!view) return;
+  const seq = ++lblLoadSeq;
+  view.innerHTML = '<div class="loader">جاري التحميل…</div>';
+  try {
+    const [prods, boq] = await Promise.all([
+      lblProducts.length ? lblProducts : SupaEngine.getTakrarProducts(),
+      lblMode === "day" ? SupaEngine.getTakrarBoq(lblDate) : []
+    ]);
+    if (seq !== lblLoadSeq) return;
+    lblProducts = prods || []; lblBoq = boq || [];
+  } catch (e) {
+    if (seq !== lblLoadSeq) return;
+    view.innerHTML = `<div class="empty-state">⚠ تعذّر التحميل — ${escHtml(e.message || String(e))}</div>`;
+    return;
+  }
+  renderLabelsView();
+}
+
+// قائمة الملصقات: [{ p, size, nut, extra }]
+function lblList() {
+  const byName = new Map(lblProducts.map(p => [lblNorm(p.name_ar), p]));
+  const out = [], missing = [];
+  if (lblMode === "day") {
+    lblBoq.forEach(b => {
+      const p = byName.get(lblNorm(b.name));
+      const nut = p && (p.nutrition[b.size || ""] || (!b.size && Object.values(p.nutrition).length === 1 ? Object.values(p.nutrition)[0] : null));
+      if (!p || !nut) { missing.push(`${b.name}${b.size ? " (" + b.size + ")" : ""}`); return; }
+      const vs = (b.variants || []).map(v => [v.name, Number(v.qty) || 0]);
+      const rest = (Number(b.qty) || 0) - vs.reduce((t, [, q]) => t + q, 0);
+      vs.concat(rest > 0 ? [["", rest]] : []).forEach(([vn, q]) => { for (let i = 0; i < q; i++) out.push({ p, size: b.size || "", nut, extra: vn ? "مع " + vn : "" }); });
+    });
+  } else {
+    lblProducts.forEach(p => Object.entries(p.nutrition).forEach(([size, nut]) => {
+      const n = Number(lblCounts[p.id + "|" + size]) || 0;
+      for (let i = 0; i < n; i++) out.push({ p, size, nut, extra: "" });
+    }));
+  }
+  return { out, missing };
+}
+
+function lblHtml(l, date) {
+  const [y, m, d] = date.split("-").map(Number);
+  const sz = [LBL_SIZES[l.size] || "", l.extra].filter(Boolean).join(" · ");
+  return `<div class="lbl"><div class="lbl-hd"><img src="assets/logo.png" alt=""><div class="lbl-nm"><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en || "")}</span></div></div>
+    <div class="lbl-sz">${escHtml(sz)}</div>
+    <table class="lbl-t"><tr><th>سعرات<i>Calories</i></th><th>بروتين<i>Protein</i></th><th>كارب<i>Carbs</i></th><th>دهون<i>Fat</i></th></tr>
+    <tr><td><b>${lblNum(l.nut.calories)}</b></td><td>${lblNum(l.nut.protein)} g</td><td>${lblNum(l.nut.carbs)} g</td><td>${lblNum(l.nut.fat)} g</td></tr></table>
+    <div class="lbl-ft">${d}/${m}/${y}</div></div>`;
+}
+
+function renderLabelsView() {
+  const view = document.getElementById("labelsView");
+  const { out, missing } = lblList();
+  const cats = [];
+  lblProducts.forEach(p => { if (!cats.includes(p.category)) cats.push(p.category); });
+  view.innerHTML = `
+    <h2 class="juice-page-title">🏷️ ملصقات القيم الغذائية</h2>
+    <div class="item-card">
+      <div class="lbl-modes">
+        <button type="button" class="lbl-mode${lblMode === "day" ? " on" : ""}" data-lbl-mode="day">📦 طلبات يوم</button>
+        <button type="button" class="lbl-mode${lblMode === "all" ? " on" : ""}" data-lbl-mode="all">📋 كل الأصناف</button>
+      </div>
+      <div class="inputs-row">
+        <div class="field"><label>${lblMode === "day" ? "يوم التوصيل" : "التاريخ على الملصق"}</label><input type="date" id="lblDateInput" value="${lblDate}"></div>
+        <div class="field"><label>الملصقات</label><div class="readonly-field"><b>${out.length}</b> ملصق · 6×4 سم</div></div>
+      </div>
+      <div class="att-actions">
+        <button class="btn" id="lblPrintBtn" ${out.length ? "" : "disabled"}>🖨 اطبع</button>
+        <button class="btn btn-ghost" id="lblDownBtn" ${out.length ? "" : "disabled"}>⬇ تنزيل PDF</button>
+        <button class="btn btn-ghost" id="lblShareBtn" ${out.length ? "" : "disabled"}>📤 مشاركة</button>
+      </div>
+      ${missing.length ? `<div class="att-now prod-short-count">⚠ ما في قيم غذائية لـ: ${missing.map(escHtml).join("، ")}</div>` : ""}
+    </div>
+    ${lblMode === "day"
+      ? (lblBoq.length ? `<div class="item-card">${lblBoq.map(b => `<div class="inote-line"><b>${escHtml(b.name)}</b><span>${escHtml(b.size || "")} · ${Number(b.qty) || 0} وجبة${(b.variants || []).length ? " · " + b.variants.map(v => `${escHtml(v.name)} ${v.qty}`).join("، ") : ""}</span></div>`).join("")}</div>`
+        : `<div class="empty-state">ما في طلبات اشتراكات لهاليوم</div>`)
+      : cats.map(c => `<details class="prod-cat" open><summary class="prod-cat-head"><span>${escHtml(c || "أصناف")}</span></summary>
+        ${lblProducts.filter(p => p.category === c).map(p => {
+          const sizes = Object.keys(p.nutrition);
+          return `<div class="item-card lbl-item"><div class="prod-item-head"><b>${escHtml(p.name_ar)}</b> <small class="prod-size">${escHtml(p.name_en || "")}</small></div>
+            ${!sizes.length ? `<div class="att-now">ما في قيم غذائية بتكرار</div>` : `<div class="lbl-sizes">${sizes.map(s => `<label class="lbl-size">
+              <span>${escHtml(s ? s.replace(/P - \d+C/, "") + " جم" : "حجم واحد")} · ${lblNum(p.nutrition[s].calories)} سعرة</span>
+              <input type="number" inputmode="numeric" min="0" step="1" class="lbl-count" data-lbl-key="${escHtml(p.id + "|" + s)}" value="${lblCounts[p.id + "|" + s] || ""}" placeholder="0"></label>`).join("")}</div>`}
+          </div>`;
+        }).join("")}</details>`).join("")}`;
+  view.querySelectorAll("[data-lbl-mode]").forEach(b => b.addEventListener("click", () => { lblMode = b.dataset.lblMode; loadLabelsView(); }));
+  const d = document.getElementById("lblDateInput");
+  if (d) d.addEventListener("change", () => { lblDate = d.value || todayStr(); if (lblMode === "day") loadLabelsView(); else renderLabelsView(); });
+  view.querySelectorAll(".lbl-count").forEach(inp => inp.addEventListener("change", () => {
+    lblCounts[inp.dataset.lblKey] = Math.max(0, parseInt(inp.value, 10) || 0);
+    renderLabelsView();
+  }));
+  const pb = document.getElementById("lblPrintBtn");
+  if (pb) pb.addEventListener("click", () => lblOpenPrint(out));
+  const db = document.getElementById("lblDownBtn");
+  if (db) db.addEventListener("click", (e) => lblPdf(out, e.currentTarget, false));
+  const sb = document.getElementById("lblShareBtn");
+  if (sb) sb.addEventListener("click", (e) => lblPdf(out, e.currentTarget, true));
+}
+
+// الطباعة جوّا التطبيق (متل ورقة الحضور): كل ملصق صفحة 60×40 مم
+function lblOpenPrint(list) {
+  const old = document.getElementById("lblPrintOverlay");
+  if (old) old.remove();
+  const oldPg = document.getElementById("lblPageSize");
+  if (oldPg) oldPg.remove();
+  const ov = document.createElement("div");
+  ov.id = "lblPrintOverlay";
+  ov.className = "att-print-overlay";
+  ov.innerHTML = `<div class="att-print-bar">
+      <button type="button" class="btn btn-ghost" id="lblPrintClose">→ رجوع للتطبيق</button>
+      <button type="button" class="btn" id="lblPrintGo">🖨 اطبع (${list.length})</button>
+    </div>
+    <div class="lbl-pages">${list.map(l => lblHtml(l, lblDate)).join("")}</div>`;
+  // مقاس الصفحة 60×40 بس وقت طباعة الملصقات (ورقة الحضور A4)
+  const pg = document.createElement("style");
+  pg.id = "lblPageSize";
+  pg.textContent = "@media print{@page{size:60mm 40mm;margin:0}}";
+  document.head.appendChild(pg);
+  document.body.appendChild(ov);
+  document.body.classList.add("lbl-printing");
+  document.getElementById("lblPrintClose").addEventListener("click", () => { ov.remove(); pg.remove(); document.body.classList.remove("lbl-printing"); });
+  document.getElementById("lblPrintGo").addEventListener("click", () => window.print());
+}
+
+// PDF: صفحة 60×40 مم لكل ملصق — بالجوال بيفتح المشاركة
+async function lblPdf(list, btn, share) {
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳ جاري التجهيز…";
+  const stage = document.createElement("div");
+  stage.style.cssText = "position:fixed;left:-99999px;top:0;background:#fff;";
+  document.body.appendChild(stage);
+  try {
+    if (typeof loadPdfLibs === "function") await loadPdfLibs();
+    if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [60, 40], compress: true });
+    // نفس الصنف بنفس الحجم = نفس الصورة: منصوّر كل شكل مرة وحدة
+    const cache = new Map();
+    for (let i = 0; i < list.length; i++) {
+      const key = list[i].p.id + "|" + list[i].size + "|" + list[i].extra;
+      if (!cache.has(key)) {
+        stage.innerHTML = lblHtml(list[i], lblDate);
+        const canvas = await html2canvas(stage.firstElementChild, { scale: 4, backgroundColor: "#ffffff", logging: false });
+        cache.set(key, canvas.toDataURL("image/jpeg", 0.92));
+      }
+      if (i) pdf.addPage([60, 40], "landscape");
+      pdf.addImage(cache.get(key), "JPEG", 0, 0, 60, 40);
+    }
+    const blob = pdf.output("blob");
+    const name = `ملصقات_القيم_الغذائية_${lblDate}.pdf`;
+    const file = new File([blob], name, { type: "application/pdf" });
+    if (share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "ملصقات القيم الغذائية" }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) {
+    showToast("⚠ " + (e.message || e));
+  } finally { stage.remove(); btn.disabled = false; btn.textContent = label; }
+}

@@ -1050,6 +1050,10 @@ const SupaEngine = (() => {
       body: JSON.stringify(row)
     });
   }
+  // أصناف تكرار مع قيمها الغذائية (لكل حجم) — للملصقات
+  async function getTakrarProducts() {
+    return (await query("takrar_products?select=id,name_ar,name_en,category,nutrition&order=category,name_ar")) || [];
+  }
   // كميات اشتراكات تكرار لليوم (تقرير BoQ) — قراءة بس
   async function getTakrarBoq(date) {
     const r = (await query(`takrar_boq?select=items&date=eq.${date}`)) || [];
@@ -1188,6 +1192,7 @@ const SupaEngine = (() => {
     getSaladCheck,
     getSaladChecks,
     getTakrarBoq,
+    getTakrarProducts,
     getAttendance,
     addAttendance,
     getProduction,
