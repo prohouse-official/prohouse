@@ -52,8 +52,9 @@ function lblList() {
       vs.concat(rest > 0 ? [["", rest]] : []).forEach(([vn, q]) => { for (let i = 0; i < q; i++) out.push({ p, size: b.size || "", nut, extra: vn ? "مع " + vn : "" }); });
     });
   } else {
+    const any = Object.values(lblCounts).some(v => Number(v) > 0);
     lblProducts.forEach(p => Object.entries(p.nutrition).forEach(([size, nut]) => {
-      const n = Number(lblCounts[p.id + "|" + size]) || 0;
+      const n = any ? Number(lblCounts[p.id + "|" + size]) || 0 : 1; // ما اخترت عدد؟ ملصق لكل صنف وحجم
       for (let i = 0; i < n; i++) out.push({ p, size, nut, extra: "" });
     }));
   }
@@ -61,13 +62,14 @@ function lblList() {
 }
 
 function lblHtml(l, date) {
-  const [y, m, d] = date.split("-").map(Number);
+  const [y, m, d] = date ? date.split("-").map(Number) : [];
+  const w = (/^(\d+)P/.exec(l.size || "") || [])[1]; // حجم الوجبة اللي محسوبة عليه السعرات (100 / 150 / 200)
   const sz = [LBL_SIZES[l.size] || "", l.extra].filter(Boolean).join(" · ");
   return `<div class="lbl"><div class="lbl-hd"><img src="assets/logo.png" alt=""><div class="lbl-nm"><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en || "")}</span></div></div>
-    <div class="lbl-sz">${escHtml(sz)}</div>
+    <div class="lbl-sz">${w ? `<span class="lbl-w">وجبة ${w}</span>` : ""}${escHtml(sz)}</div>
     <table class="lbl-t"><tr><th>سعرات<i>Calories</i></th><th>بروتين<i>Protein</i></th><th>كارب<i>Carbs</i></th><th>دهون<i>Fat</i></th></tr>
     <tr><td><b>${lblNum(l.nut.calories)}</b></td><td>${lblNum(l.nut.protein)} g</td><td>${lblNum(l.nut.carbs)} g</td><td>${lblNum(l.nut.fat)} g</td></tr></table>
-    <div class="lbl-ft">${d}/${m}/${y}</div></div>`;
+    ${date ? `<div class="lbl-ft">${d}/${m}/${y}</div>` : ""}</div>`;
 }
 
 function renderLabelsView() {
@@ -83,8 +85,8 @@ function renderLabelsView() {
         <button type="button" class="lbl-mode${lblMode === "all" ? " on" : ""}" data-lbl-mode="all">📋 كل الأصناف</button>
       </div>
       <div class="inputs-row">
-        <div class="field"><label>${lblMode === "day" ? "يوم التوصيل" : "التاريخ على الملصق"}</label><input type="date" id="lblDateInput" value="${lblDate}"></div>
-        <div class="field"><label>الملصقات</label><div class="readonly-field"><b>${out.length}</b> ملصق · 6×4 سم</div></div>
+        ${lblMode === "day" ? `<div class="field"><label>يوم التوصيل</label><input type="date" id="lblDateInput" value="${lblDate}"></div>` : ""}
+        <div class="field"><label>الملصقات</label><div class="readonly-field"><b>${out.length}</b> ملصق · 6×4 سم${lblMode === "all" && !Object.values(lblCounts).some(v => Number(v) > 0) ? " (واحد لكل صنف وحجم)" : ""}</div></div>
       </div>
       <div class="att-actions">
         <button class="btn" id="lblPrintBtn" ${out.length ? "" : "disabled"}>🖨 اطبع</button>
@@ -133,7 +135,7 @@ function lblOpenPrint(list) {
       <button type="button" class="btn btn-ghost" id="lblPrintClose">→ رجوع للتطبيق</button>
       <button type="button" class="btn" id="lblPrintGo">🖨 اطبع (${list.length})</button>
     </div>
-    <div class="lbl-pages">${list.map(l => lblHtml(l, lblDate)).join("")}</div>`;
+    <div class="lbl-pages">${list.map(l => lblHtml(l, lblMode === "day" ? lblDate : "")).join("")}</div>`;
   // مقاس الصفحة 60×40 بس وقت طباعة الملصقات (ورقة الحضور A4)
   const pg = document.createElement("style");
   pg.id = "lblPageSize";
@@ -162,7 +164,7 @@ async function lblPdf(list, btn, share) {
     for (let i = 0; i < list.length; i++) {
       const key = list[i].p.id + "|" + list[i].size + "|" + list[i].extra;
       if (!cache.has(key)) {
-        stage.innerHTML = lblHtml(list[i], lblDate);
+        stage.innerHTML = lblHtml(list[i], lblMode === "day" ? lblDate : "");
         const canvas = await html2canvas(stage.firstElementChild, { scale: 4, backgroundColor: "#ffffff", logging: false });
         cache.set(key, canvas.toDataURL("image/jpeg", 0.92));
       }
@@ -170,7 +172,7 @@ async function lblPdf(list, btn, share) {
       pdf.addImage(cache.get(key), "JPEG", 0, 0, 60, 40);
     }
     const blob = pdf.output("blob");
-    const name = `ملصقات_القيم_الغذائية_${lblDate}.pdf`;
+    const name = lblMode === "day" ? `ملصقات_القيم_الغذائية_${lblDate}.pdf` : "ملصقات_القيم_الغذائية_كل_الأصناف.pdf";
     const file = new File([blob], name, { type: "application/pdf" });
     if (share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: "ملصقات القيم الغذائية" }); return; }
