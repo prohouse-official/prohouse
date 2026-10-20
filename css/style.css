@@ -3783,3 +3783,4 @@ body.readonly-user #custExpForm, body.readonly-user .tom-chef-btn ~ .rec-add-ite
 /* قبل ما تتظبط الصلاحيات: ما بيطلع بالقائمة غير الرئيسية (الشاشات المخفية ما تبيّن ولا لحظة) */
 body:not(.nav-ready) .tab-btn:not([data-tab="dashboard"]),
 body:not(.nav-ready) .nav-group-title{ display:none !important; }
+.lbl-w{ display:inline-block; border:.3mm solid #000; border-radius:1mm; padding:0 1.2mm; margin-inline-end:1.2mm; font-size:8.5pt; font-weight:800; }
