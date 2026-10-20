@@ -13,6 +13,8 @@ const TAB_ROLE_ACCESS = {
   itemnotes: [],
   // ملصقات القيم الغذائية لاشتراكات تكرار
   labels: ["owner", "chef", "kitchen", "accountant"],
+  // تكلفة المنتجات (الريسبي): المالكين والمحاسب والشيف بس
+  costing: ["owner", "accountant", "chef"],
   help: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
   assistant: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
   branches: ["owner", "manager", "chef", "accountant"],
@@ -85,7 +87,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "saladsView", "attendanceView", "productionView", "leftoversView", "labelsView", "itemnotesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "saladsView", "attendanceView", "productionView", "leftoversView", "labelsView", "costingView", "itemnotesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -154,6 +156,7 @@ function setActiveTab(tab) {
   if (tab === "attendance") { loadAttendanceView(); }
   if (tab === "production") { loadProductionView(); }
   if (tab === "leftovers") { loadLeftoversView(); }
+  if (tab === "costing") { loadCostingView(); }
   if (tab === "labels") { loadLabelsView("labelsView"); }
   if (tab === "itemnotes") { loadItemNotesView(); }
   if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
