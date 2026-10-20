@@ -1374,7 +1374,13 @@ async function shareAljFiles(files, btn) {
   try {
     const list = await aljFileBlobs(files);
     if (navigator.canShare && navigator.canShare({ files: list })) {
-      try { await navigator.share({ files: list, title: "تقارير عبداللطيف جميل" }); }
+      // نص الإيميل لكل يوم بتاريخه (التاريخ من مسار الملف: 2026-10/2026-10-01/…)
+      const iso = ((files[0] && files[0].path) || "").match(/\d{4}-\d{2}-\d{2}/);
+      const [y, m, d] = iso ? iso[0].split("-").map(Number) : [];
+      const orders = files.find(f => /^Orders/i.test(f.name));
+      const subject = orders ? orders.name.replace(/\.xlsx$/i, "") : "تقارير عبداللطيف جميل";
+      const text = `تحية طيبة\nمرفق التقرير اليومي لتاريخ ${iso ? `${d}/${m}/${y}` : ""}\nمع أطيب التحيات\nحسن.`;
+      try { await navigator.share({ files: list, title: subject, text }); }
       catch (e) { if (!e || e.name !== "AbortError") throw e; }
     } else {
       for (const file of list) {
