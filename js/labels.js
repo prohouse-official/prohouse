@@ -159,18 +159,35 @@ async function lblPdf(list, btn, share) {
     if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [60, 40], compress: true });
-    // نفس الصنف بنفس الحجم = نفس الصورة: منصوّر كل شكل مرة وحدة
+    // الأشكال المختلفة بس (نفس الصنف بنفس الحجم = نفس الصورة)، ومنصوّرهم دفعات: 30 ملصق بصورة وحدة ومنقصّها
+    // (صورة لكل ملصق كانت تاخد دقايق على الجوال)
+    const keyOf = (l) => l.p.id + "|" + l.size + "|" + l.extra;
+    const uniq = [];
+    const seen = new Set();
+    list.forEach(l => { const k = keyOf(l); if (!seen.has(k)) { seen.add(k); uniq.push(l); } });
+    const date = lblMode === "day" ? lblDate : "";
     const cache = new Map();
-    for (let i = 0; i < list.length; i++) {
-      const key = list[i].p.id + "|" + list[i].size + "|" + list[i].extra;
-      if (!cache.has(key)) {
-        stage.innerHTML = lblHtml(list[i], lblMode === "day" ? lblDate : "");
-        const canvas = await html2canvas(stage.firstElementChild, { scale: 4, backgroundColor: "#ffffff", logging: false });
-        cache.set(key, canvas.toDataURL("image/jpeg", 0.92));
-      }
-      if (i) pdf.addPage([60, 40], "landscape");
-      pdf.addImage(cache.get(key), "JPEG", 0, 0, 60, 40);
+    const COLS = 5, BATCH = 30, SCALE = 3;
+    for (let b = 0; b < uniq.length; b += BATCH) {
+      const part = uniq.slice(b, b + BATCH);
+      stage.innerHTML = `<div class="lbl-batch" style="display:grid;grid-template-columns:repeat(${COLS},60mm);background:#fff">${part.map(l => lblHtml(l, date)).join("")}</div>`;
+      const grid = stage.firstElementChild;
+      const big = await html2canvas(grid, { scale: SCALE, backgroundColor: "#ffffff", logging: false });
+      const cells = [...grid.children];
+      const gr = grid.getBoundingClientRect();
+      cells.forEach((cell, j) => {
+        const r = cell.getBoundingClientRect();
+        const c = document.createElement("canvas");
+        c.width = Math.round(r.width * SCALE); c.height = Math.round(r.height * SCALE);
+        c.getContext("2d").drawImage(big, Math.round((r.left - gr.left) * SCALE), Math.round((r.top - gr.top) * SCALE), c.width, c.height, 0, 0, c.width, c.height);
+        cache.set(keyOf(part[j]), c.toDataURL("image/jpeg", 0.88));
+      });
+      btn.textContent = `⏳ ${Math.min(b + BATCH, uniq.length)}/${uniq.length}`;
     }
+    list.forEach((l, i) => {
+      if (i) pdf.addPage([60, 40], "landscape");
+      pdf.addImage(cache.get(keyOf(l)), "JPEG", 0, 0, 60, 40, keyOf(l)); // نفس الصورة بتنحفظ مرة وحدة بالملف
+    });
     const blob = pdf.output("blob");
     const name = lblMode === "day" ? `ملصقات_القيم_الغذائية_${lblDate}.pdf` : "ملصقات_القيم_الغذائية_كل_الأصناف.pdf";
     const file = new File([blob], name, { type: "application/pdf" });

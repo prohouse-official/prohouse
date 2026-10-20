@@ -1101,6 +1101,15 @@ const SupaEngine = (() => {
   async function getPurchases(start, end) {
     return (await queryAll(`purchase_invoices?select=*&invoice_date=gte.${start}&invoice_date=lte.${end}`, "invoice_date,id")) || [];
   }
+  // تكلفة المنتجات: الريسبي والأسعار اليدوية (للمالك والمحاسب والشيف بس — RLS)
+  async function getCostRecipes() { return (await query("cost_recipes?select=*&order=name")) || []; }
+  async function saveCostRecipe(row) {
+    await query("cost_recipes?on_conflict=id", { method: "POST", headers: { "Prefer": "resolution=merge-duplicates" }, body: JSON.stringify(row) });
+  }
+  async function getCostPrices() { return (await query("cost_prices?select=*")) || []; }
+  async function saveCostPrice(row) {
+    await query("cost_prices?on_conflict=material_id", { method: "POST", headers: { "Prefer": "resolution=merge-duplicates" }, body: JSON.stringify(row) });
+  }
   // المخزون: المواد + حركاتها (الوارد من المشتريات وغيره)
   async function getInventory() {
     const [materials, moves] = await Promise.all([
@@ -1193,6 +1202,10 @@ const SupaEngine = (() => {
     getSaladChecks,
     getTakrarBoq,
     getTakrarProducts,
+    getCostRecipes,
+    saveCostRecipe,
+    getCostPrices,
+    saveCostPrice,
     getAttendance,
     addAttendance,
     getProduction,

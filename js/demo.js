@@ -56,7 +56,7 @@
     });
     return {
       items, daily_entries, tabsense_sales,
-      day_meta: [], tomorrow_orders: [], waste_log: [], juice_counts: [], juice_sales: [], salad_checks: [], takrar_boq: [], attendance_log: [], production_checks: [], item_notes: [], leftover_checks: [], takrar_products: [],
+      day_meta: [], tomorrow_orders: [], waste_log: [], juice_counts: [], juice_sales: [], salad_checks: [], takrar_boq: [], attendance_log: [], production_checks: [], item_notes: [], leftover_checks: [], takrar_products: [], cost_recipes: [], cost_prices: [],
       juices: [["سنكرز بروتين بار", "سنكرز بروتين بار|بروتين بار سنيكرس"], ["بورن وينر", "بورن وينر|بروتين بار بورن وينر"], ["جرينيد", "جرينيد|بروتين بار جرينيد"], ["مارس بروتين بار", "مارس بروتين بار|بروتين بار مارس"]]
         .map(([name, ts], i) => ({ id: "snack_" + (i + 1), name, unit: "حبة", tabsense_name: ts, branches: "الروضة,الشاطئ," + AJL, kind: "snack", active: true, sort_order: i + 1 }))
         .concat([["سانتي برتقال", AJL], ["سانتي مانجو الفونسو", AJL], ["سانتي (كل النكهات)", "الروضة,الشاطئ", "سانتي"]]
@@ -116,7 +116,7 @@
 
   const KEYS = {
     daily_entries: ["date", "branch", "item_id"], day_meta: ["date", "branch"], items: ["id"], settings: ["key"], juices: ["id"],
-    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], salad_checks: ["date", "branch"], takrar_boq: ["date"], attendance_log: ["id"], production_checks: ["date"], item_notes: ["date", "branch"], leftover_checks: ["date"], takrar_products: ["id"], purchase_invoices: ["id"], purchase_suppliers: ["name"], inv_materials: ["id"], inv_movements: ["id"],
+    juice_counts: ["date", "branch", "juice_id"], employees: ["id"], tomorrow_orders: ["date", "branch", "item_id"], tomorrow_meta: ["date", "branch"], custody_closings: ["date", "branch"], salad_checks: ["date", "branch"], takrar_boq: ["date"], attendance_log: ["id"], production_checks: ["date"], item_notes: ["date", "branch"], leftover_checks: ["date"], takrar_products: ["id"], cost_recipes: ["id"], cost_prices: ["material_id"], purchase_invoices: ["id"], purchase_suppliers: ["name"], inv_materials: ["id"], inv_movements: ["id"],
     push_subscriptions: ["endpoint"], reminder_settings: ["key"], waste_log: ["id"], tabsense_payments: ["date", "branch", "channel"]
   };
 
