@@ -154,7 +154,7 @@ function setActiveTab(tab) {
   if (tab === "attendance") { loadAttendanceView(); }
   if (tab === "production") { loadProductionView(); }
   if (tab === "leftovers") { loadLeftoversView(); }
-  if (tab === "labels") { loadLabelsView(); }
+  if (tab === "labels") { loadLabelsView("labelsView"); }
   if (tab === "itemnotes") { loadItemNotesView(); }
   if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
   if (tab === "users") { renderUsersView(); }

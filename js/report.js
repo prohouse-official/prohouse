@@ -37,7 +37,9 @@ function initReportTab() {
     const type = e.target.value;
     const isTomorrow = type === "tomorrow";
     document.getElementById("dailyReportControls").classList.toggle("hidden", type !== "daily");
-    document.getElementById("entriesReportControls").classList.toggle("hidden", type === "daily" || isTomorrow || type === "alj" || type === "acct");
+    document.getElementById("entriesReportControls").classList.toggle("hidden", type === "daily" || isTomorrow || type === "alj" || type === "acct" || type === "labels");
+    document.getElementById("labelsReportControls").classList.toggle("hidden", type !== "labels");
+    if (type === "labels" && typeof loadLabelsView === "function") loadLabelsView("labelsReportView");
     document.getElementById("acctReportControls").classList.toggle("hidden", type !== "acct");
     if (type === "acct") loadAcctReport();
     document.getElementById("tomorrowReportControls").classList.toggle("hidden", !isTomorrow);

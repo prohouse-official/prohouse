@@ -9,13 +9,17 @@ let lblProducts = [];
 let lblBoq = [];
 let lblCounts = {}; // «id|الحجم» → عدد (وضع كل الأصناف)
 let lblLoadSeq = 0;
+let lblHost = "labelsView"; // نفس الشاشة: من القائمة أو من التقارير
 
 const LBL_SIZES = { "100P - 100C": "100 جم بروتين · 100 جم كارب", "150P - 150C": "150 جم بروتين · 150 جم كارب", "200P - 200C": "200 جم بروتين · 200 جم كارب" };
 const lblNorm = (s) => String(s || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/\s+/g, " ").trim();
 const lblNum = (x) => (Math.round(Number(x) * 10) / 10).toString();
 
-async function loadLabelsView() {
-  const view = document.getElementById("labelsView");
+async function loadLabelsView(host) {
+  if (host) lblHost = host;
+  // الشاشة بمكان واحد بس (نفس أرقام العناصر)
+  ["labelsView", "labelsReportView"].forEach(id => { const el = document.getElementById(id); if (id !== lblHost && el) el.innerHTML = ""; });
+  const view = document.getElementById(lblHost);
   if (!view) return;
   const seq = ++lblLoadSeq;
   view.innerHTML = '<div class="loader">جاري التحميل…</div>';
@@ -67,7 +71,7 @@ function lblHtml(l, date) {
 }
 
 function renderLabelsView() {
-  const view = document.getElementById("labelsView");
+  const view = document.getElementById(lblHost);
   const { out, missing } = lblList();
   const cats = [];
   lblProducts.forEach(p => { if (!cats.includes(p.category)) cats.push(p.category); });
