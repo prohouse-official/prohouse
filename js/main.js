@@ -195,6 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
 const NAV_HIDDEN_TABS = ["branches", "items", "users", "waste", "checklist", "closing"]; // الهدر صار جوّا تقرير المتبقي (زر 🗑 بكل صنف)
 
 function applyRoleUiGating() {
+  document.body.classList.add("nav-ready");
   // حساب القراءة فقط (المحاسب): كل الخانات والأزرار اللي تكتب تنقفل
   document.body.classList.toggle("readonly-user", !!(Auth.isReadOnly && Auth.isReadOnly()));
   document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -571,6 +572,8 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 // ---- الإقلاع ----
 (async function boot() {
   if (!Auth.isLoggedIn()) { showLoginView(); return; }
+  // القائمة تتظبط من الجلسة المحفوظة قبل ما يخلص التحقق من السيرفر — وإلا بتطلع كل الشاشات المخفية بهاللحظة
+  applyRoleUiGating();
   await Auth.verify(); // يحدّث الدور/الفروع لو تغيّرت، وبيرجع لتسجيل الدخول لو الجلسة انتهت
   if (!Auth.isLoggedIn()) { showLoginView(); return; }
   startApp();
