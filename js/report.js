@@ -1379,7 +1379,11 @@ async function shareAljFiles(files, btn) {
       const [y, m, d] = iso ? iso[0].split("-").map(Number) : [];
       const orders = files.find(f => /^Orders/i.test(f.name));
       const subject = orders ? orders.name.replace(/\.xlsx$/i, "") : "تقارير عبداللطيف جميل";
-      const text = `تحية طيبة\nمرفق التقرير اليومي لتاريخ ${iso ? `${d}/${m}/${y}` : ""}\nمع أطيب التحيات\nحسن.`;
+      // CRLF بين السطور: تطبيق Gmail على الآيفون بيلزّق السطور إذا كانت \n بس
+      const lines = ["تحية طيبة", `مرفق التقرير اليومي لتاريخ ${iso ? `${d}/${m}/${y}` : ""}`, "مع أطيب التحيات", "حسن."];
+      const text = lines.join("\r\n");
+      // ونسخة بالحافظة: لو التطبيق لزّق السطور، بيمسح النص وبيلصق
+      try { if (navigator.clipboard) await navigator.clipboard.writeText(lines.join("\n")); } catch (e) { /* بدونها */ }
       try { await navigator.share({ files: list, title: subject, text }); }
       catch (e) { if (!e || e.name !== "AbortError") throw e; }
     } else {
