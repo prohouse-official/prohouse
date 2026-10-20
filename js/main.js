@@ -9,8 +9,10 @@ const TAB_ROLE_ACCESS = {
   production: ["owner", "chef", "kitchen", "accountant"],
   // استلام المتبقي من الفروع (الروضة بتجمعه وبترجّعه للمطبخ)
   leftovers: ["owner", "chef", "kitchen", "accountant"],
-  // ملاحظات الأصناف: الفرع بيسجّل، والشيف والمطبخ بيتابعوا
-  itemnotes: ["owner", "manager", "chef", "kitchen", "branch_staff", "employee", "accountant"],
+  // ملاحظات الأصناف: انشالت (الملاحظات بشاشة الجرد) — الشاشة بتضل بالكود بدون ما تطلع لحدا
+  itemnotes: [],
+  // ملصقات القيم الغذائية لاشتراكات تكرار
+  labels: ["owner", "chef", "kitchen", "accountant"],
   help: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
   assistant: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
   branches: ["owner", "manager", "chef", "accountant"],
@@ -83,7 +85,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "saladsView", "attendanceView", "productionView", "leftoversView", "itemnotesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "saladsView", "attendanceView", "productionView", "leftoversView", "labelsView", "itemnotesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -152,6 +154,7 @@ function setActiveTab(tab) {
   if (tab === "attendance") { loadAttendanceView(); }
   if (tab === "production") { loadProductionView(); }
   if (tab === "leftovers") { loadLeftoversView(); }
+  if (tab === "labels") { loadLabelsView(); }
   if (tab === "itemnotes") { loadItemNotesView(); }
   if (tab === "waste") { loadWasteData(currentWasteDate, currentWasteBranch); }
   if (tab === "users") { renderUsersView(); }
@@ -192,6 +195,7 @@ document.addEventListener("DOMContentLoaded", () => {
 const NAV_HIDDEN_TABS = ["branches", "items", "users", "waste", "checklist", "closing"]; // الهدر صار جوّا تقرير المتبقي (زر 🗑 بكل صنف)
 
 function applyRoleUiGating() {
+  document.body.classList.add("nav-ready");
   // حساب القراءة فقط (المحاسب): كل الخانات والأزرار اللي تكتب تنقفل
   document.body.classList.toggle("readonly-user", !!(Auth.isReadOnly && Auth.isReadOnly()));
   document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -568,6 +572,8 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 // ---- الإقلاع ----
 (async function boot() {
   if (!Auth.isLoggedIn()) { showLoginView(); return; }
+  // القائمة تتظبط من الجلسة المحفوظة قبل ما يخلص التحقق من السيرفر — وإلا بتطلع كل الشاشات المخفية بهاللحظة
+  applyRoleUiGating();
   await Auth.verify(); // يحدّث الدور/الفروع لو تغيّرت، وبيرجع لتسجيل الدخول لو الجلسة انتهت
   if (!Auth.isLoggedIn()) { showLoginView(); return; }
   startApp();
