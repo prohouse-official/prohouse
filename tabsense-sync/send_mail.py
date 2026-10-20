@@ -15,16 +15,17 @@ if not to:
     sys.exit("no recipients")
 
 d = date.fromisoformat(iso)
-label = d.strftime("%A, %d %B %Y")
 
 msg = EmailMessage()
-msg["Subject"] = f"Pro House - Daily Reports - {d.strftime('%d %b %Y')}"
+# العنوان والنص نفس اللي بيبعته حسن يدوي: «Orders (1 oct)» ونص عربي بتاريخ اليوم
+msg["Subject"] = orders_name.rsplit(".", 1)[0]
 msg["From"] = f"Pro House <{sender}>"
 msg["To"] = ", ".join(to)
 msg.set_content(
-    "Dear Team,\n\n"
-    f"Please find attached the daily reports for {label} (Summary and Orders).\n\n"
-    "Best regards,\nPro House\n"
+    "تحية طيبة\n"
+    f"مرفق التقرير اليومي لتاريخ {d.day}/{d.month}/{d.year}\n"
+    "مع أطيب التحيات\n"
+    "حسن.\n"
 )
 with open(summary_path, "rb") as f:
     msg.add_attachment(f.read(), maintype="application", subtype="pdf", filename=summary_name)
