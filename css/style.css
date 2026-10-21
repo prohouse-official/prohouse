@@ -3791,3 +3791,4 @@ body:not(.nav-ready) .nav-group-title{ display:none !important; }
 .cost-table .cost-mat-in{ width:100%; min-width:120px; }
 .cost-table .cost-qty{ width:70px; }
 .cost-summary{ display:flex; flex-wrap:wrap; gap:14px; margin:10px 0; font-size:15px; }
+.pur-new-btns{ display:flex; gap:6px; flex-wrap:wrap; }
