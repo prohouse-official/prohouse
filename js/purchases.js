@@ -7,6 +7,8 @@
 
 const PURCHASES_LIVE = true;
 const PUR_CENTRAL_BRANCH = "الروضة";
+// فواتير اشتراها المالك مباشرة (مو من عهدة فرع) — بتنحفظ بدون فرع
+const PUR_DIRECT = "مشتريات مباشرة";
 const PUR_CATEGORIES = ["لحوم", "خضراوات", "بهارات", "بقالة", "مشروبات", "بلاستيك وتغليف", "منظفات", "أدوات طبخ", "اشتراكات التطبيقات", "أخرى"];
 // شرح قصير يطلع تحت التصنيف بالملخص
 const PUR_CAT_NOTES = { "اشتراكات التطبيقات": "فوديكس وتاب سنس (أنظمة الكاشير) · تكرار (منصة الاشتراكات) · كيتا (عمولة التوصيل)" };
@@ -218,7 +220,7 @@ function renderPurchasesView() {
   const maxCat = Math.max(1, ...cats.map(c => Math.abs(c[1])));
   const sups = Object.entries(s.bySupplier).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const list = purVisible();
-  const branches = branchList();
+  const branches = branchList().concat(PUR_DIRECT);
 
   view.innerHTML = `
     <div class="cust-card">
@@ -227,7 +229,8 @@ function renderPurchasesView() {
           <h2 class="cust-title">🧾 المشتريات</h2>
           <div class="cust-sub">فواتير يزيد (قوقل فورم) + مصروفات الفروع من العهدة</div>
         </div>
-        ${Auth.isOwner() ? `<button type="button" class="cust-btn primary pur-new" id="purNew">➕ فاتورة</button>` : ""}
+        ${Auth.isOwner() ? `<div class="pur-new-btns"><button type="button" class="cust-btn primary pur-new" id="purScanNew">📷 صوّر فاتورة</button>
+          <button type="button" class="cust-btn pur-new" id="purNew">➕ فاتورة</button></div>` : ""}
       </div>
       ${window.PH_DEMO ? `<div class="pur-trial">🧪 نسخة معاينة — الفواتير هنا وهمية</div>`
         : `<div class="pur-trial">🧪 تجربة — الفواتير منسوخة من شيت يزيد وتتحدث تلقائياً. الفورم لسا هو الأساس.</div>`}
@@ -242,7 +245,7 @@ function renderPurchasesView() {
         </div>
         <select id="purBranchSelect">
           <option value="">كل الفروع</option>
-          ${branches.map(b => `<option value="${escHtml(b)}" ${b === purBranch ? "selected" : ""}>${escHtml(b)}${b === PUR_CENTRAL_BRANCH ? " (المطبخ المركزي)" : ""}</option>`).join("")}
+          ${branches.map(b => `<option value="${escHtml(b)}" ${b === purBranch ? "selected" : ""}>${escHtml(b)}${b === PUR_CENTRAL_BRANCH ? " (المطبخ المركزي)" : b === PUR_DIRECT ? " (مو من العهدة)" : ""}</option>`).join("")}
         </select>
       </div>
     </div>
@@ -342,7 +345,7 @@ function purDetailHtml() {
         <label class="pur-field"><span>المورد</span>
           <input type="text" list="purSupplierList" data-f="supplier" value="${escHtml(d.supplier || "")}" ${dis}></label>
         <label class="pur-field"><span>الفرع</span>
-          <select data-f="branch" ${dis}>${branchList().map(b => `<option ${b === d.branch ? "selected" : ""}>${escHtml(b)}</option>`).join("")}</select></label>
+          <select data-f="branch" ${dis}>${branchList().concat(PUR_DIRECT).map(b => `<option ${b === d.branch ? "selected" : ""}>${escHtml(b)}</option>`).join("")}</select></label>
         ${field("discount", "الخصم (قبل الضريبة)", "number")}
         <label class="pur-field"><span>الخصم على</span>
           <select data-f="discount_line" ${dis}>
@@ -423,7 +426,13 @@ function bindPurchasesView() {
     const el = view.querySelector(`.pur-item[data-id="${CSS.escape(id)}"]`);
     if (el && purOpenId) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }));
-  if ($("purNew")) $("purNew").addEventListener("click", newPurchaseInvoice);
+  if ($("purNew")) $("purNew").addEventListener("click", () => newPurchaseInvoice());
+  // فاتورة مباشرة: بتفتح فاتورة جديدة بدون فرع وعلى طول الكاميرا (القراءة الآلية بتعبّي البيانات)
+  if ($("purScanNew")) $("purScanNew").addEventListener("click", () => {
+    newPurchaseInvoice(PUR_DIRECT);
+    const btn = $("purPhoto");
+    if (btn) btn.click();
+  });
   view.querySelectorAll("[data-supvat]").forEach(inp => inp.addEventListener("change", async () => {
     const name = inp.dataset.supvat, vat_no = inp.value.replace(/\s+/g, "");
     try {
@@ -619,11 +628,11 @@ function purNewId() {
   return "pur_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
-function newPurchaseInvoice() {
+function newPurchaseInvoice(branch) {
   const emp = Auth.getEmployee();
   const inv = {
     id: purNewId(), source: "site", kind: "invoice", invoice_date: todayStr(), invoice_no: "", supplier: "",
-    branch: PUR_CENTRAL_BRANCH, subtotal: null, vat: null, total: null,
+    branch: branch || PUR_CENTRAL_BRANCH, subtotal: null, vat: null, total: null,
     lines: [{ name: "", qty: null, unit: "", unit_price: null, total: null, category: "" }],
     receipt: "", status: "pending", created_by: emp ? emp.name : "", created_at: new Date().toISOString(), _virtual: true
   };
