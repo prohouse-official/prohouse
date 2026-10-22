@@ -10,7 +10,7 @@
 // والمبيعات بتتعبّى تلقائياً من تابسنس بمطابقة الاسم — والاثنين قابلين للتعديل اليدوي لو الواقع مختلف.
 
 const JUICE_MODES = {
-  snack: { tab: "🍫 البروتين بار والحلى", noun: "صنف", none: "ما فيه أصناف بروتين بار لهذا الفرع — أضفها من الكرت تحت." },
+  snack: { tab: "🍫 البروتين بار", noun: "صنف", none: "ما فيه أصناف بروتين بار لهذا الفرع — أضفها من الكرت تحت." },
   juice: { tab: "🥤 المشروبات", noun: "مشروب", none: "ما فيه مشروبات مضافة لهذا الفرع — أضفها من الكرت تحت." }
 };
 let juiceMode = "snack";
@@ -98,6 +98,16 @@ function visibleJuicesFor(branch, allKinds) {
 
 // المبيعات المسحوبة تلقائياً لهذا العصير (أو undefined لو ما في تطابق)
 // «اسم تابسنس» ممكن يكون أكثر من اسم مفصولة بـ | (كل فرع اسمه بالكاشير مختلف، أو نكهتين لنفس الصنف) — منجمعهم
+// الواصل من تقرير الاستلام (حلى المطبخ: تشيز كيك، ماتيلدا، شوفان…) — بالاسم من خانة receive_names
+let juiceReceivedMap = {};
+function autoAddedFor(juice) {
+  if (!juice.receiveNames) return undefined;
+  const keys = [...new Set(String(juice.receiveNames).split("|").map(normalizeArabic).filter(Boolean))];
+  let found = false, total = 0;
+  keys.forEach(k => { if (juiceReceivedMap[k] !== undefined) { found = true; total += juiceReceivedMap[k]; } });
+  return found ? total : undefined;
+}
+
 function autoSoldFor(juice) {
   const names = juice.tabsenseName ? String(juice.tabsenseName).split("|") : [juice.name];
   const keys = [...new Set(names.map(normalizeArabic).filter(Boolean))];
@@ -366,6 +376,9 @@ function applyJuiceDayData(val) {
     const e = currentJuiceEntry[j.id];
     // عدّ بداية الدوام ما يتعبّى تلقائياً — الموظف يعدّ بنفسه، وإغلاق أمس يطلع كمرجع
     // مبيعات تابسنس توصل متأخرة أحياناً: لو انحفظ الجرد والمبيعات صفر، منعبّيها لما توصل
+    // الواصل: من تقرير الاستلام لو الصنف مربوط فيه (ما بيلمس رقم انكتب بإيد)
+    const rec = autoAddedFor(j);
+    if (rec !== undefined && (e.added === "" || e.added === null || e.added === undefined || (Number(e.added) === 0 && rec > 0))) e.added = rec;
     const auto = autoSoldFor(j);
     if (auto !== undefined && (e.sold === "" || e.sold === null || e.sold === undefined || (Number(e.sold) === 0 && Number(auto) > 0))) e.sold = auto;
   });
@@ -395,8 +408,16 @@ async function loadJuiceDay(dateStr) {
   }
 
   const cacheKey = "juiceday:" + dateStr + ":" + currentJuiceBranch;
-  const data = await Sync.get("getJuiceDay", { date: dateStr, branch: currentJuiceBranch }, cacheKey);
+  const [data, day] = await Promise.all([
+    Sync.get("getJuiceDay", { date: dateStr, branch: currentJuiceBranch }, cacheKey),
+    Juices.current.some(j => j.receiveNames) ? SupaEngine.getDay(dateStr, currentJuiceBranch).catch(() => null) : null
+  ]);
   if (seq !== juiceLoadSeq) return;
+  juiceReceivedMap = {};
+  ((day && day.items) || []).forEach(d => {
+    const q = Number(d.received);
+    if (q > 0) { const k = normalizeArabic(d.itemName || ""); juiceReceivedMap[k] = (juiceReceivedMap[k] || 0) + q; }
+  });
   juiceLoadFailed = data === null || data === undefined;
   applyJuiceDayData(data);
   renderJuicesView();

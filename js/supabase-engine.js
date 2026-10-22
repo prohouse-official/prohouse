@@ -592,6 +592,7 @@ const SupaEngine = (() => {
       name: r.name,
       unit: r.unit,
       tabsenseName: r.tabsense_name,
+      receiveNames: r.receive_names || "",
       branches: r.branches,
       kind: r.kind || "juice",
       active: r.active,
