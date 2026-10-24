@@ -545,10 +545,8 @@ async function openChefPicker({ category, branch, isUsed, extraNames, onPick }) 
 // "دجاج الشيف 1" + "دجاج بيكانت" ← "دجاج الشيف 1 (بيكانت)"
 function chefSlotName(it, cookName) {
   const dish = String(cookName || "").trim();
-  if (!dish) return it.name;
-  const cat = String(it.category || "").trim();
-  const short = dish.replace(new RegExp("^" + cat + "\\s+"), "").trim() || dish;
-  return `${it.name} (${short})`;
+  // خانة الشيف بتبيّن باسم الطبخة بس («دجاج كاري»، «داوود باشا») مو «دجاج الشيف 1 (كاري)»
+  return dish || it.name;
 }
 
 // ---- العرض المدمج دائماً (انشال زر التبديل) ----
