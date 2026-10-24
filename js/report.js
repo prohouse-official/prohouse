@@ -631,8 +631,8 @@ function chefReportName(it, cookName) {
   const base = String(it.name || "").trim();
   if (!/الشيف/.test(base)) return base;
   const plain = base.replace(/\s*\d+\s*$/, "");
-  const dish = String(cookName || "").trim().replace(new RegExp("^" + String(it.category || "").trim() + "\\s+"), "");
-  return dish ? `${plain} (${dish})` : `${plain}……`;
+  const dish = String(cookName || "").trim();
+  return dish || `${plain}……`;
 }
 
 // حجم السفنديش المكتوب بالنموذج (من شاشة الأصناف)، وإذا فاضي: البروتين 1/3 والباقي نفس الوحدة
@@ -870,9 +870,10 @@ function chefCombinedSheet(branches, perBranch, order, boq = []) {
       const norm = chefNormName(it.name);
       const alias = Object.keys(CHEF_COMBINED_ALIASES).find(k => chefNormName(k) === norm);
       if (alias) { aliased.push({ base: CHEF_COMBINED_ALIASES[alias], branch, e, it }); return; }
-      // أطباق الشيف: كل خانة (دجاج الشيف 1، 2…) سطر واحد لكل الفروع وبدون اسم طبخة — الشيف هو اللي يسمّي
+      // أطباق الشيف بدون اسم طبخة: كل خانة (دجاج الشيف 1، 2…) سطر واحد لكل الفروع
       // والأصناف العادية بنفس الاسم (رز أبيض، ويدجز…) سطر واحد حتى لو كل فرع إله صنف مختلف
-      const chef = /الشيف/.test(norm);
+      // خانة الشيف اللي الفرع كتب اسم طبختها («دجاج كاري»، «داوود باشا») بتطلع باسم الطبخة؛ الفاضية «دجاج الشيف 1 ……»
+      const chef = /الشيف/.test(norm) && !String(e.cookName || "").trim();
       const name = chef ? `${norm} ……` : chefReportName(it, e.cookName);
       const key = (chef ? "chef:" : "n:") + chefNormName(chef ? norm : name);
       addTo(key, { category: it.category || "-", name, base: chef ? norm.replace(/\s*\d+$/, "") : "", rank: 999, sort: 9999 }, branch, e, it);
