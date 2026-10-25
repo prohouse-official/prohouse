@@ -788,7 +788,7 @@ async function runTomorrowReport() {
 
   // ورقة مجمعة (اختيار لحاله): الصنف، إجمالي المطلوب، وكم طالب كل فرع (+ الاشتراكات مدموجة مع أصناف الفروع)
   if (tomorrowReportCombined && !branchFilter && branches.length > 1) {
-    // المتبقي اليوم: متبقي اليوم اللي قبل تاريخ الطلبية (طلبية الاثنين = متبقي الأحد) لكل فرع
+    // المتبقي اليوم: متبقي فرع الروضة بس لليوم اللي قبل تاريخ الطلبية (طلبية الاثنين = متبقي الأحد)
     let remByBranch = null;
     try {
       const prev = await Promise.all(branches.map(b => Sync.get("getDay", { date: addDaysStr(date, -1), branch: b }, "day:" + addDaysStr(date, -1) + ":" + b).catch(() => null)));
@@ -947,14 +947,14 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remByBranch = n
     });
     meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY, SUB_PICKUP].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
   }
-  // المتبقي اليوم لكل سطر: مجموع متبقي أصنافه عند الفروع (جرامات + عدد)
+  // المتبقي اليوم لكل سطر: متبقي فرع الروضة بس — متبقي الفروع التانية بيرجع للروضة، ومنها بيرجع للشيف
+  const RAWDAH = "الروضة";
   const remText = (r) => {
-    if (!remByBranch) return "";
+    const m = remByBranch && remByBranch[branches.indexOf(RAWDAH)];
+    if (!m) return "";
     let g = 0, n = 0, any = false;
-    const seen = new Set();
-    (r.itemIds || []).forEach(([br, id]) => {
-      const k = br + "|" + id; if (seen.has(k)) return; seen.add(k);
-      const m = remByBranch[branches.indexOf(br)]; const v = m && m.get(id);
+    new Set((r.itemIds || []).map(([, id]) => id)).forEach(id => {
+      const v = m.get(id);
       if (!v) return;
       if (v.w !== null && !isNaN(v.w)) { g += v.w; any = true; } else if (v.n !== null && !isNaN(v.n)) { n += v.n; any = true; }
     });
