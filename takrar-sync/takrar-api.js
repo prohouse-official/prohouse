@@ -185,7 +185,31 @@ async function sync() {
   await syncBoq();
 }
 
+// fields → أسماء حقول الطلب، وقيم الحقول اللي شكلها نوع (توصيل/استلام/طريقة/نافذة) مع عددها — بلا أي بيانات عملاء ولا مبالغ
+async function fields() {
+  const now = Date.now();
+  const orders = await fetchOrders(riyadh(now - 6 * 86400000), riyadh(now));
+  console.log("ORDERS", orders.length, "SHAPE", JSON.stringify(shape(orders[0] || {})).slice(0, 3000));
+  const hit = /pickup|pick_up|deliver|fulfil|type|method|shipping|window|collect|branch|mode|kind|channel/i;
+  const counts = {};
+  const walk = (o, path, d) => {
+    if (!o || typeof o !== "object" || d > 3) return;
+    for (const [k, v] of Object.entries(o)) {
+      const p = path ? path + "." + k : k;
+      if (v && typeof v === "object" && !Array.isArray(v)) { walk(v, p, d + 1); continue; }
+      if (Array.isArray(v)) { if (v[0] && typeof v[0] === "object") walk(v[0], p + "[]", d + 1); continue; }
+      if (!hit.test(p)) continue;
+      if (typeof v === "string" && (v.length > 40 || /@|\d{5,}/.test(v))) continue;
+      const val = typeof v === "string" ? v.replace(/\d{3,}/g, "#") : String(v);
+      ((counts[p] = counts[p] || {})[val] = (counts[p][val] || 0) + 1);
+    }
+  };
+  orders.forEach(o => walk(o, "", 0));
+  Object.entries(counts).forEach(([p, m]) => console.log("FIELD", p, JSON.stringify(Object.entries(m).slice(0, 12))));
+}
+
 (async () => {
+  if (MODE === "fields") return fields();
   if (MODE === "docs") return docs();
   if (MODE === "probe") return probe();
   return sync();
