@@ -198,7 +198,7 @@ async function fields() {
       const p = path ? path + "." + k : k;
       if (v && typeof v === "object" && !Array.isArray(v)) { walk(v, p, d + 1); continue; }
       if (Array.isArray(v)) { if (v[0] && typeof v[0] === "object") walk(v[0], p + "[]", d + 1); continue; }
-      if (!hit.test(p)) continue;
+      if (!hit.test(p) || typeof v === "number") continue;
       if (typeof v === "string" && (v.length > 40 || /@|\d{5,}/.test(v))) continue;
       const val = typeof v === "string" ? v.replace(/\d{3,}/g, "#") : String(v);
       ((counts[p] = counts[p] || {})[val] = (counts[p][val] || 0) + 1);
@@ -208,7 +208,32 @@ async function fields() {
   Object.entries(counts).forEach(([p, m]) => console.log("FIELD", p, JSON.stringify(Object.entries(m).slice(0, 12))));
 }
 
+// boqprobe → هل تقرير BoQ بيقبل فلتر استلام/توصيل؟ بيطبع بس: الحالة، وإذا المجموع أقل/نفس/أكتر من الأساسي، وإذا استلام+توصيل = الكل — بلا أرقام
+async function boqProbe() {
+  const day = riyadh(Date.now() + 86400000);
+  const base = { status: "confirmed", from_date: day, to_date: day, grouped_by_size: true, group_by_plan: false, group_by_description: false, group_by_reference: false, cities_ids: [], corporates_ids: [], delivery_window_id: null };
+  const total = async (extra) => {
+    const res = await fetch(BASE + "/public-api/v1/operations/boq-report/", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + TOKEN, Accept: "application/json", "Content-Type": "application/json", "app-id": String(cfg.appId) },
+      body: JSON.stringify({ ...base, ...extra })
+    });
+    let j = null; try { j = await res.json(); } catch (e) {}
+    const list = Array.isArray(j) ? j : (j && j.results) || [];
+    return { status: res.status, sum: list.reduce((a, r) => a + (Number(r.quantity) || 0), 0), err: res.status >= 400 && j ? JSON.stringify(j).replace(/\d{3,}/g, "#").slice(0, 200) : "" };
+  };
+  const all = await total({});
+  console.log("BOQ_BASE", all.status, all.sum > 0 ? "has-data" : "empty");
+  const cmp = (s) => s === all.sum ? "same" : s < all.sum ? "less" : "more";
+  const pairs = [["is_pickup", true, false], ["pickup", true, false], ["delivery_type", "pickup", "delivery"], ["fulfillment_type", "pickup", "delivery"], ["order_type", "pickup", "delivery"], ["is_pickup", "true", "false"]];
+  for (const [k, a, b] of pairs) {
+    const p = await total({ [k]: a }), d = await total({ [k]: b });
+    console.log("BOQ_FILTER", k, JSON.stringify(a), p.status, cmp(p.sum), "|", JSON.stringify(b), d.status, cmp(d.sum), "| p+d=all:", p.sum + d.sum === all.sum, p.err || d.err);
+  }
+}
+
 (async () => {
+  if (MODE === "boqprobe") return boqProbe();
   if (MODE === "fields") return fields();
   if (MODE === "docs") return docs();
   if (MODE === "probe") return probe();
