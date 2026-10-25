@@ -792,13 +792,18 @@ async function runTomorrowReport() {
     lastTomorrowReportSheets = combined.rows.length ? [combined] : [];
   } else if (boq.length) {
     const fmt = (q) => String(Number(q) || 0);
+    // التوصيل والاستلام بعمودين (البيانات القديمة بدون تقسيم: عمود واحد بالعدد)
+    const split = boq.some(r => r.delivery != null || r.pickup != null);
     const subRows = boq.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), "ar") || String(a.size).localeCompare(String(b.size)))
       .map(r => ({
         category: "اشتراكات",
         name: r.name + ((r.variants || []).length ? " (" + r.variants.map(v => `${v.name} ×${fmt(v.qty)}`).join("، ") + ")" : ""),
-        size: r.size || "—", qty: fmt(r.qty), total: fmt(r.qty), rec: "", rem: "", notes: "", rank: 9999, sort: 9999
+        size: r.size || "—", qty: fmt(r.qty), total: fmt(r.qty), rec: "", rem: "", notes: "", rank: 9999, sort: 9999,
+        byBranch: split ? [Number(r.delivery) ? fmt(r.delivery) : "", Number(r.pickup) ? fmt(r.pickup) : ""] : undefined
       }));
-    lastTomorrowReportSheets.push({ branch: "اشتراكات", rows: subRows });
+    lastTomorrowReportSheets.push(split
+      ? { combined: true, branch: "اشتراكات", title: "اشتراكات", branches: ["توصيل", "استلام"], rows: subRows }
+      : { branch: "اشتراكات", rows: subRows });
   }
 
   // صفحة السلطات (لحالها بنفس الملف): فروع الطلبية + اللي محفوظ لهاليوم
@@ -850,6 +855,8 @@ const chefNormName = (n) => String(n || "").replace(/\s*\(.*\)\s*$/, "").replace
 // اسم الطبق بدون «مع رز أبيض…» وبدون فروق الهمزة — لمطابقة أصناف تكرار مع أصناف الفروع
 const chefLooseName = (n) => chefNormName(n).replace(/\s+مع\s+.*$/, "").replace(/ة/g, "ه").replace(/[أإآ]/g, "ا").trim();
 const SUB_BRANCH = "اشتراكات";  // عمودها بالورقة المجمعة = كميات اشتراكات اليوم اللي بعده
+// لما تكرار يفصل التوصيل عن الاستلام: عمودين بدل «اشتراكات»
+const SUB_DELIVERY = "اشتراكات توصيل", SUB_PICKUP = "اشتراكات استلام";
 
 function chefCombinedSheet(branches, perBranch, order, boq = []) {
   const rows = new Map();
@@ -890,7 +897,10 @@ function chefCombinedSheet(branches, perBranch, order, boq = []) {
   // الاشتراكات: كل طبق ينجمع (كل الأحجام) — البروتين بالجرام (150P × العدد) وينضاف لسطر نفس الطبق عند الفروع،
   // والرز الأبيض (الكارب C) ينضاف لسطر «رز أبيض». الطبق اللي مو موجود عند الفروع سطر جديد بالعدد.
   if (boq.length) {
-    branches = branches.concat(SUB_BRANCH);
+    branches = branches.concat(SUB_BRANCH, SUB_DELIVERY, SUB_PICKUP);
+    // كل كمية بتنقسم على أعمدة الاشتراكات: [[عمود، نسبة من الكمية]]
+    const splitOf = (r) => r.delivery != null || r.pickup != null
+      ? [[SUB_DELIVERY, Number(r.delivery) || 0], [SUB_PICKUP, Number(r.pickup) || 0]] : [[SUB_BRANCH, Number(r.qty) || 0]];
     // أصناف الفروع: بالاسم، وكمان باسم الفئة قدّامه (فرع: «بخاري مع الكشنة» = تكرار: «دجاج بخاري»، «مندي» = «دجاج مندي»)
     const byLoose = new Map();
     [...rows.entries()].filter(([k]) => k.startsWith("n:")).forEach(([k, r]) => {
@@ -900,9 +910,9 @@ function chefCombinedSheet(branches, perBranch, order, boq = []) {
       if (pre && !l.startsWith(pre + " ") && !byLoose.has(pre + " " + l)) byLoose.set(pre + " " + l, k);
     });
     const meals = new Map(); // key → عدد الوجبات
-    const add = (key, init, part, count) => {
+    const add = (key, init, part, count, col = SUB_BRANCH) => {
       if (!rows.has(key)) rows.set(key, { ...init, sizes: new Set(), parts: {}, notes: [] });
-      (rows.get(key).parts[SUB_BRANCH] = rows.get(key).parts[SUB_BRANCH] || []).push(part);
+      (rows.get(key).parts[col] = rows.get(key).parts[col] || []).push(part);
       if (count) meals.set(key, (meals.get(key) || 0) + count);
     };
     boq.forEach(r => {
@@ -912,18 +922,18 @@ function chefCombinedSheet(branches, perBranch, order, boq = []) {
       const loose = chefLooseName(r.name);
       const key = byLoose.get(loose) || "sub:" + loose;
       const init = { category: SUB_BRANCH, name: chefNormName(r.name).replace(/\s+مع\s+.*$/, ""), base: "", rank: 9999, sort: 9999 };
-      add(key, init, m ? { key: "g", qty: Number(m[1]) * qty } : { key: "n:", qty }, qty);
+      splitOf(r).forEach(([col, q]) => { if (q) add(key, init, m ? { key: "g", qty: Number(m[1]) * q } : { key: "n:", qty: q }, q, col); });
       // الرز: «مع رز أبيض» بالاسم أو اختيار رز أبيض — الكارب بالجرام لسطر الرز الأبيض
       if (m) {
         const vs = (r.variants || []).filter(v => /رز|ارز|أرز/.test(v.name));
-        const rice = vs.length ? vs.map(v => [v.name, Number(v.qty) || 0]) : /(رز|أرز|ارز)\s+(أبيض|ابيض)/.test(r.name) ? [["رز أبيض", qty]] : [];
-        rice.forEach(([vn, vq]) => {
+        const rice = vs.length ? vs.map(v => [v.name, v]) : /(رز|أرز|ارز)\s+(أبيض|ابيض)/.test(r.name) ? [["رز أبيض", r]] : [];
+        rice.forEach(([vn, src]) => {
           const rk = byLoose.get(chefLooseName(vn)) || "sub:" + chefLooseName(vn);
-          add(rk, { category: SUB_BRANCH, name: chefNormName(vn), base: "", rank: 9999, sort: 9999 }, { key: "g", qty: Number(m[2]) * vq }, 0);
+          splitOf(src).forEach(([col, vq]) => { if (vq) add(rk, { category: SUB_BRANCH, name: chefNormName(vn), base: "", rank: 9999, sort: 9999 }, { key: "g", qty: Number(m[2]) * vq }, 0, col); });
         });
       }
     });
-    meals.forEach((n, key) => { if (rows.get(key).parts[SUB_BRANCH].some(p => p.key === "g")) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
+    meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY, SUB_PICKUP].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
   }
   const list = [...rows.values()].map(r => ({
     ...r, size: [...r.sizes].join("، "),
@@ -974,7 +984,7 @@ function chefSheetHtml(sheet, date) {
       <tr class="chef-title" style="height:${chefPtPx(S.titleH)}px">
         <td colspan="3" style="text-align:left">اليوم:</td><td style="text-align:right">${esc(chefDayName(date))}</td>
         <td style="text-align:right">التاريخ:</td><td colspan="${dateSpan}" style="text-align:right">${esc(chefDateText(date))}</td>
-        <td colspan="${S.cols.length - 5 - dateSpan}">${sheet.combined ? "كل الفروع" : "فرع " + esc(sheet.branch)}</td>
+        <td colspan="${S.cols.length - 5 - dateSpan}">${sheet.title ? esc(sheet.title) : sheet.combined ? "كل الفروع" : "فرع " + esc(sheet.branch)}</td>
       </tr>
       <tr class="chef-head" style="height:${chefPtPx(S.headH)}px">${S.headers.map(h => cell(h, `background:#${S.headFill}`)).join("")}</tr>
       ${body}
@@ -1043,7 +1053,7 @@ async function exportTomorrowReportExcel() {
     if (lastCol > 6 + span) ws.mergeCells(1, 6 + span, 1, lastCol);
     const [y, m, d] = lastTomorrowReportDate.split("-").map(Number);
     const title = [["A1", "اليوم:", "left"], ["D1", chefDayName(lastTomorrowReportDate), "right"], ["E1", "التاريخ:", "right"],
-      ["F1", new Date(Date.UTC(y, m - 1, d)), "right"], [ws.getCell(1, 6 + chefDateSpan(sheetData)).address, sheetData.combined ? "كل الفروع" : "فرع " + sheetData.branch, "center"]];
+      ["F1", new Date(Date.UTC(y, m - 1, d)), "right"], [ws.getCell(1, 6 + chefDateSpan(sheetData)).address, sheetData.title || (sheetData.combined ? "كل الفروع" : "فرع " + sheetData.branch), "center"]];
     title.forEach(([a, v, h]) => { const c = ws.getCell(a); c.value = v; c.font = font(S.titleFont); c.alignment = { horizontal: h, vertical: "middle" }; });
     ws.getCell("F1").numFmt = "dd-mm-yyyy";
     ws.getRow(1).height = S.titleH;

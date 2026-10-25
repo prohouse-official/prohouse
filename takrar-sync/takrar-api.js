@@ -137,17 +137,37 @@ async function syncBoq() {
   const now = Date.now();
   for (let i = 0; i < 3; i++) {
     const day = riyadh(now + i * 86400000);
-    const res = await fetch(BASE + "/public-api/v1/operations/boq-report/", {
-      method: "POST",
-      headers: { Authorization: "Bearer " + TOKEN, Accept: "application/json", "Content-Type": "application/json", "app-id": String(cfg.appId) },
-      body: JSON.stringify({ status: "confirmed", from_date: day, to_date: day, grouped_by_size: true, group_by_plan: false, group_by_description: false, group_by_reference: false, cities_ids: [], corporates_ids: [], delivery_window_id: null })
+    // التوصيل والاستلام كل واحد لحاله (فلتر is_pickup) — مجموعهن = الكل
+    const part = async (isPickup) => {
+      const res = await fetch(BASE + "/public-api/v1/operations/boq-report/", {
+        method: "POST",
+        headers: { Authorization: "Bearer " + TOKEN, Accept: "application/json", "Content-Type": "application/json", "app-id": String(cfg.appId) },
+        body: JSON.stringify({ status: "confirmed", from_date: day, to_date: day, grouped_by_size: true, group_by_plan: false, group_by_description: false, group_by_reference: false, cities_ids: [], corporates_ids: [], delivery_window_id: null, is_pickup: isPickup })
+      });
+      if (res.status !== 200) { console.log("TAKRAR_BOQ", isPickup ? "pickup" : "delivery", res.status); return null; }
+      const list = await res.json();
+      return Array.isArray(list) ? list : list.results || [];
+    };
+    const [del, pick] = [await part(false), await part(true)];
+    if (!del || !pick) continue;
+    const byKey = new Map();
+    const addList = (list, field) => list.forEach(r => {
+      const name = r.name_ar || r.name_en, size = r.size_title || "";
+      const key = name + "|" + size;
+      const row = byKey.get(key) || { name, category: r.category_name_ar || "", size, qty: 0, delivery: 0, pickup: 0, variants: [] };
+      const q = Number(r.quantity) || 0;
+      row.qty += q; row[field] += q;
+      (r.variants || []).forEach(v => {
+        const vn = v.variant_combo_name_ar || v.variant_combo_name_en;
+        let vr = row.variants.find(x => x.name === vn);
+        if (!vr) row.variants.push(vr = { name: vn, qty: 0, delivery: 0, pickup: 0 });
+        const vq = Number(v.quantity) || 0;
+        vr.qty += vq; vr[field] += vq;
+      });
+      byKey.set(key, row);
     });
-    if (res.status !== 200) { console.log("TAKRAR_BOQ", res.status); continue; }
-    const list = await res.json();
-    const rows = (Array.isArray(list) ? list : list.results || []).map(r => ({
-      name: r.name_ar || r.name_en, category: r.category_name_ar || "", size: r.size_title || "", qty: Number(r.quantity) || 0,
-      variants: (r.variants || []).map(v => ({ name: v.variant_combo_name_ar || v.variant_combo_name_en, qty: Number(v.quantity) || 0 }))
-    }));
+    addList(del, "delivery"); addList(pick, "pickup");
+    const rows = [...byKey.values()];
     const up = await fetch(SUPA_URL + "/functions/v1/tabsense-ingest", {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: ANON, Authorization: "Bearer " + ANON, "x-github-oidc": await oidcToken() },
