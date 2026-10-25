@@ -796,7 +796,8 @@ async function runTomorrowReport() {
       remItems = ((prev && prev.items) || []).map(x => {
         const w = !blank(x.remainingWeight) ? Number(x.remainingWeight) : null, n = w === null && !blank(x.remaining) ? Number(x.remaining) : null;
         const it = Items.byId(x.itemId) || { id: x.itemId, name: x.itemName, category: "-", unit: x.unit };
-        return { id: x.itemId, name: chefReportName(it, x.cookName), category: it.category || "-", w: w > 0 ? w : null, n: n > 0 ? n : null };
+        // اسم الصنف نفسه؛ خانة الشيف بدون اسم طبخة بتنكتب باسمها (لحم الشيف 2) بدون «……»
+        return { id: x.itemId, name: chefReportName(it, x.cookName).replace(/[….]+$/, "").trim(), category: it.category || "-", w: w > 0 ? w : null, n: n > 0 ? n : null };
       }).filter(x => x.w || x.n);
     } catch (e) { remItems = null; }
     if (run !== tomorrowReportRun) return;
@@ -949,17 +950,18 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
     });
     meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY, SUB_PICKUP].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
   }
-  // المتبقي اليوم (متبقي الروضة): قسم لحاله بآخر الورقة، كل صنف باسمه هو وكميته بعمود «المتبقي اليوم»
+  // المتبقي اليوم (متبقي الروضة): كل صنف باسمه هو تحت تصنيفه (دجاج، لحم، بحري…) وكميته بعمود «المتبقي اليوم»
   const remFmt = (v) => [v.g ? `${Math.round(v.g * 100) / 100} جم` : "", v.n ? String(Math.round(v.n * 100) / 100) : ""].filter(Boolean).join(" + ");
   if (remItems && remItems.length) {
     const own = new Map();
     remItems.forEach(x => {
       const k = x.id + "|" + x.name;
-      const cur = own.get(k) || { g: 0, n: 0, name: x.name, id: x.id };
+      const cur = own.get(k) || { g: 0, n: 0, name: x.name, id: x.id, category: x.category };
       cur.g += x.w || 0; cur.n += x.n || 0;
       own.set(k, cur);
     });
-    own.forEach((v, k) => rows.set("rem:" + k, { category: "متبقي الروضة", name: v.name, base: "", rank: 99999, sort: order.has(v.id) ? order.get(v.id) : 9999, sizes: new Set(), parts: {}, notes: [], remToday: remFmt(v) }));
+    // بعد أسطر الطلبية بنفس التصنيف
+    own.forEach((v, k) => rows.set("rem:" + k, { category: v.category, name: v.name, base: "", rank: categoryRank(v.category), sort: 5000 + (order.has(v.id) ? order.get(v.id) : 0), sizes: new Set(), parts: {}, notes: [], remToday: remFmt(v) }));
   }
   const list = [...rows.values()].map(r => ({
     ...r, size: [...r.sizes].join("، "), remToday: r.remToday || "",
