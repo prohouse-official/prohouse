@@ -788,7 +788,17 @@ async function runTomorrowReport() {
 
   // ورقة مجمعة (اختيار لحاله): الصنف، إجمالي المطلوب، وكم طالب كل فرع (+ الاشتراكات مدموجة مع أصناف الفروع)
   if (tomorrowReportCombined && !branchFilter && branches.length > 1) {
-    const combined = chefCombinedSheet(branches, perBranch, order, boq);
+    // المتبقي اليوم: متبقي اليوم اللي قبل تاريخ الطلبية (طلبية الاثنين = متبقي الأحد) لكل فرع
+    let remByBranch = null;
+    try {
+      const prev = await Promise.all(branches.map(b => Sync.get("getDay", { date: addDaysStr(date, -1), branch: b }, "day:" + addDaysStr(date, -1) + ":" + b).catch(() => null)));
+      remByBranch = prev.map(d => new Map(((d && d.items) || []).map(x => {
+        const w = !blank(x.remainingWeight) ? x.remainingWeight : null, n = w === null && !blank(x.remaining) ? x.remaining : null;
+        return [x.itemId, { w: w === null ? null : Number(w), n: n === null ? null : Number(n) }];
+      })));
+    } catch (e) { remByBranch = null; }
+    if (run !== tomorrowReportRun) return;
+    const combined = chefCombinedSheet(branches, perBranch, order, boq, remByBranch);
     lastTomorrowReportSheets = combined.rows.length ? [combined] : [];
   } else if (boq.length) {
     const fmt = (q) => String(Number(q) || 0);
@@ -858,8 +868,9 @@ const SUB_BRANCH = "اشتراكات";  // عمودها بالورقة المج�
 // لما تكرار يفصل التوصيل عن الاستلام: عمودين بدل «اشتراكات»
 const SUB_DELIVERY = "اشتراكات توصيل", SUB_PICKUP = "اشتراكات استلام";
 
-function chefCombinedSheet(branches, perBranch, order, boq = []) {
+function chefCombinedSheet(branches, perBranch, order, boq = [], remByBranch = null) {
   const rows = new Map();
+  const orderBranches = branches.length; // أعمدة الفروع الحقيقية (قبل ما نضيف أعمدة الاشتراكات)
   const aliased = []; // [{ base, branch, e, it }]
   const addTo = (key, init, branch, e, it) => {
     if (!rows.has(key)) rows.set(key, { ...init, sizes: new Set(), parts: {}, notes: [] });
@@ -869,6 +880,7 @@ function chefCombinedSheet(branches, perBranch, order, boq = []) {
     row.rank = Math.min(row.rank, categoryRank(it.category));
     row.sort = Math.min(row.sort, order.has(it.id) ? order.get(it.id) : 9999);
     (row.parts[branch] = row.parts[branch] || []).push(chefOrderPart(branch, e, it));
+    (row.itemIds = row.itemIds || []).push([branch, it.id]);
     if (String(e.notes || "").trim()) row.notes.push(`${branch}: ${String(e.notes).trim()}`);
   };
   branches.forEach((branch, bi) => {
@@ -935,14 +947,27 @@ function chefCombinedSheet(branches, perBranch, order, boq = []) {
     });
     meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY, SUB_PICKUP].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
   }
+  // المتبقي اليوم لكل سطر: مجموع متبقي أصنافه عند الفروع (جرامات + عدد)
+  const remText = (r) => {
+    if (!remByBranch) return "";
+    let g = 0, n = 0, any = false;
+    const seen = new Set();
+    (r.itemIds || []).forEach(([br, id]) => {
+      const k = br + "|" + id; if (seen.has(k)) return; seen.add(k);
+      const m = remByBranch[branches.indexOf(br)]; const v = m && m.get(id);
+      if (!v) return;
+      if (v.w !== null && !isNaN(v.w)) { g += v.w; any = true; } else if (v.n !== null && !isNaN(v.n)) { n += v.n; any = true; }
+    });
+    return any ? [g ? `${Math.round(g * 100) / 100} جم` : "", n ? String(Math.round(n * 100) / 100) : ""].filter(Boolean).join(" + ") : "";
+  };
   const list = [...rows.values()].map(r => ({
-    ...r, size: [...r.sizes].join("، "),
+    ...r, size: [...r.sizes].join("، "), remToday: remText(r),
     total: chefTotalText(Object.values(r.parts).flat()), notes: r.notes.join(" · "),
     byBranch: branches.map(b => (r.parts[b] ? chefTotalText(r.parts[b]) : ""))
   })).sort((a, b) => a.rank - b.rank || a.sort - b.sort);
   const used = branches.filter((b, i) => list.some(r => r.byBranch[i]));
   const idx = used.map(b => branches.indexOf(b));
-  return { combined: true, branch: "كل الفروع", branches: used, rows: list.map(r => ({ ...r, byBranch: idx.map(i => r.byBranch[i]) })) };
+  return { combined: true, hasRem: !!remByBranch, branch: "كل الفروع", branches: used, rows: list.map(r => ({ ...r, byBranch: idx.map(i => r.byBranch[i]) })) };
 }
 
 // أعمدة ورقة كل الفروع: استلام | الفئة | تسليم | اسم الصنف | حجم السفنديش | إجمالي المطلوب | فرع، فرع…
@@ -952,8 +977,8 @@ function chefCombinedLayout(sheet) {
   const n = sheet.branches.length;
   const branchW = n > 3 ? 24 : 30;
   return {
-    cols: [15.2, 15.2, 15.2, 40, 23.68, 40, ...sheet.branches.map(() => branchW), 50],
-    headers: ["استلام", "الفئة", "تسليم", "اسم الصنف", "حجم السفنديش", "إجمالي المطلوب", ...sheet.branches, "ملاحظات"]
+    cols: [15.2, 15.2, 15.2, 40, 23.68, 40, ...(sheet.hasRem ? [30] : []), ...sheet.branches.map(() => branchW), 50],
+    headers: ["استلام", "الفئة", "تسليم", "اسم الصنف", "حجم السفنديش", "إجمالي المطلوب", ...(sheet.hasRem ? ["المتبقي اليوم"] : []), ...sheet.branches, "ملاحظات"]
   };
 }
 
@@ -971,7 +996,7 @@ function chefSheetHtml(sheet, date) {
   sheet.rows.forEach(r => { const g = groups[groups.length - 1]; if (g && g.category === r.category) g.rows.push(r); else groups.push({ category: r.category, rows: [r] }); });
   const box = () => cell("□", `font-size:${chefPtPx(S.boxFont)}px`);
   const tail = (r) => sheet.combined
-    ? cell(r.total, "font-weight:700;background:#F2F2F2") + r.byBranch.map(t => cell(t)).join("") + cell(r.notes || "")
+    ? cell(r.total, "font-weight:700;background:#F2F2F2") + (sheet.hasRem ? cell(r.remToday || "") : "") + r.byBranch.map(t => cell(t)).join("") + cell(r.notes || "")
     : `${cell(r.qty)}${cell(r.rec || "")}${cell(r.rem || "")}${cell(r.notes)}`;
   const body = groups.map(g => g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
       ${box()}
@@ -1073,7 +1098,7 @@ async function exportTomorrowReportExcel() {
       const start = r;
       g.rows.forEach((x, i) => {
         const row = ws.getRow(r);
-        const tail = sheetData.combined ? [x.total, ...x.byBranch.map(t => t || null), x.notes || null] : [x.qty, x.rec || null, x.rem || null, x.notes || null];
+        const tail = sheetData.combined ? [x.total, ...(sheetData.hasRem ? [x.remToday || null] : []), ...x.byBranch.map(t => t || null), x.notes || null] : [x.qty, x.rec || null, x.rem || null, x.notes || null];
         ["□", i === 0 ? g.category : null, "□", x.name, x.size, ...tail].forEach((v, ci) => {
           const c = row.getCell(ci + 1);
           if (v !== null) c.value = v;
