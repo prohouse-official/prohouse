@@ -70,7 +70,7 @@ async function explore(page, apis) {
   // شكل طلب/رد الـ API المهمة (أسماء الحقول وأنواعها بس — بدون قيم)
   page.on("response", async (res) => {
     const u = res.url();
-    if (!/\/api\/(order\/history\/getOrders|settlement|bill|invoice|finance|data\/shop\/download-center)/.test(u)) return;
+    if (!/\/api\/(order\/history\/getOrders|settlement|bill|invoice|finance|data\/shop\/download-center|.*download)/.test(u)) return;
     let body = null; try { body = await res.json(); } catch (e) {}
     if (body && typeof body.data === "string" && /cate\/detail/.test(u)) { try { console.log("CATE_DATA_SHAPE", JSON.stringify(shape(JSON.parse(body.data))).slice(0, 3000)); } catch (e) { console.log("CATE_DATA_NOT_JSON", body.data.length); } }
     const req = res.request().postData() || "";
@@ -160,12 +160,40 @@ async function explore(page, apis) {
       else { await page.waitForTimeout(4000); console.log("DOWNLOAD none; popups:", page.context().pages().length, JSON.stringify(newApis(n0))); }
     } catch (e) { console.log("DOWNLOAD_ERR", clean(e.message)); }
     console.log("BILL_DETAIL", clean(page.url()), JSON.stringify((await leafAll()).slice(0, 100)), JSON.stringify(newApis(n0)));
-    await page.goto("https://merchant.mykeeta.com/m/web/app/finance#/main/bill", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(7000);
+    // «تنزيل الفاتورة» بيعمل مهمة تنزيل؛ الملف بيطلع بتبويب «تنزيل» (مركز التنزيلات) — نستنى ونشوف القائمة ونوع الملف
+    await page.waitForTimeout(25000);
     n0 = apis.size;
-    console.log("CLICK_DOWNLOAD_TAB", await clickIn("تنزيل"));
-    await page.waitForTimeout(7000);
-    console.log("DOWNLOAD_TAB", clean(page.url()), JSON.stringify((await leafAll()).slice(0, 100)), JSON.stringify(newApis(n0)));
+    for (const f of page.frames()) {
+      // التبويب «تنزيل» جنب «الرصيد» و«الفاتورة» (مو زر «تنزيل الفاتورة»)
+      const tabs = f.getByText("تنزيل", { exact: true });
+      const c = await tabs.count().catch(() => 0);
+      if (c) { await tabs.first().click({ force: true }).catch(() => {}); console.log("CLICK_DOWNLOAD_TAB", c); break; }
+    }
+    await page.waitForTimeout(9000);
+    console.log("DOWNLOAD_TAB", clean(page.url()), JSON.stringify((await leafAll()).slice(20, 140)), JSON.stringify(newApis(n0)));
+    // أول زر تنزيل بالقائمة: اسم الملف (بدون أرقام) ونوعه وحجمه بس
+    for (const label of ["تنزيل", "Download", "تحميل"]) {
+      let done = false;
+      for (const f of page.frames()) {
+        const els = f.getByText(label, { exact: true });
+        const c = await els.count().catch(() => 0);
+        for (let k = c - 1; k >= 1 && !done; k--) {
+          const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 12000 }).catch(() => null), els.nth(k).click({ force: true }).catch(() => {})]);
+          if (dl) {
+            const fp = await dl.path().catch(() => null);
+            const buf = fp ? require("fs").readFileSync(fp) : Buffer.alloc(0);
+            console.log("FILE", clean(dl.suggestedFilename()), buf.length, "bytes", "magic:", JSON.stringify(buf.slice(0, 4).toString("latin1")), clean(dl.url().split("?")[0]));
+            if (buf.slice(0, 4).toString("latin1") === "%PDF") {
+              const txt = buf.toString("latin1");
+              console.log("PDF_HINTS", JSON.stringify({ pages: (txt.match(/\/Type\s*\/Page[^s]/g) || []).length, hasText: /BT[\s\S]{0,200}Tj/.test(txt) }));
+            }
+            done = true;
+          }
+        }
+        if (done) break;
+      }
+      if (done) break;
+    }
     const frames = page.frames().map(f => clean(f.url().split("?")[0])).filter(u => u && u !== "about:blank");
     console.log("PAGE", JSON.stringify({ menu: name, url: clean(info.url), frames, tabs: info.tabs.map(clean), heads: info.heads.map(clean), tables: info.tables.map(r => r.map(clean)), buttons: info.buttons.map(clean), newApis: [...apis].slice(before).filter(u => /\/api\//.test(u) && !/rapfront|i18n|log|metric/.test(u)) }));
   }
