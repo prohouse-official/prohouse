@@ -788,17 +788,17 @@ async function runTomorrowReport() {
 
   // ورقة مجمعة (اختيار لحاله): الصنف، إجمالي المطلوب، وكم طالب كل فرع (+ الاشتراكات مدموجة مع أصناف الفروع)
   if (tomorrowReportCombined && !branchFilter && branches.length > 1) {
-    // المتبقي اليوم: متبقي كل الفروع لليوم اللي قبل تاريخ الطلبية (طلبية الاثنين = متبقي الأحد)
-    // الشاطئ وعبداللطيف بيرجّعوا للروضة، فكميتهم بتنضاف على استلام الروضة (ومنها للشيف)
+    // المتبقي اليوم: متبقي فرع الروضة بس لليوم اللي قبل تاريخ الطلبية (طلبية الاثنين = متبقي الأحد)
     let remItems = null;
     try {
       const prevDate = addDaysStr(date, -1);
-      const prev = await Promise.all(branches.map(b => Sync.get("getDay", { date: prevDate, branch: b }, "day:" + prevDate + ":" + b).catch(() => null)));
-      remItems = prev.flatMap(d => ((d && d.items) || []).map(x => {
+      const prev = await Sync.get("getDay", { date: prevDate, branch: "الروضة" }, "day:" + prevDate + ":الروضة").catch(() => null);
+      remItems = ((prev && prev.items) || []).map(x => {
         const w = !blank(x.remainingWeight) ? Number(x.remainingWeight) : null, n = w === null && !blank(x.remaining) ? Number(x.remaining) : null;
         const it = Items.byId(x.itemId) || { id: x.itemId, name: x.itemName, category: "-", unit: x.unit };
-        return { id: x.itemId, name: chefReportName(it, x.cookName), category: it.category || "-", w: w > 0 ? w : null, n: n > 0 ? n : null };
-      })).filter(x => x.w || x.n);
+        // اسم الصنف نفسه؛ خانة الشيف بدون اسم طبخة بتنكتب باسمها (لحم الشيف 2) بدون «……»
+        return { id: x.itemId, name: chefReportName(it, x.cookName).replace(/[….]+$/, "").trim(), category: it.category || "-", w: w > 0 ? w : null, n: n > 0 ? n : null };
+      }).filter(x => x.w || x.n);
     } catch (e) { remItems = null; }
     if (run !== tomorrowReportRun) return;
     const combined = chefCombinedSheet(branches, perBranch, order, boq, remItems);
@@ -950,31 +950,18 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
     });
     meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY, SUB_PICKUP].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
   }
-  // المتبقي اليوم (مجموع متبقي الفروع عند الروضة): بيتطابق مع سطر الطلبية باسم الطبق (خانة الشيف ممكن تتغير طبختها من يوم ليوم)
-  // والمتبقي اللي ما انطلب بكرا ينضاف له سطر لحاله
-  const remKey = (n) => chefLooseName(n).replace(/[….\s]+$/, "");
-  const remMap = new Map();
-  (remItems || []).forEach(x => {
-    const k = remKey(x.name);
-    const cur = remMap.get(k) || { g: 0, n: 0, category: x.category, name: x.name, id: x.id };
-    cur.g += x.w || 0; cur.n += x.n || 0;
-    remMap.set(k, cur);
-  });
+  // المتبقي اليوم (متبقي الروضة): كل صنف باسمه هو تحت تصنيفه (دجاج، لحم، بحري…) وكميته بعمود «المتبقي اليوم»
   const remFmt = (v) => [v.g ? `${Math.round(v.g * 100) / 100} جم` : "", v.n ? String(Math.round(v.n * 100) / 100) : ""].filter(Boolean).join(" + ");
-  const usedRem = new Set();
-  const remText = (r) => {
-    const k = remKey(r.name), v = remMap.get(k);
-    if (!v) return "";
-    usedRem.add(k);
-    return remFmt(v);
-  };
-  if (remItems) {
-    const withRem = [...rows.values()].map(r => ({ r, rem: remText(r) }));
-    withRem.forEach(({ r, rem }) => { r.remToday = rem; });
-    remMap.forEach((v, k) => {
-      if (usedRem.has(k)) return;
-      rows.set("rem:" + k, { category: v.category, name: v.name, base: "", rank: categoryRank(v.category), sort: order.has(v.id) ? order.get(v.id) : 9999, sizes: new Set(), parts: {}, notes: ["متبقي — مو بطلبية بكرا"], remToday: remFmt(v) });
+  if (remItems && remItems.length) {
+    const own = new Map();
+    remItems.forEach(x => {
+      const k = x.id + "|" + x.name;
+      const cur = own.get(k) || { g: 0, n: 0, name: x.name, id: x.id, category: x.category };
+      cur.g += x.w || 0; cur.n += x.n || 0;
+      own.set(k, cur);
     });
+    // بعد أسطر الطلبية بنفس التصنيف
+    own.forEach((v, k) => rows.set("rem:" + k, { category: v.category, name: v.name, base: "", rank: categoryRank(v.category), sort: 5000 + (order.has(v.id) ? order.get(v.id) : 0), sizes: new Set(), parts: {}, notes: [], remToday: remFmt(v) }));
   }
   const list = [...rows.values()].map(r => ({
     ...r, size: [...r.sizes].join("، "), remToday: r.remToday || "",
@@ -983,7 +970,7 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
   })).sort((a, b) => a.rank - b.rank || a.sort - b.sort);
   const used = branches.filter((b, i) => list.some(r => r.byBranch[i]));
   const idx = used.map(b => branches.indexOf(b));
-  return { combined: true, hasRem: !!remItems, branch: "كل الفروع", branches: used, rows: list.map(r => ({ ...r, byBranch: idx.map(i => r.byBranch[i]) })) };
+  return { combined: true, hasRem: !!(remItems && remItems.length), branch: "كل الفروع", branches: used, rows: list.map(r => ({ ...r, byBranch: idx.map(i => r.byBranch[i]) })) };
 }
 
 // أعمدة ورقة كل الفروع: استلام | الفئة | تسليم | اسم الصنف | حجم السفنديش | إجمالي المطلوب | فرع، فرع…
