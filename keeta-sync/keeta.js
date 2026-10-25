@@ -148,6 +148,11 @@ async function explore(page, apis) {
     let n0 = apis.size;
     await page.goto("https://merchant.mykeeta.com/m/web/app/finance#/main/bill", { waitUntil: "domcontentloaded", timeout: 30000 }).catch(() => {});
     await page.waitForTimeout(9000);
+    // نافذة الترحيب الجديدة («البدء») بتغطي الصفحة
+    for (const f of page.frames()) { const b = f.getByText("البدء", { exact: true }).first(); if (await b.isVisible().catch(() => false)) { await b.click({ force: true }).catch(() => {}); console.log("CLOSED_WELCOME"); } }
+    await page.waitForTimeout(1500);
+    for (const f of page.frames()) if (/\/web\/app\/finance/.test(f.url()) && !/\/m\/web/.test(f.url())) await f.evaluate(() => { if (!/bill/.test(location.hash)) location.hash = "#/main/bill"; }).catch(() => {});
+    await page.waitForTimeout(6000);
     console.log("BILL_PAGE", JSON.stringify((await leafAll()).slice(0, 80)), JSON.stringify(newApis(n0)));
     n0 = apis.size;
     console.log("CLICK_DETAILS", await clickIn("التفاصيل"));
@@ -167,7 +172,6 @@ async function explore(page, apis) {
     for (const f of page.frames()) {
       // التبويب «تنزيل» هو أخو «الفاتورة» و«الرصيد» بنفس الشريط (مو زر «تنزيل الفاتورة»)
       const r = await f.evaluate(() => {
-        document.querySelectorAll("[class*=drawer], [class*=mask]").forEach(e => { if (getComputedStyle(e).position === "fixed") e.remove(); });
         const leaves = Array.from(document.querySelectorAll("body *")).filter(e => e.children.length === 0 && (e.innerText || "").trim() === "تنزيل");
         for (const el of leaves) {
           let p = el.parentElement;
@@ -179,7 +183,14 @@ async function explore(page, apis) {
       }).catch(e => "err");
       console.log("CLICK_DOWNLOAD_TAB", clean(f.url().split("?")[0]), r);
     }
-    await page.waitForTimeout(9000);
+    await page.waitForTimeout(15000);
+    // إذا الصفحة طلعت ERROR: نعيد تحميل التبويب من جوّا الإطار
+    for (const f of page.frames()) {
+      if (/\/web\/app\/finance/.test(f.url()) && !/\/m\/web/.test(f.url())) {
+        const bad = await f.evaluate(() => /ERROR/.test(document.body.innerText || "")).catch(() => false);
+        if (bad) { await f.evaluate(() => { location.hash = "#/main/bill"; }).catch(() => {}); await page.waitForTimeout(6000); await f.evaluate(() => { location.hash = "#/main/download"; }).catch(() => {}); await page.waitForTimeout(15000); console.log("RETRY_DOWNLOAD_TAB"); }
+      }
+    }
     console.log("HASHES", JSON.stringify(await Promise.all(page.frames().map(f => f.evaluate(() => location.hash).catch(() => "")))));
     console.log("DOWNLOAD_TAB", clean(page.url()), JSON.stringify((await leafAll()).slice(20, 140)), JSON.stringify(newApis(n0)));
     // أول زر تنزيل بالقائمة: اسم الملف (بدون أرقام) ونوعه وحجمه بس
