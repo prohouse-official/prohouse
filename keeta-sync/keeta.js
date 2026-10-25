@@ -163,13 +163,24 @@ async function explore(page, apis) {
     // «تنزيل الفاتورة» بيعمل مهمة تنزيل؛ الملف بيطلع بتبويب «تنزيل» (مركز التنزيلات) — نستنى ونشوف القائمة ونوع الملف
     await page.waitForTimeout(25000);
     n0 = apis.size;
+    for (let k = 0; k < 3; k++) { await page.keyboard.press("Escape").catch(() => {}); await page.waitForTimeout(400); }
     for (const f of page.frames()) {
-      // التبويب «تنزيل» جنب «الرصيد» و«الفاتورة» (مو زر «تنزيل الفاتورة»)
-      const tabs = f.getByText("تنزيل", { exact: true });
-      const c = await tabs.count().catch(() => 0);
-      if (c) { await tabs.first().click({ force: true }).catch(() => {}); console.log("CLICK_DOWNLOAD_TAB", c); break; }
+      // التبويب «تنزيل» هو أخو «الفاتورة» و«الرصيد» بنفس الشريط (مو زر «تنزيل الفاتورة»)
+      const r = await f.evaluate(() => {
+        document.querySelectorAll("[class*=drawer], [class*=mask]").forEach(e => { if (getComputedStyle(e).position === "fixed") e.remove(); });
+        const leaves = Array.from(document.querySelectorAll("body *")).filter(e => e.children.length === 0 && (e.innerText || "").trim() === "تنزيل");
+        for (const el of leaves) {
+          let p = el.parentElement;
+          for (let d = 0; d < 4 && p; d++, p = p.parentElement) {
+            if (/الفاتورة/.test(p.innerText || "") && /الرصيد/.test(p.innerText || "") && (p.innerText || "").length < 60) { el.click(); (el.closest("[role=tab], li, div") || el).click(); return "ok:" + location.hash; }
+          }
+        }
+        return "none:" + leaves.length;
+      }).catch(e => "err");
+      console.log("CLICK_DOWNLOAD_TAB", clean(f.url().split("?")[0]), r);
     }
     await page.waitForTimeout(9000);
+    console.log("HASHES", JSON.stringify(await Promise.all(page.frames().map(f => f.evaluate(() => location.hash).catch(() => "")))));
     console.log("DOWNLOAD_TAB", clean(page.url()), JSON.stringify((await leafAll()).slice(20, 140)), JSON.stringify(newApis(n0)));
     // أول زر تنزيل بالقائمة: اسم الملف (بدون أرقام) ونوعه وحجمه بس
     for (const label of ["تنزيل", "Download", "تحميل"]) {
