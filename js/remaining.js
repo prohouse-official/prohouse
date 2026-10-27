@@ -586,7 +586,7 @@ function renderRemainingView(receivingData, salesData) {
     const catItems = byCat[cat];
     const isWeightMeal = isWeightMealCategory(cat);
     const isSandwich = isSandwichCategory(cat);
-    const isSalad = isSaladCategory(cat);
+    const isSaladCat = isSaladCategory(cat);
     const isMealCat = isMealMatchingCategory(cat);
     const categorySoldMeals = isMealCat ? getMatchedCategorySales(salesMap, cat) : 0;
     const categoryConsumedGrams = isWeightMeal ? (categorySoldMeals * MEAL_WEIGHT_G) : 0;
@@ -597,9 +597,11 @@ function renderRemainingView(receivingData, salesData) {
     const catWaste = catItems.reduce((sum, it) => sum + remainingWasteFor(it.id), 0);
 
     const cardsHtml = catItems.map(it => {
+      const dw = isDailyWeigh(it);
+      const isSalad = isSaladCat && !dw;
       const recEntry = receivingMap[it.id] || {};
       const recQty = Number(recEntry.received || 0);
-      catReceivedSum += recQty;
+      if (!dw) catReceivedSum += recQty;
 
       const remData = currentRemainingData[it.id] || { remaining: "", remainingWeight: "", remainingSauce: "", isSauce: false, notes: "" };
       const rawVal = remData.remaining || remData.remainingWeight || remData.remainingSauce || "";
@@ -609,8 +611,7 @@ function renderRemainingView(receivingData, salesData) {
       const actualChicken = !isSauceWeight ? numVal : 0;
       const actualSauce = isSauceWeight ? numVal : 0;
 
-      catActualChickenSum += actualChicken;
-      catActualSauceSum += actualSauce;
+      if (!dw) { catActualChickenSum += actualChicken; catActualSauceSum += actualSauce; }
 
       const isCounted = rawVal !== "" && rawVal !== null && rawVal !== undefined;
 
@@ -619,7 +620,7 @@ function renderRemainingView(receivingData, salesData) {
 
       let itemVarianceText = "";
       let hasVariance = false;
-      if (recQty > 0 && Auth.canSeeSales()) {
+      if (recQty > 0 && Auth.canSeeSales() && !dw) {
         if (isWeightMeal) {
           const itemExpected = Math.max(0, recQty - categoryConsumedGrams - remainingWasteFor(it.id));
           const diff = numVal - itemExpected; // بروتين أو صوص — الاثنين من وزن الاستلام
@@ -643,7 +644,7 @@ function renderRemainingView(receivingData, salesData) {
       const itemUnitLabel = isSandwich ? "ساندويتش" : (isSalad ? "حبة" : (it.unit || "جم"));
 
       return `
-        <div class="remaining-card-mobile" 
+        <div class="remaining-card-mobile${dw ? " rem-slim" : ""}" 
              data-item-id="${it.id}" 
              data-cat="${cat}"
              data-counted="${isCounted}"
@@ -660,7 +661,7 @@ function renderRemainingView(receivingData, salesData) {
               <span class="rem-item-unit">(${itemUnitLabel})</span>
               ${it.isCustom ? '<span class="badge ok rec-custom-badge">إضافي</span>' : ''}
               <span class="rec-meta-chip rec-req-chip" title="المستلم صباحاً">📦 ${recQty > 0 ? Math.round(recQty) : '—'}</span>
-              ${numVal > 0 ? `
+              ${numVal > 0 && !dw ? `
                 <span id="remmeals-${it.id}" class="rec-meta-chip rec-meal-chip">
                   ${formatRemainingItemChip(actualChicken, actualSauce, isWeightMeal, false, cat, isSauceWeight)}
                 </span>
@@ -788,7 +789,7 @@ function renderRemainingView(receivingData, salesData) {
       } else {
         varBadgeHtml = `<span class="cat-pill pill-pending">⏳ بانتظار الجرد</span>`;
       }
-    } else if (isSalad) {
+    } else if (isSaladCat) {
       const recCount = Math.round(catReceivedSum);
       const soldCount = categorySoldMeals;
       const expectedRem = Math.max(0, recCount - soldCount - Math.round(catWaste));
@@ -910,6 +911,7 @@ function updateCategoryHeaderMetrics(itemId) {
 
   catItems.forEach(it => {
     const recEntry = receivingMap[it.id] || {};
+    if (isDailyWeigh(it)) return;
     catReceivedSum += Number(recEntry.received || 0);
 
     const remData = currentRemainingData[it.id] || {};
@@ -1586,7 +1588,7 @@ function openRemainingWaste(itemId) {
   const it = getAllRemainingActiveItems(cachedReceivingDataForRemaining).find(x => x.id === itemId) || Items.byId(itemId);
   if (!it) return;
   const cat = String(it.category || "");
-  const unit = isSandwichCategory(cat) ? "ساندويتش" : (isSaladCategory(cat) ? "حبة" : (it.unit || "جم"));
+  const unit = isSandwichCategory(cat) ? "ساندويتش" : (isSaladCategory(cat) && !isDailyWeigh(it) ? "حبة" : (it.unit || "جم"));
   const esc = (t) => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const records = currentRemainingWaste.filter(w => w.itemId === itemId);
   let reason = WASTE_REASONS[0];

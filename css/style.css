@@ -3805,3 +3805,15 @@ body:not(.nav-ready) .nav-group-title{ display:none !important; }
 .rec-filter-chip, .rem-filter-chip, .tom-filter-chip{ min-height:36px; }
 .pur-sup-toggle{ min-height:38px; }
 #attDateInput{ min-height:38px; }
+
+/* أصناف السلطة اللي بتنوزن يومياً: سطر نحيف */
+.rec-slim{padding:4px 10px;margin:3px 0}
+.rec-slim .rec-card-header{margin:0;padding:0}
+.rec-slim .rec-req-chip,.rec-slim .rec-diff-chip,.rec-slim .rec-btn-remove,.rec-slim .badge,.rec-slim .rec-inline-btns,.rec-slim .rec-item-unit{display:none}
+.rec-slim .rec-input-action-row{margin:2px 0 0}
+.rem-slim{padding:4px 10px;margin:3px 0}
+.rem-slim .rem-inline-actions{display:none}
+.rec-slim .rec-notes-toggle-wrap{display:none}
+.rec-slim{display:flex;align-items:center;gap:8px}
+.rec-slim .rec-card-header{flex:1}
+.rec-slim .rec-input-action-row{flex:0 0 46%}

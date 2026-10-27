@@ -171,6 +171,7 @@ function getAllReceivingActiveItems() {
     if (currentReceivingRemovedIds.has(it.id)) return false;
     const branches = itemBranches(it);
     if (branches.length && !branches.includes(currentReceivingBranch)) return false;
+    if (isDailyWeigh(it)) return true;
     // الاختياري بيطلع بس إذا انطلب لهاليوم أو انسجل استلامه
     if (isOptionalItem(it)) {
       const d = currentReceivingData[it.id];
@@ -379,13 +380,14 @@ function renderReceivingView() {
 
       const catStr = String(it.category || "");
       const isSandwich = catStr.includes("فطور") || catStr.includes("ساندويتش") || catStr.includes("ساندوتش");
-      const isSalad = catStr.includes("سلط");
+      const dw = isDailyWeigh(it);
+      const isSalad = catStr.includes("سلط") && !dw;
       const isWeightMeal = catStr.includes("دجاج") || catStr.includes("لحم") || catStr.includes("بحري") || catStr.includes("سمك") || catStr.includes("أسماك");
       const isMeal = isWeightMeal || isSandwich || isSalad;
       const notesExpanded = receivingNotesExpanded[it.id] || !!recData.notes;
 
       html += `
-        <div class="item-card receiving-item-card" data-item-id="${it.id}" data-status="${status}">
+        <div class="item-card receiving-item-card${dw ? " rec-slim" : ""}" data-item-id="${it.id}" data-status="${status}">
           <!-- سطر معلومات الصنف الموحد (اسم، مطلوب، فرق، وجبات، حالة وحذف) -->
           <div class="rec-card-header">
             <div class="rec-item-header-main">
