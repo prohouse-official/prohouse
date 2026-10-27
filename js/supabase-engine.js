@@ -148,7 +148,7 @@ const SupaEngine = (() => {
   // --- قراءة الأصناف ---
   async function getItems(all) {
     const filter = all ? "" : "&active=eq.true";
-    const res = await query(`items?select=*${filter}&order=sort_order.asc`);
+    const res = await query(`items?select=*${filter}&order=sort_order.asc,id.asc`);
     return (res || []).map(r => ({
       id: r.id,
       category: r.category,
@@ -586,7 +586,7 @@ const SupaEngine = (() => {
   // --- جرد العصيرات (Juices & Counts) ---
   async function getJuices(all) {
     const filter = all ? "" : "&active=eq.true";
-    const res = await query(`juices?select=*${filter}&order=sort_order.asc`);
+    const res = await query(`juices?select=*${filter}&order=sort_order.asc,id.asc`);
     return (res || []).map(r => ({
       id: r.id,
       name: r.name,
@@ -1008,7 +1008,7 @@ const SupaEngine = (() => {
   // الحضور والانصراف (branch = null → كل الفروع). الوقت recorded_at من السيرفر
   async function getAttendance(date, branch) {
     const b = branch ? `&branch=eq.${encodeURIComponent(branch)}` : "";
-    return (await query(`attendance_log?select=*&date=eq.${date}${b}&order=recorded_at.asc`)) || [];
+    return (await query(`attendance_log?select=*&date=eq.${date}${b}&order=recorded_at.asc,id.asc`)) || [];
   }
   async function addAttendance(row) {
     const r = await query("attendance_log", { method: "POST", headers: { "Prefer": "return=representation" }, body: JSON.stringify(row) });
@@ -1053,7 +1053,7 @@ const SupaEngine = (() => {
   }
   // أصناف تكرار مع قيمها الغذائية (لكل حجم) — للملصقات
   async function getTakrarProducts() {
-    return (await query("takrar_products?select=id,name_ar,name_en,category,nutrition&order=category,name_ar")) || [];
+    return (await query("takrar_products?select=id,name_ar,name_en,category,nutrition&order=category,name_ar,id")) || [];
   }
   // كميات اشتراكات تكرار لليوم (تقرير BoQ) — قراءة بس
   async function getTakrarBoq(date) {

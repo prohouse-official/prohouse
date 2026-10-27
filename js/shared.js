@@ -345,7 +345,13 @@ async function loadRequestedQty(date, branch) {
 async function loadRequestedOrder(date, branch) {
   const data = await Sync.get("getTomorrowOrder", { date, branch }, "tomorrow:" + date + ":" + branch);
   const qty = {}, cook = {}, unit = {};
-  (data || []).forEach(it => { qty[it.itemId] = it.qty; unit[it.itemId] = it.unit || ""; if (it.cookName) cook[it.itemId] = it.cookName; });
+  // الصف اللي كميته فاضية واسم طبخته فاضي = صنف انشال من الطلبية (بنصفّر الكمية ما بنمسح الصف) — ما بيعتبر مطلوب،
+  // وإلا الصنف الاختياري المشال كان يطلع بالاستلام والمتبقي بحالة «لم يصل»
+  (data || []).forEach(it => {
+    const empty = it.qty === null || it.qty === undefined || it.qty === "";
+    if (empty && !it.cookName) return;
+    qty[it.itemId] = it.qty; unit[it.itemId] = it.unit || ""; if (it.cookName) cook[it.itemId] = it.cookName;
+  });
   return { qty, cook, unit };
 }
 

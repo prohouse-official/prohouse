@@ -263,11 +263,7 @@ function saveChecklistData() {
     notes: notes
   });
 
-  if (typeof Toast !== "undefined" && Toast.show) {
-    Toast.show("🎉 تم حفظ وتوثيق قائمة الفحص بنجاح!");
-  } else {
-    phAlert("تم حفظ قائمة الفحص بنجاح!");
-  }
+  showToast("🎉 تم حفظ وتوثيق قائمة الفحص بنجاح!");
 
   renderChecklistView();
   if (typeof renderDashboard === "function") renderDashboard();

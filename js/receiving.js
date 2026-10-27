@@ -426,6 +426,7 @@ function renderReceivingView() {
                      id="recinput-${it.id}"
                      enterkeyhint="next"
                      oninput="onReceivingInputChange('${it.id}', this.value)"
+                     onchange="onReceivingSanity('${it.id}', this)"
                      class="entry-input rec-main-input ${diff < 0 ? 'border-red' : (diff > 0 ? 'border-orange' : (hasValue ? 'border-green' : ''))}">
               <span class="rec-input-unit-label">${isSandwich ? "ساندويتش" : (isSalad ? "حبة" : (it.unit || "جم"))}</span>
             </div>
@@ -596,6 +597,17 @@ function onReceivingBranchChange(branch) {
   currentReceivingBranch = branch;
   if (typeof currentRemainingBranch !== "undefined") currentRemainingBranch = branch;
   loadReceivingData(currentReceivingDate, currentReceivingBranch);
+}
+
+// نفس فكرة المتبقي: رقم مستلم أكبر من 3 أضعاف المطلوب (مثل 90010 بدل 900) نسأل عنه قبل ما يثبت
+async function onReceivingSanity(itemId, input) {
+  const v = Number(input.value), ord = Number(currentReceivingOrdered[itemId] || 0);
+  if (!(ord > 0) || !(v > ord * 3) || v - ord < 500) return;
+  const ok = await phConfirm(`المستلم ${v} أكبر بكتير من المطلوب ${ord}. متأكد من الرقم؟`);
+  if (ok) return;
+  input.value = "";
+  onReceivingInputChange(itemId, "");
+  input.focus({ preventScroll: true });
 }
 
 function onReceivingInputChange(itemId, val) {

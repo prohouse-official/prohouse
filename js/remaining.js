@@ -688,6 +688,8 @@ function renderRemainingView(receivingData, salesData) {
                          placeholder="—"
                          ${isClosed ? 'disabled' : ''}
                          oninput="onRemainingWeightChange('${it.id}', this.value)"
+                         data-rec="${recQty}"
+                         onchange="onRemainingSanity('${it.id}', this)"
                          class="entry-input rem-mini-input ${numVal > 0 ? 'border-green' : ''}">
                   <span class="rem-mini-unit">${itemUnitLabel}</span>
                 </div>
@@ -1071,6 +1073,18 @@ function onRemainingWeightChange(itemId, val) {
 
   saveRemainingLocalDebounced();
   updateSaveBarRemainingStatus();
+}
+
+// رقم المتبقي بيتحفظ مع كل حرف بينكتب، فكتير مرات انحفظ رقم فيه صفر زيادة (600 ← 6000).
+// لما يطلع من الخانة: لو المتبقي أكبر من 4 أضعاف المستلم نسأله قبل ما يثبت.
+async function onRemainingSanity(itemId, input) {
+  const v = Number(input.value), rec = Number(input.dataset.rec || 0);
+  if (!(rec > 0) || !(v > rec * 4) || v - rec < 500) return;
+  const ok = await phConfirm(`المتبقي ${v} أكبر بكتير من المستلم اليوم ${rec}. متأكد من الرقم؟`);
+  if (ok) return;
+  input.value = "";
+  onRemainingWeightChange(itemId, "");
+  input.focus({ preventScroll: true });
 }
 
 function toggleRemainingIsSauce(itemId) {
