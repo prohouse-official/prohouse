@@ -644,8 +644,10 @@ function itemPanSize(it) {
 }
 // العدد: للأصناف اللي تنطلب بالوزن نكتب الجرامات صريحة عشان ما تنفهم عدد سفنديشات
 function chefQtyText(qty, unit) {
-  if (/كجم|كيلو/.test(String(unit || ""))) return `${qty} كجم`;
-  return isWeightUnit(unit) ? `${qty} جم` : qty;
+  if (/كجم|كيلو/.test(String(unit || ""))) return `${Math.round(Number(qty) * 1000)} جم`;
+  // رقم كبير بوحدة سفنديش (1/3…) = جرامات مكتوبة بوحدة الحجم
+  if (isWeightUnit(unit) || (/\d\/\d/.test(String(unit || "")) && Number(qty) >= 50)) return `${qty} جم`;
+  return qty;
 }
 
 function initTomorrowReportControls() {
@@ -837,7 +839,7 @@ function chefOrderPart(branch, e, it) {
   // رقم صغير (أقل من ٥٠) بفرع سفنديش = عدد سفنديشات مو جرامات
   // فرع عادي: الوحدة اللي اختارها بالطلبية. فرع سفنديش: وحدة الصنف (الوحدة المحفوظة عنده حجم السفنديش)
   const baseUnit = isPanOrderBranch(branch) ? it.unit : (e.unit || it.unit);
-  const weight = /كجم|كيلو/.test(String(baseUnit || "")) ? 1000 : isWeightUnit(baseUnit) ? 1 : 0;
+  const weight = /كجم|كيلو/.test(String(baseUnit || "")) ? 1000 : (isWeightUnit(baseUnit) || (chefIsPanSize(baseUnit) && qty >= 50)) ? 1 : 0;
   if (weight && !(isPanOrderBranch(branch) && qty < 50)) {
     const g = qty * weight;
     return { key: "g", qty: g, text: `${g} جم` };
