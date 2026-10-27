@@ -121,6 +121,13 @@ function getAllRemainingActiveItems(receivingData) {
       if (added && currentRemainingAddedSlots[id] && item.name === def.name) item.name = chefSlotName(def, currentRemainingAddedSlots[id]);
       if (isChefItem(def) && r && r.cookName && item.name === def.name) item.name = chefSlotName(def, r.cookName);
     }
+    // فيه طلبية لهاليوم: المتبقي يعرض نفس أصناف الطلبية (متل الاستلام)، إلا اللي انستلم أو انجرد أو انضاف يدوي
+    if (remainingOrderedIds.size && !isDailyWeigh(item) && !remainingOrderedIds.has(id) && !extraIds.has(id)) {
+      const r = recById[id], d = currentRemainingData[id];
+      const received = r && Number(r.received) > 0;
+      const counted = d && [d.remaining, d.remainingWeight, d.remainingSauce].some(v => v !== "" && v !== null && v !== undefined);
+      if (!received && !counted && !Object.prototype.hasOwnProperty.call(currentRemainingAddedSlots, id)) return;
+    }
     if (remainingHidesCategory(item.category, branch)) return;
     result.push(item);
   });
@@ -241,6 +248,7 @@ function initRemainingModule() {
   currentRemainingDate = todayStr();
 }
 
+let remainingOrderedIds = new Set(); // الأصناف اللي انطلبت لهاليوم (نفس طلبية الغد اللي انحطت أمس)
 let remainingLoadSeq = 0;
 let remainingLoadOk = true;
 async function loadRemainingData(date, branch) {
@@ -262,13 +270,16 @@ async function loadRemainingData(date, branch) {
       ? getActiveReceivingData(currentRemainingDate, currentRemainingBranch)
       : null;
 
+    const orderedPromise = loadRequestedOrder(currentRemainingDate, currentRemainingBranch).catch(() => null);
     const [receivingData, salesData, remainingData, wasteData] = await Promise.all([
       (activeRec ? Promise.resolve(activeRec) : Sync.get("getDay", { date: currentRemainingDate, branch: currentRemainingBranch }, "day:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null)),
       Sync.get("getSalesByCategory", { start: currentRemainingDate, end: currentRemainingDate, branch: currentRemainingBranch }, "tabsense:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null),
       Sync.get("getRemainingReport", { date: currentRemainingDate, branch: currentRemainingBranch }, "remaining:" + currentRemainingDate + ":" + currentRemainingBranch).catch(() => null),
       SupaEngine.getWasteReport(currentRemainingDate, currentRemainingBranch).catch(() => null)
     ]);
+    const orderedReq = await orderedPromise;
     if (seq !== remainingLoadSeq) return;
+    remainingOrderedIds = new Set(orderedReq ? Object.keys(orderedReq.qty).filter(id => Number(orderedReq.qty[id]) > 0) : []);
     remainingLoadOk = !!remainingData;
     currentRemainingWaste = (wasteData && wasteData.items) || [];
 

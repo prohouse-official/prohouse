@@ -914,10 +914,10 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
   // الاشتراكات: كل طبق ينجمع (كل الأحجام) — البروتين بالجرام (150P × العدد) وينضاف لسطر نفس الطبق عند الفروع،
   // والرز الأبيض (الكارب C) ينضاف لسطر «رز أبيض». الطبق اللي مو موجود عند الفروع سطر جديد بالعدد.
   if (boq.length) {
-    branches = branches.concat(SUB_BRANCH, SUB_DELIVERY, SUB_PICKUP);
+    branches = branches.concat(SUB_BRANCH, SUB_DELIVERY);  // اشتراكات الاستلام ما بيجهزها الشيف: المشترك بيجي يستلم
     // كل كمية بتنقسم على أعمدة الاشتراكات: [[عمود، نسبة من الكمية]]
     const splitOf = (r) => r.delivery != null || r.pickup != null
-      ? [[SUB_DELIVERY, Number(r.delivery) || 0], [SUB_PICKUP, Number(r.pickup) || 0]] : [[SUB_BRANCH, Number(r.qty) || 0]];
+      ? [[SUB_DELIVERY, Number(r.delivery) || 0]] : [[SUB_BRANCH, Number(r.qty) || 0]];
     // أصناف الفروع: بالاسم، وكمان باسم الفئة قدّامه (فرع: «بخاري مع الكشنة» = تكرار: «دجاج بخاري»، «مندي» = «دجاج مندي»)
     const byLoose = new Map();
     [...rows.entries()].filter(([k]) => k.startsWith("n:")).forEach(([k, r]) => {
@@ -950,7 +950,7 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
         });
       }
     });
-    meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY, SUB_PICKUP].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
+    meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
   }
   // المتبقي اليوم (متبقي الروضة): لو الصنف بالطلبية بينكتب بنفس سطره (مطابقة باسم الطبق مو برقم الخانة)،
   // ولو مو بالطلبية (بيستو، كاري…) بياخد سطر لحاله باسمه تحت تصنيفه
