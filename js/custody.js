@@ -282,6 +282,11 @@ async function addCustodyExpense(payments) {
   const d = custodyDraftExpense;
   const amount = toNum(d.amount);
   if (amount === null || amount <= 0) { showToast("⚠ اكتب مبلغ المصروف"); return; }
+  // أرقام مكتوبة بالملاحظة غير المبلغ (سلفة أو تسليم نقد) ما بتنحسب — نسأل قبل الحفظ
+  const noteNums = (String(d.note || "").match(/\d+(?:\.\d+)?/g) || []).map(Number).filter(n => n >= 100 && Math.abs(n - amount) > 0.5);
+  if (noteNums.length && !(await phConfirm(`بالملاحظة رقم ${noteNums[0]} والمبلغ ${amount}. الرقم اللي بالملاحظة ما بينحسب بالعهدة. تحفظ هيك؟`, { ok: "احفظ" }))) return;
+  // مبلغ كبير بدون إيصال ولا فاتورة: نتأكد
+  if (amount >= 100 && !d.photo && !d.qr && !(await phConfirm(`مصروف ${amount} ريال بدون صورة فاتورة. تحفظه هيك؟`, { ok: "احفظ بدون صورة" }))) return;
   // بدون صورة ينحفظ عادي (بدون فاتورة) — ما نوقف الموظف
   const btn = document.getElementById("custExpAdd");
   if (btn) { btn.disabled = true; btn.textContent = "⏳ جاري الحفظ…"; }
