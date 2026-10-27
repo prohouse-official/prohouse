@@ -7,6 +7,8 @@ let lblMode = "day";
 let lblDate = new Date().getHours() >= 12 ? addDaysStr(todayStr(), 1) : todayStr();
 let lblProducts = [];
 let lblBoq = [];
+let lblFilter = "";  // تصنيف محدد (وضع كل الأصناف)
+let lblQuery = "";   // بحث بالاسم
 let lblCounts = {}; // «id|الحجم» → عدد (وضع كل الأصناف)
 let lblLoadSeq = 0;
 let lblHost = "labelsView"; // نفس الشاشة: من القائمة أو من التقارير
@@ -48,6 +50,12 @@ async function loadLabelsView(host) {
 }
 
 // قائمة الملصقات: [{ p, size, nut, extra }]
+// الأصناف الظاهرة حسب فلتر التصنيف والبحث
+function lblVisibleProducts() {
+  const q = lblNorm(lblQuery);
+  return lblProducts.filter(p => (!lblFilter || p.category === lblFilter) && (!q || lblNorm(p.name_ar + " " + (p.name_en || "")).includes(q)));
+}
+
 function lblList() {
   const byName = new Map(lblProducts.map(p => [lblNorm(p.name_ar), p]));
   const out = [], missing = [];
@@ -68,7 +76,7 @@ function lblList() {
     });
   } else {
     const any = Object.values(lblCounts).some(v => Number(v) > 0);
-    lblProducts.forEach(p => Object.entries(p.nutrition).forEach(([size, nut]) => {
+    lblVisibleProducts().forEach(p => Object.entries(p.nutrition).forEach(([size, nut]) => {
       const n = any ? Number(lblCounts[p.id + "|" + size]) || 0 : 1; // ما اخترت عدد؟ ملصق لكل صنف وحجم
       for (let i = 0; i < n; i++) out.push({ p, size, nut, extra: "" });
     }));
@@ -99,6 +107,8 @@ function renderLabelsView() {
   const { out, missing } = lblList();
   const cats = [];
   lblProducts.forEach(p => { if (!cats.includes(p.category)) cats.push(p.category); });
+  const visible = lblVisibleProducts();
+  const visCats = cats.filter(c => visible.some(p => p.category === c));
   view.innerHTML = `
     <h2 class="juice-page-title">🏷️ ملصقات القيم الغذائية</h2>
     <div class="item-card">
@@ -116,6 +126,12 @@ function renderLabelsView() {
         <button class="btn btn-ghost" id="lblDownBtn" ${out.length ? "" : "disabled"}>⬇ تنزيل PDF</button>
         <button class="btn btn-ghost" id="lblShareBtn" ${out.length ? "" : "disabled"}>📤 مشاركة</button>
       </div>
+      ${lblMode === "all" ? `<div class="lbl-filters">
+        <button type="button" class="lbl-chip${!lblFilter ? " on" : ""}" data-lbl-filter="">الكل</button>
+        ${cats.map(c => `<button type="button" class="lbl-chip${lblFilter === c ? " on" : ""}" data-lbl-filter="${escHtml(c)}">${escHtml(c || "أصناف")} (${lblProducts.filter(p => p.category === c).length})</button>`).join("")}
+        <button type="button" class="lbl-chip" data-lbl-mode="salad">🥗 سلطات الفرع</button>
+      </div>
+      <div class="field"><label>بحث بالاسم</label><input type="search" id="lblSearch" value="${escHtml(lblQuery)}" placeholder="اكتب جزء من الاسم"></div>` : ""}
       ${missing.length ? `<div class="att-now prod-short-count">⚠ ما في قيم غذائية لـ: ${missing.map(escHtml).join("، ")}</div>` : ""}
     </div>
     ${lblMode === "salad"
@@ -125,8 +141,8 @@ function renderLabelsView() {
       : lblMode === "day"
       ? (lblBoq.length ? `<div class="item-card">${lblBoq.map(b => `<div class="inote-line"><b>${escHtml(b.name)}</b><span>${escHtml(b.size || "")} · ${Number(b.qty) || 0} وجبة${(b.variants || []).length ? " · " + b.variants.map(v => `${escHtml(v.name)} ${v.qty}`).join("، ") : ""}</span></div>`).join("")}</div>`
         : `<div class="empty-state">ما في طلبات اشتراكات لهاليوم</div>`)
-      : cats.map(c => `<details class="prod-cat" open><summary class="prod-cat-head"><span>${escHtml(c || "أصناف")}</span></summary>
-        ${lblProducts.filter(p => p.category === c).map(p => {
+      : (visCats.length ? visCats : []).map(c => `<details class="prod-cat" open><summary class="prod-cat-head"><span>${escHtml(c || "أصناف")}</span><span class="prod-cat-count">${visible.filter(p => p.category === c).length}</span></summary>
+        ${visible.filter(p => p.category === c).map(p => {
           const sizes = Object.keys(p.nutrition);
           return `<div class="item-card lbl-item"><div class="prod-item-head"><b>${escHtml(p.name_ar)}</b> <small class="prod-size">${escHtml(p.name_en || "")}</small></div>
             ${!sizes.length ? `<div class="att-now">ما في قيم غذائية بتكرار</div>` : `<div class="lbl-sizes">${sizes.map(s => `<label class="lbl-size">
@@ -135,6 +151,9 @@ function renderLabelsView() {
           </div>`;
         }).join("")}</details>`).join("")}`;
   view.querySelectorAll("[data-lbl-mode]").forEach(b => b.addEventListener("click", () => { lblMode = b.dataset.lblMode; loadLabelsView(); }));
+  view.querySelectorAll("[data-lbl-filter]").forEach(b => b.addEventListener("click", () => { lblFilter = b.dataset.lblFilter; renderLabelsView(); }));
+  const sq = document.getElementById("lblSearch");
+  if (sq) sq.addEventListener("input", () => { lblQuery = sq.value; clearTimeout(sq._t); sq._t = setTimeout(() => { renderLabelsView(); const n = document.getElementById("lblSearch"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); });
   const d = document.getElementById("lblDateInput");
   if (d) d.addEventListener("change", () => { lblDate = d.value || todayStr(); if (lblMode === "day") loadLabelsView(); else renderLabelsView(); });
   view.querySelectorAll(".lbl-count").forEach(inp => inp.addEventListener("change", () => {
