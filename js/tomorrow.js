@@ -136,7 +136,10 @@ function renderTomorrowView() {
       const q = Number(ord.qty);
       if (!isNaN(q) && q > 0) {
         const u = ord.unit || it.unit;
-        if (tomIsWeightUnit(u) || (isMealCategory(it.category) && !tomIsPanUnit(u))) {
+        // فرع السفنديش بيكتب الجرامات والوحدة هي حجم السفنديش: رقم 50+ = جرامات، وأقل = عدد سفنديشات
+        const isGrams = panMode ? (q >= 50 && (tomIsWeightUnit(it.unit) || isMealCategory(it.category)))
+          : (tomIsWeightUnit(u) || (isMealCategory(it.category) && !tomIsPanUnit(u)));
+        if (isGrams) {
           totalRequestedWeight += q;
           totalEstimatedMeals += q / MEAL_WEIGHT_G;
         }
@@ -165,14 +168,14 @@ function renderTomorrowView() {
         <span class="rem-stat-num">${filledItems}/${totalItems}</span>
         <span class="rem-stat-lbl">أصناف محددة</span>
       </div>
-      ${panMode ? "" : `<div class="rem-stat-pill ok">
+      <div class="rem-stat-pill ok">
         <span class="rem-stat-num">${(totalRequestedWeight / 1000).toFixed(1).replace(/\.0$/, "")} كجم</span>
         <span class="rem-stat-lbl">إجمالي وزن البروتين</span>
       </div>
       <div class="rem-stat-pill">
         <span class="rem-stat-num">${Math.round(totalEstimatedMeals)}</span>
         <span class="rem-stat-lbl">إجمالي الوجبات التقديرية</span>
-      </div>`}
+      </div>
     </div>
 
     ${typeof tabAllowed === "function" && tabAllowed("report") ? `<button type="button" class="btn primary tom-chef-btn" onclick="goToChefReport()">👨‍🍳 طلبية الشيف (PDF للواتساب)</button>` : ""}
@@ -233,7 +236,7 @@ function renderTomorrowView() {
     const header = document.createElement("div");
     header.className = "category-header";
     header.innerHTML = `
-      <span class="cat-label-wrap"><span class="cat-label">${categoryIconSticker(group.category)} ${group.category}</span>${panMode ? "" : tomCatTotalHtml(group.category)}</span>
+      <span class="cat-label-wrap"><span class="cat-label">${categoryIconSticker(group.category)} ${group.category}</span>${tomCatTotalHtml(group.category)}</span>
       <span class="cat-count-badge">
         <span class="cat-count">${filledInCat}/${group.items.length}</span>
         <span class="chevron">▾</span>
@@ -933,6 +936,7 @@ function tomOrderedGrams(category) {
     const q = Number((currentTomorrowOrder[it.id] || {}).qty || 0);
     const u = String(it.unit || "جرام");
     if (!q) return sum;
+    if (isPanOrderBranch(currentTomorrowBranch) && q < 50) return sum; // عدد سفنديشات مو جرامات
     if (/كجم|كيلو/.test(u)) return sum + q * 1000;
     return /جرام|جم/.test(u) ? sum + q : sum;
   }, 0);
