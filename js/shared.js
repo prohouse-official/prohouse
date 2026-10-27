@@ -368,6 +368,8 @@ function isMadeToOrderName(name) {
   const n = String(name || "").replace(/[إأآ]/g, "ا");
   return raw.split(",").map(s => s.trim()).filter(Boolean).some(k => n.includes(k.replace(/[إأآ]/g, "ا")));
 }
+// أصناف السلطة اللي بتنوزن كل يوم (جرام): سطر نحيف، وبتبعد عن الطلبية وعن حسابات «حبة»
+function isDailyWeigh(it) { return !!it && /^sal_/.test(String(it.id || "")); }
 function madeToOrderSection(name) {
   return /ستيك|لحم/.test(String(name || "")) ? "لحم" : "بحري";
 }
