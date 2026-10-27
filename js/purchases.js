@@ -83,6 +83,11 @@ function purchaseChecks(inv, all) {
   const out = [];
   const sub = purNum(inv.subtotal), vat = purNum(inv.vat), total = purNum(inv.total);
   if (!inv.invoice_date) out.push("التاريخ ناقص");
+  else {
+    // قراءة التاريخ من الصورة أحياناً بتغلط بالسنة (2021، 2019): فرق أكتر من 45 يوم عن اليوم = غالباً غلط
+    const diff = Math.abs(new Date(inv.invoice_date + "T12:00:00Z") - new Date(todayStr() + "T12:00:00Z")) / 86400000;
+    if (diff > 45) out.push(`تاريخ الفاتورة ${inv.invoice_date} بعيد عن اليوم — تأكد منه`);
+  }
   if (!String(inv.supplier || "").trim()) out.push("اسم المورد ناقص");
   const noInvoice = inv.extra && inv.extra.doc_type === "بدون فاتورة";
   if (inv.source !== "custody" && !noInvoice && !String(inv.invoice_no || "").trim()) out.push("رقم الفاتورة ناقص");
