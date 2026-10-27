@@ -463,7 +463,7 @@ function renderReceivingView() {
 
     // زر إضافة صنف تحت كل قسم (إلا الأقسام اللي منيوها ثابت)
     html += `
-        ${canAddToCategory(cat) ? `<button type="button" class="rec-add-item-btn" onclick="${usesChefSlots(cat) ? "openReceivingChefPicker" : "openAddReceivingItemModal"}('${String(cat).replace(/'/g, "\\'")}')">
+        ${canAddToCategory(cat, currentReceivingBranch) ? `<button type="button" class="rec-add-item-btn" onclick="${usesChefSlots(cat) ? "openReceivingChefPicker" : "openAddReceivingItemModal"}('${String(cat).replace(/'/g, "\\'")}')">
           ➕ ${usesChefSlots(cat) ? "إضافة صنف " + cat : "إضافة صنف في قسم (" + cat + ")"}
         </button>` : ""}
       </div></div></div>`;

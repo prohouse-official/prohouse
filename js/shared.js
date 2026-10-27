@@ -414,9 +414,13 @@ function isChefSlot(it) {
   return isOptionalItem(it) && /الشيف\s*\d+\s*$/.test(String(it.name || ""));
 }
 const CHEF_SLOT_CATS = ["دجاج", "لحم", "بحري"];
-// أقسام منيوها ثابت (الدجاج: 6 ثابتة + 3 متغيرة · اللحم والبحري: 3 متغيرة باليوم) — ما فيها زر «إضافة صنف»
+// زر «إضافة صنف» انشال من كل الأقسام والفروع — المنيو ثابت وما بيتغيّر إلا بأمر المالك.
+// الاستثناء الوحيد: قسم الفطور عند فرع عبداللطيف جميل.
 const LOCKED_MENU_CATS = ["دجاج", "لحم", "بحري"];
-const canAddToCategory = (cat) => !LOCKED_MENU_CATS.includes(String(cat || "").trim());
+const ADD_ITEM_BRANCH = "عبداللطيف جميل", ADD_ITEM_CAT = "فطور";
+// المالك بس بيقدر يضيف بكل الأقسام والفروع
+const canAddToCategory = (cat, branch) => (typeof Auth !== "undefined" && Auth.role && Auth.role() === "owner")
+  || (String(cat || "").trim() === ADD_ITEM_CAT && String(branch || "").trim() === ADD_ITEM_BRANCH);
 // الأقسام الأساسية (دجاج/لحم/بحري) تضل ظاهرة حتى لو كل أصنافها انشالت أو ما انطلب منها شي —
 // قبل كان القسم يختفي ويختفي معه زر «إضافة صنف»، فما يقدر الموظف يسجّل طبخات الشيف
 function ensureCoreCategories(byCat, branch) {
