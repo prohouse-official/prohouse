@@ -12,6 +12,15 @@ let lblLoadSeq = 0;
 let lblHost = "labelsView"; // نفس الشاشة: من القائمة أو من التقارير
 
 const LBL_SIZES = { "100P - 100C": "100 جم بروتين · 100 جم كارب", "150P - 150C": "150 جم بروتين · 150 جم كارب", "200P - 200C": "200 جم بروتين · 200 جم كارب" };
+// سلطات الفرع: اسم عربي وإنجليزي، مكونات بالإنجليزي فقط، وسعرات تقريبية (تقدير، تتعدّل من هون بعد ما الشيف يأكدها)
+const LBL_SALADS = [
+  { n: 1, ar: "مكسيكو سلاد", en: "Mexico Salad", cal: 280, ing: "White cabbage, red cabbage, grated carrot, sweet corn, cucumber, boiled chickpeas. Sauce: cocktail or ranch." },
+  { n: 2, ar: "تكساس سلاد", en: "Texas Salad", cal: 240, ing: "Arugula, Greek olives, cherry tomato, corn, basil leaves. Sauce: Italian or pomegranate molasses." },
+  { n: 3, ar: "تروبيكال سلاد", en: "Tropical Salad", cal: 310, ing: "Oven-fried eggplant cubes, pomegranate, lettuce, arugula, apple. Sauce: ranch." },
+  { n: 4, ar: "جريلد بيبي كورن سلاد", en: "Grilled Baby Corn Salad", cal: 230, ing: "Lettuce, grated carrot, green onion, tomato, grilled yellow corn. Sauce: cocktail or Italian." },
+  { n: 5, ar: "بيتروت هلثي", en: "Beetroot Healthy", cal: 190, ing: "Beetroot, cucumber, parsley, lettuce, sliced grapes. Sauce: Italian or pomegranate molasses." },
+  { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", cal: 300, ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
+];
 const lblNorm = (s) => String(s || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/\s+/g, " ").trim();
 const lblNum = (x) => (Math.round(Number(x) * 10) / 10).toString();
 
@@ -42,7 +51,13 @@ async function loadLabelsView(host) {
 function lblList() {
   const byName = new Map(lblProducts.map(p => [lblNorm(p.name_ar), p]));
   const out = [], missing = [];
-  if (lblMode === "day") {
+  if (lblMode === "salad") {
+    const any = LBL_SALADS.some(x => Number(lblCounts["salad|" + x.n]) > 0);
+    LBL_SALADS.forEach(x => {
+      const n = any ? Number(lblCounts["salad|" + x.n]) || 0 : 1;
+      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, extra: "", ing: x.ing });
+    });
+  } else if (lblMode === "day") {
     lblBoq.forEach(b => {
       const p = byName.get(lblNorm(b.name));
       const nut = p && (p.nutrition[b.size || ""] || (!b.size && Object.values(p.nutrition).length === 1 ? Object.values(p.nutrition)[0] : null));
@@ -61,7 +76,14 @@ function lblList() {
   return { out, missing };
 }
 
+function lblSaladHtml(l) {
+  return `<div class="lbl lbl-salad"><div class="lbl-hd"><img src="assets/logo.png" alt=""><div class="lbl-nm"><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en)}</span></div></div>
+    <div class="lbl-ing"><b>Ingredients:</b> ${escHtml(l.ing)}</div>
+    <div class="lbl-cal"><span>Calories</span><b>≈ ${lblNum(l.nut.calories)} kcal</b></div></div>`;
+}
+
 function lblHtml(l, date) {
+  if (l.ing) return lblSaladHtml(l);
   const [y, m, d] = date ? date.split("-").map(Number) : [];
   const w = (/^(\d+)P/.exec(l.size || "") || [])[1]; // حجم الوجبة اللي محسوبة عليه السعرات (100 / 150 / 200)
   const sz = [LBL_SIZES[l.size] || "", l.extra].filter(Boolean).join(" · ");
@@ -83,6 +105,7 @@ function renderLabelsView() {
       <div class="lbl-modes">
         <button type="button" class="lbl-mode${lblMode === "day" ? " on" : ""}" data-lbl-mode="day">📦 طلبات يوم</button>
         <button type="button" class="lbl-mode${lblMode === "all" ? " on" : ""}" data-lbl-mode="all">📋 كل الأصناف</button>
+        <button type="button" class="lbl-mode${lblMode === "salad" ? " on" : ""}" data-lbl-mode="salad">🥗 السلطات</button>
       </div>
       <div class="inputs-row">
         ${lblMode === "day" ? `<div class="field"><label>يوم التوصيل</label><input type="date" id="lblDateInput" value="${lblDate}"></div>` : ""}
@@ -95,7 +118,11 @@ function renderLabelsView() {
       </div>
       ${missing.length ? `<div class="att-now prod-short-count">⚠ ما في قيم غذائية لـ: ${missing.map(escHtml).join("، ")}</div>` : ""}
     </div>
-    ${lblMode === "day"
+    ${lblMode === "salad"
+      ? `<div class="item-card"><div class="lbl-sizes">${LBL_SALADS.map(x => `<label class="lbl-size"><span><b>${escHtml(x.ar)}</b> · ${escHtml(x.en)} · ≈${x.cal} kcal</span>
+          <input type="number" inputmode="numeric" min="0" step="1" class="lbl-count" data-lbl-key="${"salad|" + x.n}" value="${lblCounts["salad|" + x.n] || ""}" placeholder="0"></label>`).join("")}</div>
+          <div class="att-now">السعرات تقديرية للحصة. إذا ما حددت عدد، بيطلع ملصق واحد لكل سلطة.</div></div>`
+      : lblMode === "day"
       ? (lblBoq.length ? `<div class="item-card">${lblBoq.map(b => `<div class="inote-line"><b>${escHtml(b.name)}</b><span>${escHtml(b.size || "")} · ${Number(b.qty) || 0} وجبة${(b.variants || []).length ? " · " + b.variants.map(v => `${escHtml(v.name)} ${v.qty}`).join("، ") : ""}</span></div>`).join("")}</div>`
         : `<div class="empty-state">ما في طلبات اشتراكات لهاليوم</div>`)
       : cats.map(c => `<details class="prod-cat" open><summary class="prod-cat-head"><span>${escHtml(c || "أصناف")}</span></summary>
@@ -189,7 +216,7 @@ async function lblPdf(list, btn, share) {
       pdf.addImage(cache.get(keyOf(l)), "JPEG", 0, 0, 60, 40, keyOf(l)); // نفس الصورة بتنحفظ مرة وحدة بالملف
     });
     const blob = pdf.output("blob");
-    const name = lblMode === "day" ? `ملصقات_القيم_الغذائية_${lblDate}.pdf` : "ملصقات_القيم_الغذائية_كل_الأصناف.pdf";
+    const name = lblMode === "salad" ? "ملصقات_السلطات.pdf" : lblMode === "day" ? `ملصقات_القيم_الغذائية_${lblDate}.pdf` : "ملصقات_القيم_الغذائية_كل_الأصناف.pdf";
     const file = new File([blob], name, { type: "application/pdf" });
     if (share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: "ملصقات القيم الغذائية" }); return; }
