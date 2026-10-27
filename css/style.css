@@ -3850,10 +3850,14 @@ body:not(.nav-ready) .nav-group-title{ display:none !important; }
 input[type=date]{min-height:36px}
 
 /* ملصق السلطة: شعار + اسم عربي/إنجليزي + مكونات إنجليزي + سعرات */
-.lbl-salad .lbl-ing{ font-size:7pt; line-height:1.3; direction:ltr; text-align:left; flex:1; overflow:hidden; }
+.lbl-salad .lbl-ing{ font-size:6pt; line-height:1.25; direction:ltr; text-align:left; flex:1; overflow:hidden; }
 .lbl-salad .lbl-cal{ display:flex; justify-content:space-between; align-items:center; direction:ltr; border:.25mm solid #000; background:#eee; padding:.6mm 1.4mm; font-size:7pt; }
 .lbl-salad .lbl-cal b{ font-size:9pt; }
 
 .lbl-filters{ display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
 .lbl-chip{ border:1px solid var(--line, #ddd); background:#fff; border-radius:999px; padding:6px 12px; font-weight:700; font-size:13px; cursor:pointer; min-height:36px; }
 .lbl-chip.on{ background:#fff3d6; border-color:#d9a400; }
+.lbl-salad .lbl-ing-ar{ direction:rtl; text-align:right; flex:0 0 auto; }
+.lbl-salad .lbl-ing:not(.lbl-ing-ar){ flex:0 0 auto; }
+.lbl-salad .lbl-hd{ gap:1mm; }
+.lbl-salad .lbl-cal{ margin-top:auto; }

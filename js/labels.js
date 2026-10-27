@@ -16,12 +16,12 @@ let lblHost = "labelsView"; // نفس الشاشة: من القائمة أو م�
 const LBL_SIZES = { "100P - 100C": "100 جم بروتين · 100 جم كارب", "150P - 150C": "150 جم بروتين · 150 جم كارب", "200P - 200C": "200 جم بروتين · 200 جم كارب" };
 // سلطات الفرع: اسم عربي وإنجليزي، مكونات بالإنجليزي فقط، وسعرات تقريبية لعلبة 100 جم أو أقل (شاملة صوص حوالي 15 جم) — تقدير، تتعدّل من هون بعد ما الشيف يأكدها
 const LBL_SALADS = [
-  { n: 1, ar: "مكسيكو سلاد", en: "Mexico Salad", cal: 120, ing: "White cabbage, red cabbage, grated carrot, sweet corn, cucumber, boiled chickpeas. Sauce: cocktail or ranch." },
-  { n: 2, ar: "تكساس سلاد", en: "Texas Salad", cal: 100, ing: "Arugula, Greek olives, cherry tomato, corn, basil leaves. Sauce: Italian or pomegranate molasses." },
-  { n: 3, ar: "تروبيكال سلاد", en: "Tropical Salad", cal: 140, ing: "Oven-fried eggplant cubes, pomegranate, lettuce, arugula, apple. Sauce: ranch." },
-  { n: 4, ar: "جريلد بيبي كورن سلاد", en: "Grilled Baby Corn Salad", cal: 100, ing: "Lettuce, grated carrot, green onion, tomato, grilled yellow corn. Sauce: cocktail or Italian." },
-  { n: 5, ar: "بيتروت هلثي", en: "Beetroot Healthy", cal: 90, ing: "Beetroot, cucumber, parsley, lettuce, sliced grapes. Sauce: Italian or pomegranate molasses." },
-  { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", cal: 140, ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
+  { n: 1, ar: "مكسيكو سلاد", en: "Mexico Salad", cal: 120, ar_ing: "ملفوف أبيض، ملفوف أحمر، جزر مبشور، ذرة حب، خيار، حمص مسلوق. الصوص: كوكتيل أو رانش.", ing: "White cabbage, red cabbage, grated carrot, sweet corn, cucumber, boiled chickpeas. Sauce: cocktail or ranch." },
+  { n: 2, ar: "تكساس سلاد", en: "Texas Salad", cal: 100, ar_ing: "جرجير، زيتون يوناني، طماطم شيري، ذرة، أوراق الريحان. الصوص: إيطالي أو دبس رمان.", ing: "Arugula, Greek olives, cherry tomato, corn, basil leaves. Sauce: Italian or pomegranate molasses." },
+  { n: 3, ar: "تروبيكال سلاد", en: "Tropical Salad", cal: 140, ar_ing: "باذنجان مكعبات مقلي بالفرن، رمان، خس، جرجير، تفاح. الصوص: رانش.", ing: "Oven-fried eggplant cubes, pomegranate, lettuce, arugula, apple. Sauce: ranch." },
+  { n: 4, ar: "جريلد بيبي كورن سلاد", en: "Grilled Baby Corn Salad", cal: 100, ar_ing: "خس، جزر مبشور، بصل أخضر، طماطم، ذرة صفراء مشوية. الصوص: كوكتيل أو إيطالي.", ing: "Lettuce, grated carrot, green onion, tomato, grilled yellow corn. Sauce: cocktail or Italian." },
+  { n: 5, ar: "بيتروت هلثي", en: "Beetroot Healthy", cal: 90, ar_ing: "شمندر، خيار، بقدونس، خس، عنب مقطع. الصوص: إيطالي أو دبس رمان.", ing: "Beetroot, cucumber, parsley, lettuce, sliced grapes. Sauce: Italian or pomegranate molasses." },
+  { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", cal: 140, ar_ing: "جرجير، تفاح، خس، توت مجفف، جبنة فيتا. الصوص: رانش أو إيطالي.", ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
 ];
 const lblNorm = (s) => String(s || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/\s+/g, " ").trim();
 const lblNum = (x) => (Math.round(Number(x) * 10) / 10).toString();
@@ -63,7 +63,7 @@ function lblList() {
     const any = LBL_SALADS.some(x => Number(lblCounts["salad|" + x.n]) > 0);
     LBL_SALADS.forEach(x => {
       const n = any ? Number(lblCounts["salad|" + x.n]) || 0 : 1;
-      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, extra: "", ing: x.ing });
+      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, extra: "", ing: x.ing, ar_ing: x.ar_ing });
     });
   } else if (lblMode === "day") {
     lblBoq.forEach(b => {
@@ -87,6 +87,7 @@ function lblList() {
 function lblSaladHtml(l) {
   return `<div class="lbl lbl-salad"><div class="lbl-hd"><img src="assets/logo.png" alt=""><div class="lbl-nm"><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en)}</span></div></div>
     <div class="lbl-ing"><b>Ingredients:</b> ${escHtml(l.ing)}</div>
+    <div class="lbl-ing lbl-ing-ar"><b>المكونات:</b> ${escHtml(l.ar_ing || "")}</div>
     <div class="lbl-cal"><span>Calories</span><b>≈ ${lblNum(l.nut.calories)} kcal</b></div></div>`;
 }
 
