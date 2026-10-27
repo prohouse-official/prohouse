@@ -3848,3 +3848,8 @@ body:not(.nav-ready) .nav-group-title{ display:none !important; }
 .receiving-item-card.rec-slim .rec-notes-btn{width:32px;height:32px}
 #remainingView .rem-slim .rem-inline-actions button{min-width:32px;min-height:32px;height:32px}
 input[type=date]{min-height:36px}
+
+/* ملصق السلطة: شعار + اسم عربي/إنجليزي + مكونات إنجليزي + سعرات */
+.lbl-salad .lbl-ing{ font-size:7pt; line-height:1.3; direction:ltr; text-align:left; flex:1; overflow:hidden; }
+.lbl-salad .lbl-cal{ display:flex; justify-content:space-between; align-items:center; direction:ltr; border:.25mm solid #000; background:#eee; padding:.6mm 1.4mm; font-size:7pt; }
+.lbl-salad .lbl-cal b{ font-size:9pt; }
