@@ -643,6 +643,17 @@ function itemPanSize(it) {
   return isWeightUnit(it.unit) ? "" : String(it.unit || "");
 }
 // العدد: للأصناف اللي تنطلب بالوزن نكتب الجرامات صريحة عشان ما تنفهم عدد سفنديشات
+// لون سطر كل فئة بورقة الشيف (تفتيح خفيف عشان الكتابة تبقى واضحة)
+function chefCatColor(cat) {
+  const c = String(cat || "");
+  if (c.includes("دجاج")) return "FFF2A8";      // أصفر
+  if (c.includes("لحم")) return "F8C9C4";       // أحمر
+  if (c.includes("بحري") || c.includes("سمك")) return "BFDDF5";  // أزرق
+  if (c.includes("حلويات")) return "F8D0E6";    // وردي
+  if (c.includes("فطور")) return "C9EBC4";      // أخضر
+  if (c.includes("اشتراك")) return "E1D2F3";    // بنفسجي
+  return "FFFFFF";                               // كارب والأطباق الجانبية وغيرها: أبيض
+}
 function chefQtyText(qty, unit) {
   if (/كجم|كيلو/.test(String(unit || ""))) return `${Math.round(Number(qty) * 1000)} جم`;
   // رقم كبير بوحدة سفنديش (1/3…) = جرامات مكتوبة بوحدة الحجم
@@ -1008,15 +1019,15 @@ function chefSheetHtml(sheet, date) {
   // تجميع الفئات عشان خلية الفئة تندمج عمودياً
   const groups = [];
   sheet.rows.forEach(r => { const g = groups[groups.length - 1]; if (g && g.category === r.category) g.rows.push(r); else groups.push({ category: r.category, rows: [r] }); });
-  const box = () => cell("□", `font-size:${chefPtPx(S.boxFont)}px`);
-  const tail = (r) => sheet.combined
-    ? cell(r.total, "font-weight:700;background:#F2F2F2") + (sheet.hasRem ? cell(r.remToday || "") : "") + r.byBranch.map(t => cell(t)).join("") + cell(r.notes || "")
-    : `${cell(r.qty)}${cell(r.rec || "")}${cell(r.rem || "")}${cell(r.notes)}`;
-  const body = groups.map(g => g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
-      ${box()}
-      ${i === 0 ? `<td rowspan="${g.rows.length}" style="border:${bd}">${esc(g.category)}</td>` : ""}
-      ${box()}${cell(r.name)}${cell(r.size)}${tail(r)}
-    </tr>`).join("")).join("");
+  const box = (bg) => cell("□", `font-size:${chefPtPx(S.boxFont)}px;background:#${bg}`);
+  const tail = (r, bg) => { const cb = (t, x = "") => cell(t, `background:#${bg};${x}`); return sheet.combined
+    ? cb(r.total, "font-weight:700;filter:brightness(.93)") + (sheet.hasRem ? cb(r.remToday || "") : "") + r.byBranch.map(t => cb(t)).join("") + cb(r.notes || "")
+    : `${cb(r.qty)}${cb(r.rec || "")}${cb(r.rem || "")}${cb(r.notes)}`; };
+  const body = groups.map(g => { const bg = chefCatColor(g.category); return g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
+      ${box(bg)}
+      ${i === 0 ? `<td rowspan="${g.rows.length}" style="border:${bd};background:#${bg}">${esc(g.category)}</td>` : ""}
+      ${box(bg)}${cell(r.name, `background:#${bg}`)}${cell(r.size, `background:#${bg}`)}${tail(r, bg)}
+    </tr>`).join(""); }).join("");
   return `<div class="chef-sheet" style="width:${totalW}px">
     <table style="width:${totalW}px">
       <colgroup>${colW.map(w => `<col style="width:${w}px">`).join("")}</colgroup>
@@ -1117,7 +1128,8 @@ async function exportTomorrowReportExcel() {
           const c = row.getCell(ci + 1);
           if (v !== null) c.value = v;
           c.font = font(ci === 0 || ci === 2 ? S.boxFont : S.bodyFont); c.alignment = center; c.border = border;
-          if (sheetData.combined && ci === 5) { c.font = { ...c.font, bold: true }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F2F2" } }; }
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + chefCatColor(g.category) } };
+          if (sheetData.combined && ci === 5) { c.font = { ...c.font, bold: true }; }
         });
         row.getCell(5).numFmt = "@";
         row.height = S.rowH;
