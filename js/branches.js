@@ -1,11 +1,6 @@
 // ==================== مركز عمليات الفروع ومسارات الافتتاح والإغلاق (Branch Operations Hub) ====================
 
 let currentBranchHubSelected = "";
-
-function initBranchesModule() {
-  currentBranchHubSelected = Branch.get() || allowedBranchList()[0] || "";
-}
-
 async function renderBranchesHubView() {
   const view = document.getElementById("branchesView");
   if (!view) return;
@@ -83,54 +78,6 @@ function selectBranchControlCenter(branch) {
   currentBranchHubSelected = branch;
   setActiveTab("receiving");
 }
-
-async function showBranchControlCenterModal(branch) {
-  const date = todayStr();
-  const [dayData, receivingData, remainingData] = await Promise.all([
-    Sync.get("getDay", { date, branch }, "day:" + date + ":" + branch),
-    Sync.get("getTomorrowOrder", { date, branch }, "tomorrow:" + date + ":" + branch),
-    Sync.get("getRemainingReport", { date, branch }, "remaining:" + date + ":" + branch)
-  ]);
-
-  let modal = document.getElementById("branchControlModal");
-  if (!modal) {
-    modal = document.createElement("div");
-    modal.id = "branchControlModal";
-    modal.className = "camera-modal-backdrop";
-    document.body.appendChild(modal);
-  }
-
-  const isClosed = remainingData && remainingData.meta && remainingData.meta.isClosed;
-
-  modal.innerHTML = `
-    <div class="camera-modal-box" style="max-width:650px;">
-      <div class="camera-header">
-        <span class="checkpoint-title">🏪 مركز قيادة فرع ${branch}</span>
-        <button class="camera-close-btn" onclick="document.getElementById('branchControlModal').classList.remove('active')">✕</button>
-      </div>
-
-      <div style="padding:16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:var(--surface2);padding:12px;border-radius:12px;border:1.5px solid var(--black);">
-          <div>
-            <strong style="font-size:16px;">حالة اليوم التشغيلي:</strong>
-            <span class="sub-text">${date}</span>
-          </div>
-          <span class="badge ${isClosed ? 'danger' : 'ok'}" style="font-size:14px;padding:6px 14px;">${isClosed ? '🔒 اليوم مغلق ومقتنع' : '🟢 الفرع مفتوح وفي الخدمة'}</span>
-        </div>
-
-        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px;">
-          <button class="btn primary" onclick="document.getElementById('branchControlModal').classList.remove('active');setActiveTab('receiving');">📦 تقرير الاستلام</button>
-          <button class="btn gold" onclick="document.getElementById('branchControlModal').classList.remove('active');setActiveTab('remaining');">📊 تقرير المتبقي والجرد</button>
-          <button class="btn secondary" onclick="document.getElementById('branchControlModal').classList.remove('active');setActiveTab('tomorrow');">📦 طلبية الغد</button>
-          <button class="btn secondary" onclick="document.getElementById('branchControlModal').classList.remove('active');setActiveSubTab('inspection');">📷 المعاينة الميدانية</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  modal.classList.add("active");
-}
-
 // ---- مراحل التوثيق الميداني الثلاث لبرو هاوس ----
 const INSPECTION_STAGES = [
   { id: "morning", name: "الجولة 1: الافتتاح الصباحي", time: "08:00 ص", icon: "🌅", targetHour: 8, targetMin: 0 },

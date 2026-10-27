@@ -1,25 +1,3 @@
-// ==================== سجل التغييرات وحالة النظام والنسخ الاحتياطي (Audit & System Health Module) ====================
-
-function logAuditEvent(action, details) {
-  const emp = Auth.getEmployee();
-  const logObj = {
-    id: "LOG-" + Date.now(),
-    action: action,
-    details: details,
-    user: emp ? emp.name : "النظام",
-    branch: Branch.get() || "الكل",
-    timestamp: new Date().toISOString()
-  };
-
-  try {
-    const list = JSON.parse(localStorage.getItem("ph_audit_log") || "[]");
-    list.unshift(logObj);
-    localStorage.setItem("ph_audit_log", JSON.stringify(list.slice(0, 100))); // الاحتفاظ بآخر 100 عملية
-  } catch (e) {
-    console.error("Audit log storage error", e);
-  }
-}
-
 function getAuditLogs() {
   try {
     return JSON.parse(localStorage.getItem("ph_audit_log") || "[]");

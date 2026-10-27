@@ -318,19 +318,6 @@ function savePhotoToLocalStorageFallback(photoData) {
   }
   return photoData;
 }
-
-async function getPhotosForSession(sessionId) {
-  const branch = (typeof Branch !== "undefined" ? Branch.get() : "") || (typeof allowedBranchList === "function" ? allowedBranchList()[0] : "");
-  const date = todayStr();
-  const all = await getAllPhotos(branch, date);
-  return all.filter(p => p.sessionId === sessionId);
-}
-
-function getPhotosFromLocalStorageFallback(sessionId) {
-  const list = JSON.parse(localStorage.getItem("ph_local_photos") || "[]");
-  return list.filter(p => p.sessionId === sessionId);
-}
-
 async function getAllPhotos(branchFilter, dateFilter) {
   const bFilter = branchFilter || (typeof Branch !== "undefined" ? Branch.get() : "") || (typeof allowedBranchList === "function" ? allowedBranchList()[0] : "");
   const dFilter = dateFilter || todayStr();

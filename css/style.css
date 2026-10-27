@@ -3843,3 +3843,8 @@ body:not(.nav-ready) .nav-group-title{ display:none !important; }
 #remainingView .rem-slim .rem-inline-actions{display:flex !important;gap:4px}
 #remainingView .rem-slim .rem-inline-actions button{min-width:28px;min-height:28px;height:28px;padding:0 4px;font-size:12px;border-radius:8px}
 #remainingView .rem-slim .rem-inputs-group{width:130px}
+/* هدف اللمس: 32px على الأقل بسطر السلطة النحيف + حقول التاريخ */
+.receiving-item-card.rec-slim .rec-btn-remove{width:32px;height:32px}
+.receiving-item-card.rec-slim .rec-notes-btn{width:32px;height:32px}
+#remainingView .rem-slim .rem-inline-actions button{min-width:32px;min-height:32px;height:32px}
+input[type=date]{min-height:36px}

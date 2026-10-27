@@ -402,16 +402,6 @@ function onTomorrowBranchChanged(val) {
   loadTomorrowOrder(currentTomorrowDate);
 }
 
-// ---- تفاعلات سريعة للطلبية ----
-
-function onQuickSetTomorrowSuggested(itemId, val) {
-  const inp = document.getElementById("tominput-" + itemId);
-  if (inp) {
-    inp.value = val;
-    inp.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-}
-
 function onQuickSetTomorrowZero(itemId) {
   const inp = document.getElementById("tominput-" + itemId);
   if (inp) {
@@ -419,117 +409,6 @@ function onQuickSetTomorrowZero(itemId) {
     inp.dispatchEvent(new Event("input", { bubbles: true }));
   }
 }
-
-function onQuickTomorrowClear(itemId) {
-  const inp = document.getElementById("tominput-" + itemId);
-  if (inp) {
-    inp.value = "";
-    inp.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-}
-
-function onQuickTomorrowIncrement(itemId, delta) {
-  const inp = document.getElementById("tominput-" + itemId);
-  if (inp) {
-    const cur = Number(inp.value || 0);
-    const n = Math.max(0, cur + delta);
-    inp.value = n;
-    inp.dispatchEvent(new Event("input", { bubbles: true }));
-  }
-}
-
-function applyAllAiRecommendations() {
-  if (Auth.isViewOnlyTomorrow()) return;
-  let appliedCount = 0;
-  const allActiveItems = getAllTomorrowActiveItems();
-  allActiveItems.forEach(item => {
-    let targetVal = null;
-    const rec = currentTomorrowRecommendations[item.id];
-    if (rec && rec.qty) {
-      targetVal = rec.qty;
-    } else {
-      const todayRec = currentTomorrowTodayReceived[item.id];
-      const todayRem = currentTomorrowTodayRemaining[item.id];
-      const isProtein = isMealCategory(item.category) || (item.unit && (item.unit.includes("جرام") || item.unit.includes("جم")));
-      if (isProtein && todayRem !== undefined) {
-        const todayUsedGrams = (todayRec ? Number(todayRec) : 0) - (todayRem ? Number(todayRem) : 0);
-        if (todayUsedGrams > 0) targetVal = Math.round(todayUsedGrams * 1.15);
-      }
-    }
-
-    if (targetVal !== null) {
-      if (!currentTomorrowOrder[item.id]) currentTomorrowOrder[item.id] = { qty: "", notes: "" };
-      currentTomorrowOrder[item.id].qty = String(targetVal);
-      const inp = document.getElementById("tominput-" + item.id);
-      if (inp) inp.value = String(targetVal);
-      appliedCount++;
-    }
-  });
-
-  saveTomorrowNow(false);
-  renderTomorrowView();
-  showToast(`✨ تم تطبيق المقترحات على ${appliedCount} صنف بنجاح!`);
-}
-
-// ---- تصدير مباشر للمطبخ المركزي عبر واتساب ----
-function exportTomorrowOrderWhatsApp() {
-  const branchName = currentTomorrowBranch || Branch.get() || "الفرع الرئيسي";
-  const empName = (Auth.getEmployee() || {}).name || "المدير";
-
-  const allActiveItems = getAllTomorrowActiveItems();
-  const orderedItems = allActiveItems
-    .filter(it => currentTomorrowOrder[it.id] && currentTomorrowOrder[it.id].qty !== "" && Number(currentTomorrowOrder[it.id].qty) > 0)
-    .map(it => ({
-      name: it.name,
-      category: it.category || "عام",
-      unit: tomorrowOrderUnit(it),
-      qty: currentTomorrowOrder[it.id].qty,
-      notes: currentTomorrowOrder[it.id].notes || ""
-    }));
-
-  if (!orderedItems.length) {
-    showToast("⚠️ لم تقم بتحديد أي كميات بعد في الطلبية!");
-    return;
-  }
-
-  // تجميع حسب التصنيف
-  const byCat = {};
-  let totalProteinGrams = 0;
-  orderedItems.forEach(it => {
-    if (!byCat[it.category]) byCat[it.category] = [];
-    byCat[it.category].push(it);
-    if (tomIsWeightUnit(it.unit) || (isMealCategory(it.category) && !tomIsPanUnit(it.unit))) {
-      totalProteinGrams += Number(it.qty || 0);
-    }
-  });
-
-  let msg = `*📋 طلبية المطبخ المركزي - ${branchName}*\n`;
-  msg += `📅 *تاريخ الاستلام:* ${currentTomorrowDate}\n`;
-  msg += `👤 *المسؤول:* ${empName}\n`;
-  if (totalProteinGrams > 0) {
-    msg += `⚖️ *إجمالي البروتين:* ${Math.round(totalProteinGrams / 1000)} كجم (≈ ${mealsCount(totalProteinGrams)} وجبة)\n`;
-  }
-  msg += `--------------------------------\n`;
-
-  Object.keys(byCat).forEach(cat => {
-    msg += `*[${cat}]*\n`;
-    byCat[cat].forEach(it => {
-      msg += `• ${it.name}: *${it.qty}* ${it.unit}`;
-      if (it.notes) msg += ` _(${it.notes})_`;
-      msg += `\n`;
-    });
-    msg += `\n`;
-  });
-
-  msg += `--------------------------------\n`;
-  msg += `✅ معتمدة آلياً عبر نظام Pro House التشغيلي`;
-
-  // encodeURIComponent: الـ & و # بالملاحظات كانت تقص رسالة الواتساب
-  const encoded = encodeURIComponent(msg);
-  const waUrl = `https://api.whatsapp.com/send?text=${encoded}`;
-  window.open(waUrl, "_blank");
-}
-
 // وحدة الطلب: اللي اختارها الموظف من القائمة، وإلا وحدة الصنف الأصلية
 const tomIsWeightUnit = (u) => /جرام|جم|كجم|كيلو/.test(String(u || ""));
 const tomIsPanUnit = (u) => /\d\/\d|طاسة|صينية|حبة/.test(String(u || ""));

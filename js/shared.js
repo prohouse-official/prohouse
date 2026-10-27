@@ -335,12 +335,6 @@ function showToast(msg) {
 // يحوّل اسم تصنيف عربي لمعرّف صالح كـ id بالـ DOM
 function cssId(str) { return str.replace(/[^a-zA-Z0-9_؀-ۿ]/g, "_"); }
 
-// ---- الكمية المطلوبة من طلبية الغد ----
-// (من طلبية الغد يلي انحطت أمس مستهدفة هالتاريخ + هالفرع بالظبط)
-async function loadRequestedQty(date, branch) {
-  return (await loadRequestedOrder(date, branch)).qty;
-}
-
 // الطلبية المعتمدة لهاليوم: الكميات + اسم الطبخة لخانات الشيف
 async function loadRequestedOrder(date, branch) {
   const data = await Sync.get("getTomorrowOrder", { date, branch }, "tomorrow:" + date + ":" + branch);

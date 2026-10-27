@@ -176,15 +176,6 @@ function saladDailyLine(c) {
   return `<div class="dr-cash${sum.miss.length ? " no" : ""}">🥗 السلطات: ${sum.ok} من ${sum.total} جاهز${miss}<span class="dr-cash-sub">${escHtml(s.chef_name || "")}${recv}</span></div>`;
 }
 
-// سطر ملاحظات الأصناف: الأصناف اللي عليها ملاحظة
-function itemNotesDailyLine(c) {
-  const r = c.inotes;
-  if (!r) return `<div class="dr-cash no">📝 ملاحظات الأصناف: ما انسجّلت</div>`;
-  const list = Object.values(r.items || {}).filter(n => (n.tags || []).length || (n.text || "").trim());
-  if (!list.length) return `<div class="dr-cash">📝 ملاحظات الأصناف: ما في ملاحظات</div>`;
-  return `<div class="dr-cash">📝 ملاحظات الأصناف: ${list.length}<span class="dr-cash-sub">${list.map(n => `${escHtml(n.name || "")}: ${[...(n.tags || []), (n.text || "").trim()].filter(Boolean).map(escHtml).join("، ")}`).join("<br>")}</span></div>`;
-}
-
 // سطر الحضور والانصراف: مين حضر ومين انصرف ووقته (الوقت من السيرفر)
 function attendanceDailyLine(c) {
   if (typeof isAttendanceOffBranch === "function" && isAttendanceOffBranch(c.branch)) return "";

@@ -318,37 +318,6 @@ async function loadRemainingData(date, branch) {
     renderRemainingView(null, null);
   }
 }
-
-function calculateCategorySales(salesRows, categoryName) {
-  if (!salesRows || !Array.isArray(salesRows)) return 0;
-  let totalQty = 0;
-  salesRows.forEach(r => {
-    if (r.category === categoryName) {
-      totalQty += Number(r.qty || 0);
-    }
-  });
-  return totalQty;
-}
-
-function calculateItemVariance(receivedGrams, soldMeals, actualRemainingGrams) {
-  const rec = Number(receivedGrams || 0);
-  const sold = Number(soldMeals || 0);
-  const consumedGrams = sold * MEAL_WEIGHT_G; // 150 جرام لكل وجبة مباعة
-  const expectedRemainingGrams = Math.max(0, rec - consumedGrams);
-  const actualRemaining = Number(actualRemainingGrams || 0);
-  const varianceGrams = actualRemaining - expectedRemainingGrams;
-  const variancePct = rec > 0 ? (varianceGrams / rec) * 100 : 0;
-
-  return {
-    consumedGrams,
-    consumedMeals: sold,
-    expectedRemainingGrams,
-    actualRemaining,
-    varianceGrams,
-    variancePct
-  };
-}
-
 // أقسام ما لها مبيعات نقارن فيها (كارب، أطباق جانبية، حلويات): نعرض المستخدم بس، مو «عجز»
 function otherCatUnit(catItems) {
   const u = String(((catItems || [])[0] || {}).unit || "جرام");
@@ -1044,21 +1013,6 @@ function onQuickRemWeightZero(itemId) {
   const input = document.getElementById("remweight-" + itemId);
   if (input) input.value = "0";
 }
-
-function onQuickRemWeightClear(itemId) {
-  onRemainingWeightChange(itemId, "");
-  const input = document.getElementById("remweight-" + itemId);
-  if (input) input.value = "";
-}
-
-function onQuickRemWeightIncrement(itemId, delta) {
-  const currentVal = Number((currentRemainingData[itemId] || {}).remaining || (currentRemainingData[itemId] || {}).remainingWeight || (currentRemainingData[itemId] || {}).remainingSauce || 0);
-  const newVal = Math.max(0, currentVal + delta);
-  onRemainingWeightChange(itemId, String(newVal));
-  const input = document.getElementById("remweight-" + itemId);
-  if (input) input.value = newVal;
-}
-
 function onRemainingWeightChange(itemId, val) {
   if (!currentRemainingData[itemId]) {
     currentRemainingData[itemId] = { remaining: "", remainingWeight: "", remainingSauce: "", isSauce: false, notes: "" };
@@ -1136,27 +1090,6 @@ function toggleRemainingIsSauce(itemId) {
   saveRemainingLocalDebounced();
   updateSaveBarRemainingStatus();
 }
-
-function onQuickRemSauceZero(itemId) {
-  onRemainingSauceChange(itemId, "0");
-  const input = document.getElementById("remsauce-" + itemId);
-  if (input) input.value = "0";
-}
-
-function onQuickRemSauceClear(itemId) {
-  onRemainingSauceChange(itemId, "");
-  const input = document.getElementById("remsauce-" + itemId);
-  if (input) input.value = "";
-}
-
-function onQuickRemSauceIncrement(itemId, delta) {
-  const currentVal = Number((currentRemainingData[itemId] || {}).remainingSauce || 0);
-  const newVal = Math.max(0, currentVal + delta);
-  onRemainingSauceChange(itemId, String(newVal));
-  const input = document.getElementById("remsauce-" + itemId);
-  if (input) input.value = newVal;
-}
-
 function onRemainingSauceChange(itemId, val) {
   if (!currentRemainingData[itemId]) currentRemainingData[itemId] = { remaining: "", remainingWeight: "", remainingSauce: "", notes: "" };
   currentRemainingData[itemId].remainingSauce = val;
