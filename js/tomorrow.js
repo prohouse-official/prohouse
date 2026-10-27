@@ -1049,8 +1049,12 @@ async function renderWeekdayAverage(el, date, branch) {
 
 
 function chefSlotSuggestion(category, groupItems) {
-  const avg = (typeof weekdayAvgGrams === "function") ? weekdayAvgGrams(currentTomorrowDate, currentTomorrowBranch) : null;
-  if (!avg || !avg[category]) return null;
+  const avg0 = (typeof weekdayAvgGrams === "function") ? weekdayAvgGrams(currentTomorrowDate, currentTomorrowBranch) : null;
+  if (!avg0 || !avg0[category]) return null;
+  // نفس الرقم اللي على شريط التصنيف: الفعلي (المستلم − المتبقي) إذا فيه، وإلا متوسط المبيعات — قبل كان المقترح بيستعمل المبيعات
+  // والشريط بيعرض الفعلي، فيطلع رقمين مختلفين على نفس الشاشة
+  const act = (wdActualByKey[currentTomorrowDate + "|" + currentTomorrowBranch] || {})[category];
+  const avg = { ...avg0, [category]: act && act.grams ? act.grams : avg0[category] };
   let fixedPlanned = 0;
   let slotCount = 0;
   groupItems.forEach(it => {
@@ -1067,7 +1071,7 @@ function chefSlotSuggestion(category, groupItems) {
   if (!slotCount) return null;
   const left = Math.max(0, avg[category] - fixedPlanned);
   const qty = Math.round(left / slotCount / 50) * 50;
-  return { qty, reason: `باقي متوسط ${category} (${avg[category].toLocaleString("en-US")} جم) بعد الثابت ÷ ${slotCount}` };
+  return { qty, reason: `باقي ${act && act.actual ? "الاستهلاك الفعلي" : "متوسط"} ${category} (${avg[category].toLocaleString("en-US")} جم) بعد الثابت ÷ ${slotCount}` };
 }
 
 function openChefSlotPicker(category) {
