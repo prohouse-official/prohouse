@@ -3792,3 +3792,16 @@ body:not(.nav-ready) .nav-group-title{ display:none !important; }
 .cost-table .cost-qty{ width:70px; }
 .cost-summary{ display:flex; flex-wrap:wrap; gap:14px; margin:10px 0; font-size:15px; }
 .pur-new-btns{ display:flex; gap:6px; flex-wrap:wrap; }
+
+/* ---- إصلاح تمدد الشاشات على الجوالات الصغيرة (320–390px): عناصر كانت تطلع برا الشاشة يسار ---- */
+.field, .inputs-row > *, .rem-top-row > *, .tom-top-row > *{ min-width:0; }
+.branch-selector-wrap, .branch-closing-wrap{ flex-wrap:wrap; max-width:100%; min-width:0; }
+.branch-selector-wrap select, .branch-closing-wrap select{ max-width:100%; min-width:0; }
+.ph-branch-pills{ max-width:100%; }
+.ph-date-row{ flex-wrap:wrap; max-width:100%; }
+.ph-date-row > *{ min-width:0; }
+.day-jump{ flex-wrap:wrap; }
+/* مساحة اللمس: الأزرار الصغيرة (أقل من 32px) صعبة بالجوال */
+.rec-filter-chip, .rem-filter-chip, .tom-filter-chip{ min-height:36px; }
+.pur-sup-toggle{ min-height:38px; }
+#attDateInput{ min-height:38px; }
