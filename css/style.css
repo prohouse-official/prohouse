@@ -3813,7 +3813,6 @@ body:not(.nav-ready) .nav-group-title{ display:none !important; }
 .rec-slim .rec-input-action-row{margin:2px 0 0}
 .rem-slim{padding:4px 10px;margin:3px 0}
 .rem-slim .rem-inline-actions{display:none}
-.rec-slim .rec-notes-toggle-wrap{display:none}
 .rec-slim{display:flex;align-items:center;gap:8px}
 .rec-slim .rec-card-header{flex:1}
 .rec-slim .rec-input-action-row{flex:0 0 46%}
@@ -3832,5 +3831,15 @@ body:not(.nav-ready) .nav-group-title{ display:none !important; }
 #remainingView .rem-slim .rem-mini-zero-btn{height:32px;min-width:32px;font-size:13px}
 #remainingView .rem-slim .rem-inputs-group{width:150px}
 #remainingView .rem-slim .rem-mini-unit{font-size:10px}
-#remainingView .rem-slim .rem-inline-actions{display:none !important}
 #remainingView .rem-slim .rem-item-unit{display:none}
+/* الهدر والملاحظة والحذف بنفس السطر */
+.receiving-item-card.rec-slim{flex-wrap:wrap}
+.receiving-item-card.rec-slim .rec-btn-remove{display:inline-flex;width:28px;height:28px;min-height:0;padding:0;font-size:13px;align-items:center;justify-content:center}
+.receiving-item-card.rec-slim .rec-notes-toggle-wrap{display:block;margin:0;order:2}
+.receiving-item-card.rec-slim .rec-notes-btn{width:30px;height:30px;min-height:0;padding:0;overflow:hidden;font-size:0;border-radius:8px}
+.receiving-item-card.rec-slim .rec-notes-btn::before{content:"📝";font-size:14px}
+.receiving-item-card.rec-slim .rec-notes-container{flex:0 0 100%;order:3}
+#remainingView .remaining-card-mobile.rem-slim .rem-single-row{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"info actions inputs"}
+#remainingView .rem-slim .rem-inline-actions{display:flex !important;gap:4px}
+#remainingView .rem-slim .rem-inline-actions button{min-width:28px;min-height:28px;height:28px;padding:0 4px;font-size:12px;border-radius:8px}
+#remainingView .rem-slim .rem-inputs-group{width:130px}
