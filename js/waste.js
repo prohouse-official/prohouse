@@ -10,12 +10,6 @@ const WASTE_REASONS = [
 let currentWasteBranch = "";
 let currentWasteDate = todayStr();
 let isWasteSaving = false;
-
-function initWasteModule() {
-  currentWasteBranch = Branch.get() || allowedBranchList()[0] || "";
-  currentWasteDate = todayStr();
-}
-
 let wasteLoadSeq = 0;
 async function loadWasteData(date, branch) {
   const seq = ++wasteLoadSeq; // تبديل فرع سريع: رد الفرع القديم ما يكتب فوق الجديد

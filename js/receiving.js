@@ -496,27 +496,6 @@ function onQuickSetZero(itemId) {
   updateReceivingItemCardUI(itemId);
   saveLocalDebounced();
 }
-
-function onQuickClear(itemId) {
-  if (!currentReceivingData[itemId]) currentReceivingData[itemId] = { received: "", notes: "", cookName: "" };
-  currentReceivingData[itemId].received = "";
-  const input = document.getElementById("recinput-" + itemId);
-  if (input) input.value = "";
-  updateReceivingItemCardUI(itemId);
-  saveLocalDebounced();
-}
-
-function onQuickIncrement(itemId, amount) {
-  if (!currentReceivingData[itemId]) currentReceivingData[itemId] = { received: "", notes: "", cookName: "" };
-  const current = Number(currentReceivingData[itemId].received || 0);
-  const nextVal = Math.max(0, current + amount);
-  currentReceivingData[itemId].received = String(nextVal);
-  const input = document.getElementById("recinput-" + itemId);
-  if (input) input.value = nextVal;
-  updateReceivingItemCardUI(itemId);
-  saveLocalDebounced();
-}
-
 function toggleReceivingNote(itemId) {
   receivingNotesExpanded[itemId] = !receivingNotesExpanded[itemId];
   const el = document.getElementById("recnotes-wrap-" + itemId);
@@ -529,25 +508,6 @@ function toggleReceivingNote(itemId) {
     }
   }
 }
-
-function onMatchAllReceiving() {
-  const items = getAllReceivingActiveItems();
-  let count = 0;
-  items.forEach(it => {
-    const ord = currentReceivingOrdered[it.id];
-    if (ord !== undefined && ord !== null && ord !== "") {
-      if (!currentReceivingData[it.id]) currentReceivingData[it.id] = { received: "", notes: "", cookName: "" };
-      currentReceivingData[it.id].received = String(ord);
-      count++;
-    }
-  });
-
-  showToast(`⚡ تم نسخ الكميات المطلوبة لـ ${count} صنف بنجاح!`);
-  renderReceivingView();
-  saveLocalDebounced();
-  updateSaveBarReceivingStatus();
-}
-
 // للمالك: إجمالي المطلوب والمستلم على شريط كل تصنيف (بسطر واحد بنفس حجم الشريط)
 function recCatTotalText(cat) {
   const inCat = getAllReceivingActiveItems().filter(it => (it.category || "عام") === cat);
