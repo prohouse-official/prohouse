@@ -25,6 +25,11 @@ const LBL_SALADS = [
   { n: 5, ar: "بيتروت هلثي", en: "Beetroot Healthy", w: 200, cal: 120, ar_ing: "شمندر، خيار، بقدونس، خس، عنب مقطع. الصوص: إيطالي أو دبس رمان.", ing: "Beetroot, cucumber, parsley, lettuce, sliced grapes. Sauce: Italian or pomegranate molasses." },
   { n: 7, ar: "معصوب برو هاوس", en: "Masoub Pro House", w: 0, cal: 318, simple: true },
   { n: 8, ar: "عريكة برو هاوس", en: "Areeka Pro House", w: 0, cal: 289, simple: true },
+  { n: 9, ar: "تشوكلت فادج كيك", en: "Chocolate Fudge Cake", nameOnly: true },
+  { n: 10, ar: "تشيز كيك", en: "Cheesecake", nameOnly: true },
+  { n: 11, ar: "ماتيلدا كيك", en: "Matilda Cake", nameOnly: true },
+  { n: 12, ar: "بودينق", en: "Pudding", nameOnly: true },
+  { n: 13, ar: "مهلبية", en: "Mahalabia", nameOnly: true },
   { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", w: 180, cal: 195, ar_ing: "جرجير، تفاح، خس، توت مجفف، جبنة فيتا. الصوص: رانش أو إيطالي.", ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
 ];
 const lblNorm = (s) => String(s || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/\s+/g, " ").trim();
@@ -67,7 +72,7 @@ function lblList() {
     const any = LBL_SALADS.some(x => Number(lblCounts["salad|" + x.n]) > 0);
     LBL_SALADS.forEach(x => {
       const n = any ? Number(lblCounts["salad|" + x.n]) || 0 : 1;
-      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, w: x.w, extra: "", ing: x.ing, ar_ing: x.ar_ing, simple: x.simple });
+      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, nameOnly: x.nameOnly, w: x.w, extra: "", ing: x.ing, ar_ing: x.ar_ing, simple: x.simple });
     });
   } else if (lblMode === "day") {
     lblBoq.forEach(b => {
@@ -100,7 +105,12 @@ function lblSimpleHtml(l) {
     <div class="lbl-cal"><span>Calories</span><b>≈ ${lblNum(l.nut.calories)} kcal</b></div></div>`;
 }
 
+function lblNameHtml(l) {
+  return `<div class="lbl lbl-salad lbl-nameonly"><img src="assets/logo.png" alt=""><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en)}</span></div>`;
+}
+
 function lblHtml(l, date) {
+  if (l.nameOnly) return lblNameHtml(l);
   if (l.simple) return lblSimpleHtml(l);
   if (l.ing) return lblSaladHtml(l);
   const [y, m, d] = date ? date.split("-").map(Number) : [];
@@ -148,7 +158,7 @@ function renderLabelsView() {
       ${missing.length ? `<div class="att-now prod-short-count">⚠ ما في قيم غذائية لـ: ${missing.map(escHtml).join("، ")}</div>` : ""}
     </div>
     ${lblMode === "salad"
-      ? `<div class="item-card"><div class="lbl-sizes">${LBL_SALADS.map(x => `<label class="lbl-size"><span><b>${escHtml(x.ar)}</b> · ${escHtml(x.en)} · ${x.w ? x.w + " g · " : ""}≈${x.cal} kcal</span>
+      ? `<div class="item-card"><div class="lbl-sizes">${LBL_SALADS.map(x => `<label class="lbl-size"><span><b>${escHtml(x.ar)}</b> · ${escHtml(x.en)} · ${x.w ? x.w + " g · " : ""}${x.cal ? "≈" + x.cal + " kcal" : "بدون سعرات"}</span>
           <input type="number" inputmode="numeric" min="0" step="1" class="lbl-count" data-lbl-key="${"salad|" + x.n}" value="${lblCounts["salad|" + x.n] || ""}" placeholder="0"></label>`).join("")}</div>
           <div class="att-now">السعرات تقديرية حسب وزن كل علبة (الصوص 20 جم). إذا ما حددت عدد، بيطلع ملصق واحد لكل سلطة.</div></div>`
       : lblMode === "day"
