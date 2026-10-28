@@ -21,7 +21,7 @@ const LBL_SALADS = [
   { n: 3, ar: "تروبيكال سلاد", en: "Tropical Salad", w: 160, cal: 145, ar_ing: "باذنجان مكعبات مشوي، رمان، خس، جرجير، تفاح. الصوص: رانش.", ing: "Grilled eggplant cubes, pomegranate, lettuce, arugula, apple. Sauce: ranch." },
   { n: 4, ar: "جريلد بيبي كورن سلاد", en: "Grilled Baby Corn Salad", w: 170, cal: 120, ar_ing: "خس، جزر مبشور، بصل أخضر، طماطم، ذرة صفراء مشوية. الصوص: كوكتيل أو إيطالي.", ing: "Lettuce, grated carrot, green onion, tomato, grilled yellow corn. Sauce: cocktail or Italian." },
   { n: 5, ar: "بيتروت هلثي", en: "Beetroot Healthy", w: 200, cal: 120, ar_ing: "شمندر، خيار، بقدونس، خس، عنب مقطع. الصوص: إيطالي أو دبس رمان.", ing: "Beetroot, cucumber, parsley, lettuce, sliced grapes. Sauce: Italian or pomegranate molasses." },
-  { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", w: 180, cal: 230, ar_ing: "جرجير، تفاح، خس، توت مجفف، جبنة فيتا. الصوص: رانش أو إيطالي.", ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
+  { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", w: 180, cal: 195, ar_ing: "جرجير، تفاح، خس، توت مجفف، جبنة فيتا. الصوص: رانش أو إيطالي.", ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
 ];
 const lblNorm = (s) => String(s || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/\s+/g, " ").trim();
 const lblNum = (x) => (Math.round(Number(x) * 10) / 10).toString();
