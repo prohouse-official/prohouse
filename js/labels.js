@@ -85,7 +85,7 @@ function lblList() {
 }
 
 function lblSaladHtml(l) {
-  return `<div class="lbl lbl-salad"><div class="lbl-hd"><img src="assets/logo.png" alt=""><div class="lbl-nm"><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en)} · ${l.w} g</span></div></div>
+  return `<div class="lbl lbl-salad"><div class="lbl-hd"><img src="assets/logo.png" alt=""><div class="lbl-nm"><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en)}</span></div></div>
     <div class="lbl-ing"><b>Ingredients:</b> ${escHtml(l.ing)}</div>
     <div class="lbl-ing lbl-ing-ar"><b>المكونات:</b> ${escHtml(l.ar_ing || "")}</div>
     <div class="lbl-cal"><span>Calories</span><b>≈ ${lblNum(l.nut.calories)} kcal</b></div></div>`;
