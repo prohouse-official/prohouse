@@ -12,6 +12,7 @@ const DR_SECTIONS = [
   { cat: "السلطات", icon: "🥗", label: "سلطات", unit: "حبة" }
 ];
 
+const DR_NORMAL_GAP = 0.10; // الفرق حتى 10% من المستلم طبيعي، وما زاد عليه هدر
 let dailyReportRun = 0;
 
 function initDailyReportControls() {
@@ -79,7 +80,10 @@ async function loadDailyBranch(date, branch) {
     const used = toMeals(received - remaining - wasted);
     const gap = missing.length ? null : used - soldUnits; // موجب = عجز
     const pct = gap === null || !(received > 0) ? null : Math.abs(gap) / toMeals(received);
-    return { ...s, received, remaining, wasted, soldUnits, counted, missing, gap, pct,
+    // هامش طبيعي 10% من المستلم: الفرق ضمنه عادي، وما زاد عليه يعتبر هدر
+    const tol = DR_NORMAL_GAP * toMeals(received);
+    const excessU = gap !== null && gap > tol ? gap - tol : 0;
+    return { ...s, received, remaining, wasted, soldUnits, counted, missing, gap, pct, excessU,
              receivedU: toMeals(received), remainingU: toMeals(remaining), wastedU: toMeals(wasted) };
   }).filter(s => s.received > 0 || s.counted || s.soldUnits > 0 || s.wasted > 0);
 
@@ -156,11 +160,12 @@ function drNum(n, digits = 1) {
 
 function drGapHtml(s) {
   if (s.gap === null) return `<span class="dr-gap missing" title="ناقص: ${s.missing.join("، ")}">ناقص ${s.missing.join(" + ")}</span>`;
-  const cls = s.pct <= 0.05 ? "ok" : s.pct <= 0.10 ? "warn" : "bad";
-  if (Math.abs(s.gap) < 0.05) return `<span class="dr-gap ok">✓ مطابق</span>`;
-  // موجب: أكل طلع بدون بيع (عجز). سالب: انباع أكثر من اللي طلع — غالباً استلام ما انسجل كامل
   const g = s.weight ? `<small>${drNum(Math.abs(s.gap) * MEAL_WEIGHT_G, 0)} جم</small>` : "";
-  return `<span class="dr-gap ${cls}">${s.gap > 0 ? "عجز" : "مباع أكثر"}<b>${drNum(Math.abs(s.gap))}</b>${g}</span>`;
+  if (Math.abs(s.gap) < 0.05) return `<span class="dr-gap ok">✓ مطابق</span>`;
+  // موجب: أكل طلع بدون بيع. ضمن 10% من المستلم = طبيعي، وما زاد عليه ينحسب هدر.
+  // سالب: انباع أكثر من اللي طلع — غالباً استلام ما انسجل كامل
+  if (s.gap > 0) return `<span class="dr-gap ${s.pct <= DR_NORMAL_GAP ? "ok" : "bad"}">${s.pct <= DR_NORMAL_GAP ? "طبيعي" : "فرق"}<b>${drNum(s.gap)}</b>${g}</span>`;
+  return `<span class="dr-gap ${s.pct <= DR_NORMAL_GAP ? "ok" : "warn"}">${s.pct <= DR_NORMAL_GAP ? "طبيعي" : "مباع أكثر"}<b>${drNum(Math.abs(s.gap))}</b>${g}</span>`;
 }
 
 // سطر تجهيز السلطات: كم جاهز من كم، الناقص، مين جهّز، وتأكيد استلام الفرع
@@ -196,7 +201,7 @@ function dailyBranchHtml(c, date) {
       <td>${cell(s.receivedU, s.received, s.weight)}</td>
       <td>${s.soldUnits > 0 ? drNum(s.soldUnits) : "—"}</td>
       <td>${s.counted ? cell(s.remainingU, s.remaining, s.weight) : "—"}</td>
-      <td>${s.wasted ? cell(s.wastedU, s.wasted, s.weight) : "0"}</td>
+      <td>${(s.wasted || s.excessU) ? cell(s.wastedU + s.excessU, s.wasted + s.excessU * (s.weight ? MEAL_WEIGHT_G : 1), s.weight) : "0"}</td>
       <td>${drGapHtml(s)}</td>
     </tr>`).join("");
 
@@ -219,9 +224,55 @@ function dailyBranchHtml(c, date) {
       <thead><tr><th>القسم</th><th>المستلم</th><th>المباع</th><th>المتبقي</th><th>الهدر</th><th>الفرق</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>
-    <div class="dr-note">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم) · الفرق = المستلم − المتبقي − الهدر − المباع · «مباع أكثر» يعني غالباً إن الاستلام ما انسجل كامل · 🟢 ≤5% 🟡 ≤10% 🔴 أكثر</div>`}
+    <div class="dr-note">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم) · الفرق = المستلم − المتبقي − الهدر المسجل − المباع · الفرق حتى 10% من المستلم طبيعي، وما زاد عليه ينحسب هدر · «مباع أكثر» غالباً يعني إن الاستلام ما انسجل كامل</div>`}
     ${cash}
     ${saladDailyLine(c)}
     ${attendanceDailyLine(c)}
   </section>`;
+}
+
+
+// ---- 📄 ملخص الفروع صفحة وحدة PDF (للمشاركة على قروب التشغيل) ----
+function dailySummaryHtml(cards, date) {
+  const dateTxt = new Date(date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const body = cards.map(c => dailyBranchHtml(c, date).replace(/<div class="dr-note">[\s\S]*?<\/div>/, ""))
+    .map(h => h.replace(/<div class="dr-cash[^>]*>🕘[\s\S]*?<\/div>/, "").replace(/<div class="dr-cash[^>]*>🥗[\s\S]*?<\/div>/, "")).join("");
+  return `<div class="dr-pdf"><div class="dr-pdf-hd"><img src="assets/logo.png" alt=""><div><b>ملخص الفروع اليومي</b><span>${dateTxt}</span></div></div>${body}
+    <div class="dr-note">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم) · الفرق = المستلم − المتبقي − الهدر − المباع · الفرق حتى 10% من المستلم طبيعي وما زاد عليه هدر · «مباع أكثر» غالباً يعني إن الاستلام ما انسجل كامل</div></div>`;
+}
+
+async function dailySummaryPdf(share, btn) {
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳ جاري التجهيز…";
+  const date = document.getElementById("dailyReportDate").value || todayStr();
+  const stage = document.createElement("div");
+  stage.style.cssText = "position:fixed;left:-99999px;top:0;width:794px;background:#fff;";
+  document.body.appendChild(stage);
+  try {
+    await Items.load();
+    const cards = await Promise.all(branchList().map(b => loadDailyBranch(date, b)));
+    if (typeof loadPdfLibs === "function") await loadPdfLibs();
+    if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
+    stage.innerHTML = dailySummaryHtml(cards, date);
+    const canvas = await html2canvas(stage.firstElementChild, { scale: 2, backgroundColor: "#ffffff", logging: false });
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+    const M = 6, maxW = 210 - M * 2, maxH = 297 - M * 2;
+    let w = maxW, h = (canvas.height / canvas.width) * w;
+    if (h > maxH) { h = maxH; w = (canvas.width / canvas.height) * h; } // كل الفروع بصفحة وحدة: نصغّر لو طالت
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", (210 - w) / 2, M, w, h);
+    const blob = pdf.output("blob");
+    const name = `ملخص_الفروع_${date}.pdf`;
+    const file = new File([blob], name, { type: "application/pdf" });
+    if (share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "ملخص الفروع اليومي", text: `ملخص الفروع — ${date}` }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  } catch (e) {
+    showToast("⚠ " + (e.message || e));
+  } finally { stage.remove(); btn.disabled = false; btn.textContent = label; }
 }
