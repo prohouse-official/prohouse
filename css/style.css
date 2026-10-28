@@ -3911,3 +3911,5 @@ input[type=date]{min-height:36px}
 .lbl-mac{ direction:ltr; }
 .lbl-nameonly.lbl-long b, .lbl-nameonly.lbl-long b.lbl-en{ font-size:15pt; }
 .lbl-nameonly.lbl-long img{ height:8mm; }
+.custom-rec-check{ display:flex; gap:8px; align-items:center; font-weight:700; margin:6px 0; }
+.rem-add-product{ width:100%; margin:8px 0; }

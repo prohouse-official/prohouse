@@ -22,7 +22,7 @@ function getAllTomorrowActiveItems() {
   (Items.current || []).forEach(it => {
     const branches = itemBranches(it);
     if (branches.length && branch && !branches.includes(branch)) return;
-    if (isDailyWeigh(it)) return;
+    if (isDailyWeigh(it) || String(it.id).startsWith("fr_")) return;
     // الصنف الاختياري بيطلع بس لو انطلب فعلاً (كمية) أو إلو اسم طبخة — الصف اللي كميته فاضية (انشال من الطلبية) ما بيطلع
     const ord = currentTomorrowOrder[it.id];
     const hasEntry = ord && ((ord.qty !== "" && ord.qty != null) || ord.cookName);

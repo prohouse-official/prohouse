@@ -122,7 +122,7 @@ function getAllRemainingActiveItems(receivingData) {
       if (isChefItem(def) && r && r.cookName && item.name === def.name) item.name = chefSlotName(def, r.cookName);
     }
     // فيه طلبية لهاليوم: المتبقي يعرض نفس أصناف الطلبية (متل الاستلام)، إلا اللي انستلم أو انجرد أو انضاف يدوي
-    if (remainingOrderedIds.size && !isDailyWeigh(item) && !remainingOrderedIds.has(id) && !extraIds.has(id)) {
+    if (remainingOrderedIds.size && !isDailyWeigh(item) && !String(id).startsWith("fr_") && !remainingOrderedIds.has(id) && !extraIds.has(id)) {
       const r = recById[id], d = currentRemainingData[id];
       const received = r && Number(r.received) > 0;
       const counted = d && [d.remaining, d.remainingWeight, d.remainingSauce].some(v => v !== "" && v !== null && v !== undefined);
@@ -554,6 +554,7 @@ function renderRemainingView(receivingData, salesData) {
       ` : ''}
     </div>
     ${entryProgressHtml()}
+    ${isClosed || Auth.isReadOnly() ? "" : `<button type="button" class="rec-add-item-btn rem-add-product" onclick="openAddRemainingItemModal('')">➕ إضافة منتج للجرد (ثلاجة الواجهة وغيرها)</button>`}
   `;
 
   if (!categories.length) {
@@ -1367,20 +1368,25 @@ function openAddRemainingItemModal(category) {
     <div class="custom-rec-modal-backdrop" id="customRemainingModal" onclick="if(event.target===this) closeAddRemainingItemModal()">
       <div class="custom-rec-modal-box">
         <div class="custom-rec-modal-header">
-          <h3>➕ إضافة صنف لجرد قسم (${category})</h3>
+          <h3>➕ ${category ? "إضافة صنف لجرد قسم (" + category + ")" : "إضافة منتج للجرد"}</h3>
           <button type="button" class="custom-rec-modal-close" onclick="closeAddRemainingItemModal()">✕</button>
         </div>
         <div class="custom-rec-modal-body">
+          ${category ? "" : `<div class="custom-rec-field-group">
+            <label>القسم</label>
+            <select id="customRemItemCat">${[...new Set(["الحلويات", "ثلاجة الواجهة", ...(Items.current || []).map(it => it.category).filter(Boolean)])].map(c => `<option value="${escHtml(c)}"${c === "الحلويات" ? " selected" : ""}>${escHtml(c)}</option>`).join("")}</select>
+          </div>`}
           <div class="custom-rec-field-group">
             <label>اسم الصنف المراد جرده *</label>
             <input type="text" id="customRemItemName" placeholder="مثال: دجاج متبل إضافي، صوص خاص..." autofocus>
           </div>
+          <label class="custom-rec-check"><input type="checkbox" id="customRemItemFixed" ${category ? "" : "checked"}> صنف ثابت: يطلع بالجرد كل يوم</label>
           <div class="custom-rec-field-group">
             <label>وحدة القياس</label>
             <select id="customRemItemUnit">
-              <option value="جرام" selected>جرام (جم)</option>
+              <option value="حبة" selected>حبة</option>
+              <option value="جرام">جرام (جم)</option>
               <option value="كجم">كيلو جرام (كجم)</option>
-              <option value="حبة">حبة</option>
               <option value="علبة">علبة</option>
               <option value="لتر">لتر</option>
             </select>
@@ -1411,6 +1417,7 @@ function closeAddRemainingItemModal() {
 }
 
 function confirmAddRemainingItem(category) {
+  if (!category) category = (document.getElementById("customRemItemCat") || {}).value || "الحلويات";
   const nameInput = document.getElementById("customRemItemName");
   const unitInput = document.getElementById("customRemItemUnit");
   const qtyInput = document.getElementById("customRemItemQty");
@@ -1443,7 +1450,8 @@ function confirmAddRemainingItem(category) {
     return;
   }
 
-  const newCustomId = "custom_rem_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
+  const fixed = !!(document.getElementById("customRemItemFixed") || {}).checked;
+  const newCustomId = (fixed ? "fr_" : "custom_rem_") + Date.now() + "_" + Math.random().toString(36).slice(2, 7);
   const newItem = {
     id: newCustomId,
     name: name,
@@ -1468,7 +1476,7 @@ function confirmAddRemainingItem(category) {
       unit: unit,
       category: category,
       branches: currentRemainingBranch,
-      optional: true, // يطلع بس باليوم اللي انجرد فيه — ما يصير صنف ثابت
+      optional: !fixed, // غير الثابت يطلع بس باليوم اللي انجرد فيه
       isCustom: true
     });
   } catch (err) {
