@@ -3913,3 +3913,21 @@ input[type=date]{min-height:36px}
 .lbl-nameonly.lbl-long img{ height:8mm; }
 .custom-rec-check{ display:flex; gap:8px; align-items:center; font-weight:700; margin:6px 0; }
 .rem-add-product{ width:100%; margin:8px 0; }
+
+/* ملخص الفروع PDF (صفحة A4 واحدة) */
+.dr-pdf{ width:794px; padding:18px 22px; box-sizing:border-box; background:#fff; color:#000; direction:rtl; }
+.dr-pdf-hd{ display:flex; align-items:center; gap:14px; margin-bottom:10px; border-bottom:3px solid #F9DB4B; padding-bottom:8px; }
+.dr-pdf-hd img{ height:44px; }
+.dr-pdf-hd b{ display:block; font-size:22px; }
+.dr-pdf-hd span{ font-size:14px; font-weight:700; color:#555; }
+.dr-pdf .dr-card{ margin-bottom:10px; padding:10px 12px; border-radius:12px; }
+.dr-pdf .dr-head b{ font-size:16px; }
+.dr-pdf .dr-checks{ margin-bottom:6px; }
+.dr-pdf .dr-table{ font-size:12px; }
+.dr-pdf .dr-cash{ margin-top:4px; }
+.dr-pdf .dr-table td, .dr-pdf .dr-table th{ padding:3px 4px; }
+.dr-pdf .dr-gap{ display:inline-flex; flex-direction:row; align-items:center; gap:6px; padding:2px 10px; border-radius:10px; }
+.dr-pdf .dr-gap small{ display:inline; }
+.dr-pdf .dr-check{ padding:2px 8px; }
+.dr-pdf .dr-checks{ margin-bottom:4px; }
+.dr-pdf .dr-head{ margin-bottom:4px; }
