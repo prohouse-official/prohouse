@@ -4,6 +4,41 @@
 // المتبقي المأكَّد بينقص من إنتاج طلبية اليوم اللي بعده (صفحة الإنتاج). الصوص لحاله ما بينقص.
 // صف لكل يوم بجدول leftover_checks: items = { "فرع|item_id": { ok: true } | { qty: رقم } }
 
+const RETURN_HUB = "الروضة"; // الفرع اللي بيرجعله المتبقي
+
+// موظف الروضة (مو الشيف/المالك) بيشوف بس اللي راجع لفرعه
+function leftHubStaffView() {
+  return typeof LEFT_STAFF_ROLES !== "undefined" && LEFT_STAFF_ROLES.includes(Auth.role());
+}
+
+// المتبقي الراجع للروضة ليوم معيّن (بدون الصوص): لكل فرع وقسم — المسجَّل والمأكَّد من الروضة
+// { byCat: { cat: كمية مأكدة }, byBranch: { فرع: { recorded, confirmed, pending } }, pending }
+async function leftoverReturnsToHub(date) {
+  const others = branchList().filter(b => b !== RETURN_HUB);
+  const [days, saved] = await Promise.all([
+    Promise.all(others.map(b => SupaEngine.getDay(date, b).catch(() => null))),
+    SupaEngine.getLeftoverCheck(date).catch(() => null)
+  ]);
+  const num = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
+  const out = { byCat: {}, byBranch: {}, pending: 0 };
+  days.forEach((day, i) => ((day && day.items) || []).forEach(d => {
+    const w = num(d.remainingWeight), plain = num(d.remaining);
+    const qty = w !== null ? w : plain;
+    if (!(qty > 0)) return; // الصوص لحاله ما بيرجع
+    const it = Items.byId(d.itemId) || { category: "" };
+    const b = others[i];
+    const v = saved && saved.items && saved.items[`${b}|${d.itemId}`];
+    const conf = v ? (v.ok ? qty : Number(v.qty) || 0) : null;
+    const r = out.byBranch[b] || (out.byBranch[b] = { recorded: 0, confirmed: 0, pending: 0, byCat: {} });
+    r.recorded += qty;
+    if (conf === null) { r.pending++; out.pending++; return; }
+    r.confirmed += conf;
+    r.byCat[it.category] = (r.byCat[it.category] || 0) + conf;
+    out.byCat[it.category] = (out.byCat[it.category] || 0) + conf;
+  }));
+  return out;
+}
+
 let leftDate = new Date().getHours() >= 12 ? todayStr() : addDaysStr(todayStr(), -1);
 let leftLoadSeq = 0;
 let leftLines = [];  // [{ key, branch, itemId, name, category, unit, qty, sauce }]
@@ -61,7 +96,9 @@ async function loadLeftoversView() {
   try {
     const [lines, saved] = await Promise.all([leftoverLines(leftDate), SupaEngine.getLeftoverCheck(leftDate)]);
     if (seq !== leftLoadSeq) return;
-    leftLines = lines; leftSaved = saved;
+    // موظف الروضة: بس المتبقي الراجع من الفروع (بدون متبقي الروضة نفسها)
+    leftLines = leftHubStaffView() ? lines.filter(l => l.branch !== RETURN_HUB && !l.sauce) : lines;
+    leftSaved = saved;
   } catch (e) {
     if (seq !== leftLoadSeq) return;
     view.innerHTML = `<div class="empty-state">⚠ تعذّر التحميل — ${escHtml(e.message || String(e))}</div>`;
@@ -92,7 +129,9 @@ function renderLeftoversView() {
         <div class="field"><label>متبقي يوم</label><input type="date" id="leftDateInput" value="${leftDate}"></div>
         <div class="field"><label>الملخص</label><div class="readonly-field">${done}/${leftLines.length} صنف</div></div>
       </div>
-      <div class="att-now">الشاطئ وعبداللطيف بيرجّعوا للروضة، والروضة بترجّع للمطبخ. كبّس ✓ إذا الكمية مطابقة، أو اكتب اللي وصلك. المتبقي المأكَّد بينقص من إنتاج بكرا.</div>
+      <div class="att-now">${leftHubStaffView()
+        ? "هاد المتبقي اللي سجّله الشاطئ وعبداللطيف وراجع لعندك. وزن اللي وصلك: كبّس ✓ إذا مطابق، أو اكتب اللي وصل فعلاً. اللي بتأكده بينحسب على الروضة بالتقرير."
+        : "الشاطئ وعبداللطيف بيرجّعوا للروضة، والروضة بترجّع للمطبخ. كبّس ✓ إذا الكمية مطابقة، أو اكتب اللي وصلك. المتبقي المأكَّد بينقص من إنتاج بكرا وبينحسب على الروضة بالتقرير."}</div>
     </div>
     ${!leftLines.length ? `<div class="empty-state">ما في متبقي مسجّل لهاليوم</div>` : branches.map(b => {
       const lines = leftLines.filter(l => l.branch === b);

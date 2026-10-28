@@ -36,14 +36,19 @@ function custodyExpensesTotal(expenses) {
   return (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 }
 
-// المطابقة للمالك: المتوقع بالدرج = العهدة + مبيعات الكاش − المصاريف
+function custodyHandoversTotal(handovers) {
+  return (handovers || []).reduce((sum, h) => sum + (Number(h.amount) || 0), 0);
+}
+
+// المطابقة للمالك: المتوقع بالدرج = العهدة + مبيعات الكاش − المصاريف − الكاش المسلَّم
 function custodyReconciliation(c, payments) {
   const cashSales = payments.filter(p => CASH_CHANNEL.test(p.channel)).reduce((s, p) => s + Number(p.amount || 0), 0);
   const cardSales = payments.filter(p => CARD_CHANNEL.test(p.channel)).reduce((s, p) => s + Number(p.amount || 0), 0);
   const expenses = custodyExpensesTotal(c.expenses);
-  const expectedCash = (toNum(c.opening_float) || 0) + cashSales - expenses;
+  const handovers = custodyHandoversTotal(c.handovers);
+  const expectedCash = (toNum(c.opening_float) || 0) + cashSales - expenses - handovers;
   return {
-    cashSales, cardSales, expenses, expectedCash,
+    cashSales, cardSales, expenses, handovers, expectedCash,
     cashDiff: toNum(c.cash_counted) === null ? null : toNum(c.cash_counted) - expectedCash,
     cardDiff: toNum(c.card_total) === null ? null : toNum(c.card_total) - cardSales
   };
@@ -75,6 +80,7 @@ async function loadCustody(date, branch) {
   }
   currentCustody = row || { date: currentCustodyDate, branch: currentCustodyBranch, opening_float: null, cash_counted: null, card_total: null, expenses: [], notes: "" };
   if (!Array.isArray(currentCustody.expenses)) currentCustody.expenses = [];
+  if (!Array.isArray(currentCustody.handovers)) currentCustody.handovers = [];
   renderCustodyView(payments || []);
 }
 
@@ -162,6 +168,25 @@ function renderCustodyView(payments) {
       </div>` : ""}
     </div>
 
+    <div class="cust-step active" id="custHandStep">
+      <div class="cust-step-head"><b>💵</b> سلّمت كاش من الدرج ${c.handovers.length ? `<span class="cust-count">${c.handovers.length} · ${sar(custodyHandoversTotal(c.handovers))}</span>` : ""}</div>
+      ${c.handovers.length ? `<div class="cust-exp-list">
+        ${c.handovers.map((h, i) => `
+          <div class="cust-exp-row">
+            <div class="cust-exp-main"><b>${sar(h.amount)}</b><span>لـ ${escHtml(h.to || "")}</span>
+              <small>${escHtml(h.by || "")}${h.at ? " · " + custodyTime(h.at) : ""}</small></div>
+            ${canEdit ? `<button type="button" class="cust-exp-del" data-hdel="${i}" aria-label="حذف">✕</button>` : ""}
+          </div>`).join("")}
+      </div>` : `<div class="cust-hint">أي كاش يطلع من الدرج (للمدير، للبنك، للمطبخ…) سجّله هون — غير هيك بيطلع عجز بالكاش.</div>`}
+      ${canEdit ? `
+      <div class="cust-inline">
+        <input type="number" inputmode="decimal" step="any" min="0" placeholder="المبلغ" id="custHandAmount">
+        <input type="text" placeholder="لمين سلّمته؟" id="custHandTo" list="custHandToList">
+        <datalist id="custHandToList"><option value="المالك"><option value="المدير"><option value="إيداع بنك"><option value="المحاسب"></datalist>
+      </div>
+      <button type="button" class="cust-btn gold" id="custHandAdd">➕ سجّل التسليم</button>` : ""}
+    </div>
+
     <div class="cust-step ${closed ? "done" : opened ? "active" : "locked"}">
       <div class="cust-step-head"><b>3</b> إغلاق آخر اليوم</div>
       <label class="cust-field">
@@ -220,6 +245,8 @@ function renderCustodyView(payments) {
   if ($("custPhotoBtn")) $("custPhotoBtn").addEventListener("click", openScan);
   if ($("custExpClear")) $("custExpClear").addEventListener("click", () => { custodyDraftExpense = custodyEmptyDraft(); renderCustodyView(payments); });
   if ($("custExpAdd")) $("custExpAdd").addEventListener("click", () => addCustodyExpense(payments));
+  if ($("custHandAdd")) $("custHandAdd").addEventListener("click", () => addCustodyHandover(payments));
+  view.querySelectorAll("[data-hdel]").forEach(btn => btn.addEventListener("click", () => deleteCustodyHandover(Number(btn.dataset.hdel), payments)));
   // زر السكان فوق: ينزل لنموذج المصروف ويفتح الكاميرا مباشرة
   if ($("custScanTop")) $("custScanTop").addEventListener("click", () => {
     const form = $("custExpForm");
@@ -250,6 +277,7 @@ async function custodyPatch(mutate, payments, okMsg) {
   try {
     const fresh = (await Custody.get(currentCustodyDate, currentCustodyBranch)) || { date: currentCustodyDate, branch: currentCustodyBranch, expenses: [] };
     if (!Array.isArray(fresh.expenses)) fresh.expenses = [];
+    if (!Array.isArray(fresh.handovers)) fresh.handovers = [];
     const patch = mutate(fresh);
     if (!patch) return false;
     const row = { date: currentCustodyDate, branch: currentCustodyBranch, ...patch, updated_at: new Date().toISOString() };
@@ -305,6 +333,28 @@ async function addCustodyExpense(payments) {
   const ok = await custodyPatch((fresh) => ({ expenses: [...fresh.expenses, exp] }), payments, "✅ انضاف المصروف");
   if (ok) { custodyDraftExpense = custodyEmptyDraft(); renderCustodyView(payments); }
   else if (btn) { btn.disabled = false; btn.textContent = "➕ أضف المصروف"; }
+}
+
+// كاش طلع من الدرج (تسليم للمالك/المدير/إيداع) — ينطرح من المتوقع بالدرج
+async function addCustodyHandover(payments) {
+  const amount = toNum(document.getElementById("custHandAmount").value);
+  const to = String(document.getElementById("custHandTo").value || "").trim();
+  if (amount === null || amount <= 0) { showToast("⚠ اكتب المبلغ اللي سلّمته"); return; }
+  if (!to) { showToast("⚠ اكتب لمين سلّمت الكاش"); return; }
+  const emp = Auth.getEmployee();
+  const h = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), amount, to, by: emp ? emp.name : "", at: new Date().toISOString() };
+  await custodyPatch((fresh) => ({ handovers: [...fresh.handovers, h] }), payments, "✅ انسجّل تسليم الكاش");
+}
+
+async function deleteCustodyHandover(i, payments) {
+  const target = currentCustody.handovers[i];
+  if (!target) return;
+  if (!(await phConfirm(`تحذف تسليم ${sar(target.amount)} لـ ${target.to || ""}؟`, { ok: "احذف", danger: true }))) return;
+  await custodyPatch((fresh) => {
+    const idx = fresh.handovers.findIndex(h => h.id === target.id);
+    if (idx < 0) return null;
+    return { handovers: fresh.handovers.filter((_, k) => k !== idx) };
+  }, payments, "🗑️ انحذف التسليم");
 }
 
 // قراءة الذكاء الاصطناعي (الأساس) + رمز QR (احتياط للناقص) → بيانات وحدة
@@ -405,8 +455,9 @@ function custodyOwnerCardHtml(c, payments) {
       <div class="cust-owner-title">🔎 المطابقة مع مبيعات ${salesSourceName(currentCustodyBranch)} (لك بس)</div>
       <div class="cust-row"><span>العهدة أول اليوم</span><b>${toNum(c.opening_float) === null ? "—" : sar(c.opening_float)}</b></div>
       <div class="cust-row"><span>المصروفات (${(c.expenses || []).length})</span><b>${sar(r.expenses)}</b></div>
+      <div class="cust-row"><span>كاش مسلَّم (${(c.handovers || []).length})</span><b>${sar(r.handovers)}</b></div>
       <div class="cust-row"><span>مبيعات الكاش</span><b>${sar(r.cashSales)}</b></div>
-      <div class="cust-row"><span>المتوقع بالدرج (العهدة + الكاش − المصاريف)</span><b>${sar(r.expectedCash)}</b></div>
+      <div class="cust-row"><span>المتوقع بالدرج (العهدة + الكاش − المصاريف − المسلَّم)</span><b>${sar(r.expectedCash)}</b></div>
       <div class="cust-row"><span>الكاش الموجود</span><b>${toNum(c.cash_counted) === null ? "—" : sar(c.cash_counted)}</b></div>
       <div class="cust-row main"><span>فرق الكاش</span>${diffPillHtml(r.cashDiff)}</div>
       <div class="cust-sep"></div>
