@@ -1,7 +1,7 @@
-// ==================== لغات الموقع: عربي / English / বাংলা ====================
+// ==================== لغات الموقع: عربي / English / বাংলা / Soomaali ====================
 // الموقع مكتوب بالعربي. إذا الموظف اختار لغة تانية، هالملف بيترجم النصوص وهي عم تنعرض
 // (من القاموس js/i18n-dict.js) وبيقلب اتجاه الصفحة لليسار. العربي ما بيتغيّر فيه شي.
-const PH_LANGS = { ar: "العربية", en: "English", bn: "বাংলা" };
+const PH_LANGS = { ar: "العربية", en: "English", bn: "বাংলা", so: "Soomaali" };
 const PhLang = (() => {
   let l = "ar";
   try { l = localStorage.getItem("ph_lang") || "ar"; } catch (e) { /* بلا تخزين */ }
@@ -12,6 +12,7 @@ const PhLang = (() => {
 function phLocale() {
   if (PhLang === "en") return "en-GB";
   if (PhLang === "bn") return "bn-BD-u-nu-latn";
+  if (PhLang === "so") return "so-SO";
   return "ar-SA-u-ca-gregory";
 }
 
@@ -31,7 +32,9 @@ if (PhLang !== "ar") {
   document.documentElement.lang = PhLang;
   document.documentElement.dir = "ltr";
   // القاموس بينحمّل بس لما تكون اللغة مش عربي
-  document.write('<script src="js/i18n-dict.js?v=6.4.63"><\/script>');
+  document.write('<script src="js/i18n-dict.js?v=6.4.64"><\/script>');
+  // الصومالي: قاموس خاص، والناقص منه بيطلع بالإنجليزي
+  if (PhLang === "so") document.write('<script src="js/i18n-so.js?v=6.4.64"><\/script>');
   if (PhLang === "bn") document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap">');
 }
 
@@ -39,7 +42,7 @@ if (PhLang !== "ar") {
   if (PhLang === "ar") return;
   const AR = /[؀-ۿ]/;
   const LETTER = "\\u0621-\\u064A\\u0660-\\u0669";
-  const idx = PhLang === "en" ? 0 : 1;
+  const idx = PhLang === "bn" ? 1 : 0;
   let exact = null, phraseRe = null, phraseMap = null;
 
   const PH_I18N_EXACT_ONLY = new Set(["في", "من", "ص", "م", "لا", "عام", "عرض", "الكل", "أحد", "تمام", "نعم", "تم", "الوقت", "الاسم", "الورقة", "الملخص", "المنتج", "المطلوب"]);
@@ -48,8 +51,10 @@ if (PhLang !== "ar") {
     if (exact || typeof PH_I18N_DICT === "undefined") return !!exact;
     exact = new Map(); phraseMap = new Map();
     const keys = [];
-    for (const [ar, tr] of Object.entries(PH_I18N_DICT)) {
-      const k = norm(ar), v = tr[idx];
+    const so = PhLang === "so" && typeof PH_I18N_SO !== "undefined" ? PH_I18N_SO : null;
+    const all = so ? { ...PH_I18N_DICT, ...Object.fromEntries(Object.keys(so).map(k => [k, null])) } : PH_I18N_DICT;
+    for (const [ar, tr] of Object.entries(all)) {
+      const k = norm(ar), v = (so && so[ar]) || (tr && tr[idx]);
       if (!v) continue;
       exact.set(k, v);
       // كلمات صغيرة (في، من، لا…) معناها بيتغيّر حسب الجملة — بتنترجم بس لما تكون النص كله
