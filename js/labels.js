@@ -7,6 +7,8 @@ let lblMode = "day";
 let lblDate = new Date().getHours() >= 12 ? addDaysStr(todayStr(), 1) : todayStr();
 let lblProducts = [];
 let lblBoq = [];
+// اتجاه الطباعة: بعض الطابعات بتلف الصفحة 90° فبيقصّ الملصق — "0" عادي 60×40، "cw"/"ccw" صفحة 40×60 والمحتوى مدوّر
+let lblRot = (() => { try { return localStorage.getItem("ph_lbl_rot") || "0"; } catch (e) { return "0"; } })();
 let lblFilter = "";  // تصنيف محدد (وضع كل الأصناف)
 let lblQuery = "";   // بحث بالاسم
 let lblCounts = {}; // «id|الحجم» → عدد (وضع كل الأصناف)
@@ -122,6 +124,8 @@ function renderLabelsView() {
         ${lblMode === "day" ? `<div class="field"><label>يوم التوصيل</label><input type="date" id="lblDateInput" value="${lblDate}"></div>` : ""}
         <div class="field"><label>الملصقات</label><div class="readonly-field"><b>${out.length}</b> ملصق · 6×4 سم${lblMode === "all" && !Object.values(lblCounts).some(v => Number(v) > 0) ? " (واحد لكل صنف وحجم)" : ""}</div></div>
       </div>
+      <div class="field"><label>اتجاه الطباعة (إذا طلع الملصق مقلوب أو مقصوص غيّره)</label>
+        <select id="lblRotSel"><option value="0"${lblRot === "0" ? " selected" : ""}>عادي (60×40 أفقي)</option><option value="cw"${lblRot === "cw" ? " selected" : ""}>مدوّر 90° مع عقارب الساعة (40×60)</option><option value="ccw"${lblRot === "ccw" ? " selected" : ""}>مدوّر 90° عكس عقارب الساعة (40×60)</option></select></div>
       <div class="att-actions">
         <button class="btn" id="lblPrintBtn" ${out.length ? "" : "disabled"}>🖨 اطبع</button>
         <button class="btn btn-ghost" id="lblDownBtn" ${out.length ? "" : "disabled"}>⬇ تنزيل PDF</button>
@@ -153,6 +157,8 @@ function renderLabelsView() {
         }).join("")}</details>`).join("")}`;
   view.querySelectorAll("[data-lbl-mode]").forEach(b => b.addEventListener("click", () => { lblMode = b.dataset.lblMode; loadLabelsView(); }));
   view.querySelectorAll("[data-lbl-filter]").forEach(b => b.addEventListener("click", () => { lblFilter = b.dataset.lblFilter; renderLabelsView(); }));
+  const rs = document.getElementById("lblRotSel");
+  if (rs) rs.addEventListener("change", () => { lblRot = rs.value; try { localStorage.setItem("ph_lbl_rot", lblRot); } catch (e) { /* بدون تخزين */ } });
   const sq = document.getElementById("lblSearch");
   if (sq) sq.addEventListener("input", () => { lblQuery = sq.value; clearTimeout(sq._t); sq._t = setTimeout(() => { renderLabelsView(); const n = document.getElementById("lblSearch"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); });
   const d = document.getElementById("lblDateInput");
@@ -182,11 +188,11 @@ function lblOpenPrint(list) {
       <button type="button" class="btn btn-ghost" id="lblPrintClose">→ رجوع للتطبيق</button>
       <button type="button" class="btn" id="lblPrintGo">🖨 اطبع (${list.length})</button>
     </div>
-    <div class="lbl-pages">${list.map(l => lblHtml(l, lblMode === "day" ? lblDate : "")).join("")}</div>`;
+    <div class="lbl-pages">${list.map(l => lblRot === "0" ? lblHtml(l, lblMode === "day" ? lblDate : "") : `<div class="lbl-rot lbl-rot-${lblRot}">${lblHtml(l, lblMode === "day" ? lblDate : "")}</div>`).join("")}</div>`;
   // مقاس الصفحة 60×40 بس وقت طباعة الملصقات (ورقة الحضور A4)
   const pg = document.createElement("style");
   pg.id = "lblPageSize";
-  pg.textContent = "@media print{@page{size:60mm 40mm;margin:0}}";
+  pg.textContent = lblRot === "0" ? "@media print{@page{size:60mm 40mm;margin:0}}" : "@media print{@page{size:40mm 60mm;margin:0}}";
   document.head.appendChild(pg);
   document.body.appendChild(ov);
   document.body.classList.add("lbl-printing");
@@ -205,7 +211,8 @@ async function lblPdf(list, btn, share) {
     if (typeof loadPdfLibs === "function") await loadPdfLibs();
     if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [60, 40], compress: true });
+    const rot = lblRot !== "0";
+    const pdf = new jsPDF({ orientation: rot ? "portrait" : "landscape", unit: "mm", format: rot ? [40, 60] : [60, 40], compress: true });
     // الأشكال المختلفة بس (نفس الصنف بنفس الحجم = نفس الصورة)، ومنصوّرهم دفعات: 30 ملصق بصورة وحدة ومنقصّها
     // (صورة لكل ملصق كانت تاخد دقايق على الجوال)
     const keyOf = (l) => l.p.id + "|" + l.size + "|" + l.extra;
@@ -227,13 +234,20 @@ async function lblPdf(list, btn, share) {
         const c = document.createElement("canvas");
         c.width = Math.round(r.width * SCALE); c.height = Math.round(r.height * SCALE);
         c.getContext("2d").drawImage(big, Math.round((r.left - gr.left) * SCALE), Math.round((r.top - gr.top) * SCALE), c.width, c.height, 0, 0, c.width, c.height);
-        cache.set(keyOf(part[j]), c.toDataURL("image/jpeg", 0.88));
+        let out = c;
+        if (rot) { // تدوير الصورة 90° عشان تناسب صفحة 40×60
+          out = document.createElement("canvas"); out.width = c.height; out.height = c.width;
+          const g = out.getContext("2d");
+          if (lblRot === "cw") { g.translate(out.width, 0); g.rotate(Math.PI / 2); } else { g.translate(0, out.height); g.rotate(-Math.PI / 2); }
+          g.drawImage(c, 0, 0);
+        }
+        cache.set(keyOf(part[j]), out.toDataURL("image/jpeg", 0.88));
       });
       btn.textContent = `⏳ ${Math.min(b + BATCH, uniq.length)}/${uniq.length}`;
     }
     list.forEach((l, i) => {
-      if (i) pdf.addPage([60, 40], "landscape");
-      pdf.addImage(cache.get(keyOf(l)), "JPEG", 0, 0, 60, 40, keyOf(l)); // نفس الصورة بتنحفظ مرة وحدة بالملف
+      if (i) pdf.addPage(rot ? [40, 60] : [60, 40], rot ? "portrait" : "landscape");
+      pdf.addImage(cache.get(keyOf(l)), "JPEG", 0, 0, rot ? 40 : 60, rot ? 60 : 40, keyOf(l)); // نفس الصورة بتنحفظ مرة وحدة بالملف
     });
     const blob = pdf.output("blob");
     const name = lblMode === "salad" ? "ملصقات_السلطات.pdf" : lblMode === "day" ? `ملصقات_القيم_الغذائية_${lblDate}.pdf` : "ملصقات_القيم_الغذائية_كل_الأصناف.pdf";
