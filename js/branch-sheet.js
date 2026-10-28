@@ -22,16 +22,17 @@ const bsRem = (x, weight) => weight
 
 // نسخة خفيفة ليوم (لدرجة الأسبوع والمقارنة): أقسام + عهدة + مبيعات
 async function bsLoadLite(date, branch) {
-  const [day, sales, custody, pays] = await Promise.all([
+  const [day, sales, custody, pays, products] = await Promise.all([
     SupaEngine.getDay(date, branch).catch(() => null),
     SupaEngine.getSalesByCategory(date, date, branch).catch(() => []),
     SupaEngine.getCustody(date, branch).catch(() => null),
-    SupaEngine.getPayments(date, branch).catch(() => [])
+    SupaEngine.getPayments(date, branch).catch(() => []),
+    SupaEngine.getProductSales(date, date, branch).catch(() => [])
   ]);
   const salesMap = {};
   (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
   const items = (day && day.items) || [];
-  const sections = drComputeSections(items, salesMap, []);
+  const sections = drComputeSections(items, salesMap, [], drMadeToOrderByCat(products, branch));
   return {
     date, branch, items, sections, custody, pays: pays || [],
     hasReceiving: items.some(x => Number(x.received || 0) > 0),
@@ -239,7 +240,7 @@ function bsPageHtml(g, date, idx, total) {
     <div class="bs-kpis">${kpis}</div>
     <div class="bs-checks"><span class="bs-lbl">التسجيل</span>${checks}</div>
     ${g.sections.length ? `${sec("الأقسام")}<table class="bs-tbl"><thead><tr><th>القسم</th><th>المستلم</th><th>المباع</th><th>المتبقي</th><th>الهدر</th><th>الفرق</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="bs-hint">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم). الفرق = المستلم − المتبقي − الهدر المسجّل − المباع. الفرق حتى 10% من المستلم طبيعي، وما زاد عليه يُحسب هدراً.</div>` : `<div class="bs-empty">لا توجد أرقام أقسام لهذا اليوم.</div>`}
+      <div class="bs-hint">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم)${madeToOrderApplies(g.c.branch) ? '، والمباع بدون أصناف «حسب الطلب» (ستيك، سالمون، فيليه، بلانكو)' : ''}. الفرق = المستلم − المتبقي − الهدر المسجّل − المباع. الفرق حتى 10% من المستلم طبيعي، وما زاد عليه يُحسب هدراً.</div>` : `<div class="bs-empty">لا توجد أرقام أقسام لهذا اليوم.</div>`}
     ${att3 ? `${sec("أصناف تستحق الانتباه")}<table class="bs-tbl bs-sm"><thead><tr><th>الصنف</th><th>المستلم</th><th>المتبقي</th><th>المباع</th><th>الملاحظة</th></tr></thead><tbody>${att3}</tbody></table>` : ""}
     <div class="bs-two">
       <div>${sec("الكاش والمصاريف")}${cashTbl}${g.exps.length ? `<table class="bs-exp"><tbody>${expLines}${expMore}</tbody></table>` : ""}</div>

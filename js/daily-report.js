@@ -45,7 +45,16 @@ async function runDailyReport() {
 }
 
 // أقسام اليوم: المستلم/المباع/المتبقي/الهدر والفرق (ضمن هامش 10% طبيعي)
-function drComputeSections(items, salesMap, wasteItems) {
+// مبيعات الأصناف اللي تنعمل حسب الطلب (ستيك، سالمون، فيليه، بلانكو) بفروع فوديكس:
+// ما تنستلم مطبوخة، فتنشال من مبيعات القسم قبل المقارنة بالمستلم (مثل اقتراح طلبية الغد)
+function drMadeToOrderByCat(products, branch) {
+  const out = {};
+  if (typeof madeToOrderApplies !== "function" || !madeToOrderApplies(branch)) return out;
+  (products || []).forEach(p => { if (isMadeToOrderName(p.product)) { const c = madeToOrderSection(p.product); out[c] = (out[c] || 0) + Number(p.qty || 0); } });
+  return out;
+}
+
+function drComputeSections(items, salesMap, wasteItems, mto = {}) {
   const catOf = (id, fallbackCat) => (Items.byId(id) || {}).category || fallbackCat || "";
   return DR_SECTIONS.map(s => {
     const mine = items.filter(x => catOf(x.itemId) === s.cat);
@@ -57,7 +66,7 @@ function drComputeSections(items, salesMap, wasteItems) {
       return a + Number(x.remaining != null ? x.remaining : (x.remainingWeight || 0));
     }, 0);
     const wasted = wasteItems.filter(w => catOf(w.itemId) === s.cat).reduce((a, w) => a + Number(w.qty || 0), 0);
-    const soldUnits = getMatchedCategorySales(salesMap, s.cat); // وجبات أو ساندويتشات
+    const soldUnits = Math.max(0, getMatchedCategorySales(salesMap, s.cat) - (mto[s.cat] || 0)); // وجبات أو ساندويتشات (بدون «حسب الطلب»)
     const toMeals = (g) => s.weight ? g / MEAL_WEIGHT_G : g;
     const missing = [];
     if (!(received > 0)) missing.push("الاستلام");
@@ -77,7 +86,7 @@ function drComputeSections(items, salesMap, wasteItems) {
 
 
 async function loadDailyBranch(date, branch) {
-  const [day, sales, waste, custody, pays, salad, attendance, inotes] = await Promise.all([
+  const [day, sales, waste, custody, pays, salad, attendance, inotes, products] = await Promise.all([
     SupaEngine.getDay(date, branch).catch(() => null),
     SupaEngine.getSalesByCategory(date, date, branch).catch(() => []),
     SupaEngine.getWasteReport(date, branch).catch(() => null),
@@ -85,14 +94,15 @@ async function loadDailyBranch(date, branch) {
     SupaEngine.getPayments(date, branch).catch(() => []),
     SupaEngine.getSaladCheck(date, branch).catch(() => null),
     SupaEngine.getAttendance(date, branch).catch(() => []),
-    SupaEngine.getItemNotes(date, branch).catch(() => null)
+    SupaEngine.getItemNotes(date, branch).catch(() => null),
+    SupaEngine.getProductSales(date, date, branch).catch(() => [])
   ]);
   const salesMap = {};
   (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
   const items = (day && day.items) || [];
   const wasteItems = (waste && waste.items) || [];
 
-  const sections = drComputeSections(items, salesMap, wasteItems);
+  const sections = drComputeSections(items, salesMap, wasteItems, drMadeToOrderByCat(products, branch));
   return {
     branch, sections,
     hasReceiving: items.some(x => Number(x.received || 0) > 0),
