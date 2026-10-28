@@ -44,24 +44,10 @@ async function runDailyReport() {
   refreshTabsenseSyncInfo();
 }
 
-async function loadDailyBranch(date, branch) {
-  const [day, sales, waste, custody, pays, salad, attendance, inotes] = await Promise.all([
-    SupaEngine.getDay(date, branch).catch(() => null),
-    SupaEngine.getSalesByCategory(date, date, branch).catch(() => []),
-    SupaEngine.getWasteReport(date, branch).catch(() => null),
-    SupaEngine.getCustody(date, branch).catch(() => null),
-    SupaEngine.getPayments(date, branch).catch(() => []),
-    SupaEngine.getSaladCheck(date, branch).catch(() => null),
-    SupaEngine.getAttendance(date, branch).catch(() => []),
-    SupaEngine.getItemNotes(date, branch).catch(() => null)
-  ]);
-  const salesMap = {};
-  (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
+// أقسام اليوم: المستلم/المباع/المتبقي/الهدر والفرق (ضمن هامش 10% طبيعي)
+function drComputeSections(items, salesMap, wasteItems) {
   const catOf = (id, fallbackCat) => (Items.byId(id) || {}).category || fallbackCat || "";
-  const items = (day && day.items) || [];
-  const wasteItems = (waste && waste.items) || [];
-
-  const sections = DR_SECTIONS.map(s => {
+  return DR_SECTIONS.map(s => {
     const mine = items.filter(x => catOf(x.itemId) === s.cat);
     const received = mine.reduce((a, x) => a + Number(x.received || 0), 0);
     const counted = mine.some(x => x.remaining != null || x.remainingWeight != null || x.remainingSauce != null);
@@ -86,7 +72,27 @@ async function loadDailyBranch(date, branch) {
     return { ...s, received, remaining, wasted, soldUnits, counted, missing, gap, pct, excessU,
              receivedU: toMeals(received), remainingU: toMeals(remaining), wastedU: toMeals(wasted) };
   }).filter(s => s.received > 0 || s.counted || s.soldUnits > 0 || s.wasted > 0);
+}
 
+
+
+async function loadDailyBranch(date, branch) {
+  const [day, sales, waste, custody, pays, salad, attendance, inotes] = await Promise.all([
+    SupaEngine.getDay(date, branch).catch(() => null),
+    SupaEngine.getSalesByCategory(date, date, branch).catch(() => []),
+    SupaEngine.getWasteReport(date, branch).catch(() => null),
+    SupaEngine.getCustody(date, branch).catch(() => null),
+    SupaEngine.getPayments(date, branch).catch(() => []),
+    SupaEngine.getSaladCheck(date, branch).catch(() => null),
+    SupaEngine.getAttendance(date, branch).catch(() => []),
+    SupaEngine.getItemNotes(date, branch).catch(() => null)
+  ]);
+  const salesMap = {};
+  (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
+  const items = (day && day.items) || [];
+  const wasteItems = (waste && waste.items) || [];
+
+  const sections = drComputeSections(items, salesMap, wasteItems);
   return {
     branch, sections,
     hasReceiving: items.some(x => Number(x.received || 0) > 0),
@@ -229,50 +235,4 @@ function dailyBranchHtml(c, date) {
     ${saladDailyLine(c)}
     ${attendanceDailyLine(c)}
   </section>`;
-}
-
-
-// ---- 📄 ملخص الفروع صفحة وحدة PDF (للمشاركة على قروب التشغيل) ----
-function dailySummaryHtml(cards, date) {
-  const dateTxt = new Date(date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-  const body = cards.map(c => dailyBranchHtml(c, date).replace(/<div class="dr-note">[\s\S]*?<\/div>/, ""))
-    .map(h => h.replace(/<div class="dr-cash[^>]*>🕘[\s\S]*?<\/div>/, "").replace(/<div class="dr-cash[^>]*>🥗[\s\S]*?<\/div>/, "")).join("");
-  return `<div class="dr-pdf"><div class="dr-pdf-hd"><img src="assets/logo.png" alt=""><div><b>ملخص الفروع اليومي</b><span>${dateTxt}</span></div></div>${body}
-    <div class="dr-note">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم) · الفرق = المستلم − المتبقي − الهدر − المباع · الفرق حتى 10% من المستلم طبيعي وما زاد عليه هدر · «مباع أكثر» غالباً يعني إن الاستلام ما انسجل كامل</div></div>`;
-}
-
-async function dailySummaryPdf(share, btn) {
-  const label = btn.textContent;
-  btn.disabled = true; btn.textContent = "⏳ جاري التجهيز…";
-  const date = document.getElementById("dailyReportDate").value || todayStr();
-  const stage = document.createElement("div");
-  stage.style.cssText = "position:fixed;left:-99999px;top:0;width:794px;background:#fff;";
-  document.body.appendChild(stage);
-  try {
-    await Items.load();
-    const cards = await Promise.all(branchList().map(b => loadDailyBranch(date, b)));
-    if (typeof loadPdfLibs === "function") await loadPdfLibs();
-    if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
-    stage.innerHTML = dailySummaryHtml(cards, date);
-    const canvas = await html2canvas(stage.firstElementChild, { scale: 2, backgroundColor: "#ffffff", logging: false });
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
-    const M = 6, maxW = 210 - M * 2, maxH = 297 - M * 2;
-    let w = maxW, h = (canvas.height / canvas.width) * w;
-    if (h > maxH) { h = maxH; w = (canvas.width / canvas.height) * h; } // كل الفروع بصفحة وحدة: نصغّر لو طالت
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", (210 - w) / 2, M, w, h);
-    const blob = pdf.output("blob");
-    const name = `ملخص_الفروع_${date}.pdf`;
-    const file = new File([blob], name, { type: "application/pdf" });
-    if (share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: "ملخص الفروع اليومي", text: `ملخص الفروع — ${date}` }); return; }
-      catch (e) { if (e && e.name === "AbortError") return; }
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-  } catch (e) {
-    showToast("⚠ " + (e.message || e));
-  } finally { stage.remove(); btn.disabled = false; btn.textContent = label; }
 }
