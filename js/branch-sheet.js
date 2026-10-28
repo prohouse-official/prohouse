@@ -32,7 +32,8 @@ async function bsLoadLite(date, branch) {
   const salesMap = {};
   (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
   const items = (day && day.items) || [];
-  const sections = drComputeSections(items, salesMap, [], drMadeToOrderByCat(products, branch));
+  const returns = branch === RETURN_HUB ? await leftoverReturnsToHub(date).catch(() => null) : null;
+  const sections = drComputeSections(items, salesMap, [], drMadeToOrderByCat(products, branch), returns ? returns.byCat : {});
   return {
     date, branch, items, sections, custody, pays: pays || [],
     hasReceiving: items.some(x => Number(x.received || 0) > 0),
@@ -114,6 +115,8 @@ function bsGather(L, last, week) {
     if (!c.hasReceiving) { up("yellow"); reasons.push("الاستلام ما انسجل"); }
     if (!c.hasRemaining) { up("yellow"); reasons.push("جرد المتبقي ما انسجل"); }
     if (!c.hasSales) { up("yellow"); reasons.push("مبيعات تابسنس ما وصلت"); }
+    if (c.returns && c.returns.pending) { up("yellow"); reasons.push(`المتبقي الراجع من الفروع: ${c.returns.pending} صنف ما انأكَّد استلامه`); }
+    sections.filter(s => s.gPerMeal > MEAL_WEIGHT_G * 1.1).forEach(s => { up("yellow"); reasons.push(`${s.label || s.cat}: الوجبة طالعة ${bsFmt(s.gPerMeal)} جم بدل ${MEAL_WEIGHT_G}`); });
     if (!closed) { up("red"); reasons.push("العهدة ما انقفلت"); }
     else if (rec && rec.cashDiff !== null && rec.cashDiff <= -1) { up("red"); reasons.push(`الكاش: عجز ${sar(Math.abs(rec.cashDiff))}`); }
     else if (rec && rec.cashDiff !== null && rec.cashDiff >= 1) { up("yellow"); reasons.push(`الكاش: زيادة ${sar(rec.cashDiff)}`); }
@@ -131,6 +134,8 @@ function bsGather(L, last, week) {
     if (!c.hasRemaining) todo.push("سجّل جرد المتبقي قبل إغلاق اليوم — بدونه ما نقدر نحسب الاستهلاك.");
     if (!c.hasReceiving) todo.push("سجّل استلام الصباح من شاشة الاستلام.");
     if (!closed) todo.push("اقفل العهدة وعدّ الكاش.");
+    if (c.returns && c.returns.pending) todo.push("أكّد المتبقي اللي وصلك من الشاطئ وعبداللطيف من شاشة «المستلم المتبقي».");
+    sections.filter(s => s.gPerMeal > MEAL_WEIGHT_G * 1.1).forEach(s => todo.push(`${s.label || s.cat}: وزّن الوجبة على الميزان — ${MEAL_WEIGHT_G} جم بالمغرفة الثابتة.`));
     if (rec && rec.cashDiff !== null && rec.cashDiff <= -1) todo.push(`راجع عدّ الكاش: العجز ${sar(Math.abs(rec.cashDiff))}.`);
     sections.filter(s => s.gap !== null && s.pct > DR_NORMAL_GAP && s.gap > 0).forEach(s => todo.push(`${s.label || s.cat}: راجع وزن التقديم والوجبات اللي طلعت بدون بيع (فرق ${bsFmt(s.gap, 1)} وجبة).`));
     attention.filter(a => /بقي منه/.test(a.note)).slice(0, 1).forEach(a => todo.push(`قلّل طلبية «${a.name}» (${a.note}).`));
@@ -188,6 +193,16 @@ function bsDiff(diff) {
   return diff < 0 ? `<b class="bs-noc">عجز ${sar(Math.abs(diff))}</b>` : `<b class="bs-warnc">زيادة ${sar(diff)}</b>`;
 }
 
+// وزن الوجبة الفعلي + المتبقي الراجع للروضة
+function bsExtraLines(c) {
+  const out = [];
+  const ws = c.sections.filter(s => s.gPerMeal > 0);
+  if (ws.length) out.push(`<b>وزن الوجبة الفعلي:</b> ${ws.map(s => `${s.cat} <span class="${s.gPerMeal > MEAL_WEIGHT_G * 1.1 ? "bs-noc" : s.gPerMeal > MEAL_WEIGHT_G * 1.03 ? "bs-warnc" : "bs-okc"}">${bsFmt(s.gPerMeal)} جم</span>`).join(" · ")} <span class="bs-mut">(المعيار ${MEAL_WEIGHT_G} جم)</span>`);
+  const r = c.returns;
+  if (r && Object.keys(r.byBranch).length) out.push(`<b>رجع من الفروع:</b> ${Object.entries(r.byBranch).map(([b, x]) => `من ${escHtml(b)} ${bsFmt(x.confirmed)}${x.pending ? ` <span class="bs-noc">(${x.pending} صنف بانتظار تأكيد الروضة)</span>` : ` <span class="bs-okc">مؤكَّد</span>`}`).join(" · ")} <span class="bs-mut">— المؤكَّد مضاف على المستلم</span>`);
+  return out.length ? `<div class="bs-hint">${out.join("<br>")}</div>` : "";
+}
+
 function bsPageHtml(g, date, idx, total) {
   const st = BS_STATUS[g.level];
   const dateTxt = new Date(date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
@@ -223,7 +238,7 @@ function bsPageHtml(g, date, idx, total) {
     const sm = saladSummary(g.c.salad, g.c.branch);
     info.push(dl("تجهيز السلطات", !g.c.salad || !sm.started ? "القائمة لم تُعبَّأ" : `${sm.ok} من ${sm.total} جاهز${sm.miss.length ? " — ناقص: " + sm.miss.slice(0, 5).map(escHtml).join("، ") + (sm.miss.length > 5 ? "…" : "") : ""}`));
   }
-  const cashTbl = g.rec ? `<dl class="bs-dl">${dl("المتوقع بالدرج", sar(g.rec.expectedCash))}${dl("المعدود", sar(Number(g.c.custody.cash_counted || 0)))}${dl("فرق الكاش", bsDiff(g.rec.cashDiff))}${dl("فرق الشبكة", bsDiff(g.rec.cardDiff))}</dl>`
+  const cashTbl = g.rec ? `<dl class="bs-dl">${g.rec.handovers ? dl("كاش مسلَّم", `${sar(g.rec.handovers)} — ${(g.c.custody.handovers || []).map(h => escHtml(h.to || "")).join("، ")}`) : ""}${dl("المتوقع بالدرج", sar(g.rec.expectedCash))}${dl("المعدود", sar(Number(g.c.custody.cash_counted || 0)))}${dl("فرق الكاش", bsDiff(g.rec.cashDiff))}${dl("فرق الشبكة", bsDiff(g.rec.cardDiff))}</dl>`
     : `<p class="bs-mut">${g.closed ? "العهدة مقفولة — مبيعات تابسنس لم تصل للمطابقة." : "العهدة لم تُغلق."}</p>`;
   const expLines = g.exps.slice(0, 5).map(e => `<tr><td>${sar(e.amount)}</td><td class="bs-l">${escHtml(String(e.supplier || e.note || "مصروف").split("\n")[0].slice(0, 30))}</td><td class="${e.receipt ? "bs-okc" : "bs-noc"}">${e.receipt ? "فاتورة" : "بدون فاتورة"}</td></tr>`).join("");
   const expMore = g.exps.length > 5 ? `<tr><td colspan="3" class="bs-mut">+ ${g.exps.length - 5} مصاريف أخرى</td></tr>` : "";
@@ -240,7 +255,8 @@ function bsPageHtml(g, date, idx, total) {
     <div class="bs-kpis">${kpis}</div>
     <div class="bs-checks"><span class="bs-lbl">التسجيل</span>${checks}</div>
     ${g.sections.length ? `${sec("الأقسام")}<table class="bs-tbl"><thead><tr><th>القسم</th><th>المستلم</th><th>المباع</th><th>المتبقي</th><th>الهدر</th><th>الفرق</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="bs-hint">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم)${madeToOrderApplies(g.c.branch) ? '، والمباع بدون أصناف «حسب الطلب» (ستيك، سالمون، فيليه، بلانكو)' : ''}. الفرق = المستلم − المتبقي − الهدر المسجّل − المباع. الفرق حتى 10% من المستلم طبيعي، وما زاد عليه يُحسب هدراً.</div>` : `<div class="bs-empty">لا توجد أرقام أقسام لهذا اليوم.</div>`}
+      <div class="bs-hint">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم)${madeToOrderApplies(g.c.branch) ? '، والمباع بدون أصناف «حسب الطلب» (ستيك، سالمون، فيليه، بلانكو)' : ''}. الفرق = المستلم − المتبقي − الهدر المسجّل − المباع. الفرق حتى 10% من المستلم طبيعي، وما زاد عليه يُحسب هدراً.</div>
+      ${bsExtraLines(g.c)}` : `<div class="bs-empty">لا توجد أرقام أقسام لهذا اليوم.</div>`}
     ${att3 ? `${sec("أصناف تستحق الانتباه")}<table class="bs-tbl bs-sm"><thead><tr><th>الصنف</th><th>المستلم</th><th>المتبقي</th><th>المباع</th><th>الملاحظة</th></tr></thead><tbody>${att3}</tbody></table>` : ""}
     <div class="bs-two">
       <div>${sec("الكاش والمصاريف")}${cashTbl}${g.exps.length ? `<table class="bs-exp"><tbody>${expLines}${expMore}</tbody></table>` : ""}</div>

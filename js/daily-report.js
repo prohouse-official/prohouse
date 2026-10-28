@@ -54,11 +54,13 @@ function drMadeToOrderByCat(products, branch) {
   return out;
 }
 
-function drComputeSections(items, salesMap, wasteItems, mto = {}) {
+function drComputeSections(items, salesMap, wasteItems, mto = {}, returned = {}) {
   const catOf = (id, fallbackCat) => (Items.byId(id) || {}).category || fallbackCat || "";
   return DR_SECTIONS.map(s => {
     const mine = items.filter(x => catOf(x.itemId) === s.cat);
-    const received = mine.reduce((a, x) => a + Number(x.received || 0), 0);
+    // الروضة: المتبقي الراجع من الفروع (المأكَّد) ينضاف على المستلم
+    const ret = Number(returned[s.cat] || 0);
+    const received = mine.reduce((a, x) => a + Number(x.received || 0), 0) + ret;
     const counted = mine.some(x => x.remaining != null || x.remainingWeight != null || x.remainingSauce != null);
     const remaining = mine.reduce((a, x) => {
       // الصوص الباقي بالصحن من وزن الاستلام، فيحسب من المتبقي
@@ -78,7 +80,9 @@ function drComputeSections(items, salesMap, wasteItems, mto = {}) {
     // هامش طبيعي 10% من المستلم: الفرق ضمنه عادي، وما زاد عليه يعتبر هدر
     const tol = DR_NORMAL_GAP * toMeals(received);
     const excessU = gap !== null && gap > tol ? gap - tol : 0;
-    return { ...s, received, remaining, wasted, soldUnits, counted, missing, gap, pct, excessU,
+    // وزن الوجبة الفعلي = المستخدم ÷ الوجبات المباعة (المعيار 150 جم)
+    const gPerMeal = s.weight && counted && soldUnits > 0 && received > 0 ? (received - remaining - wasted) / soldUnits : null;
+    return { ...s, received, returned: ret, remaining, wasted, soldUnits, counted, missing, gap, pct, excessU, gPerMeal,
              receivedU: toMeals(received), remainingU: toMeals(remaining), wastedU: toMeals(wasted) };
   }).filter(s => s.received > 0 || s.counted || s.soldUnits > 0 || s.wasted > 0);
 }
@@ -101,10 +105,11 @@ async function loadDailyBranch(date, branch) {
   (sales || []).forEach(r => { salesMap[r.category] = (salesMap[r.category] || 0) + Number(r.qty || 0); });
   const items = (day && day.items) || [];
   const wasteItems = (waste && waste.items) || [];
+  const returns = branch === RETURN_HUB ? await leftoverReturnsToHub(date).catch(() => null) : null;
 
-  const sections = drComputeSections(items, salesMap, wasteItems, drMadeToOrderByCat(products, branch));
+  const sections = drComputeSections(items, salesMap, wasteItems, drMadeToOrderByCat(products, branch), returns ? returns.byCat : {});
   return {
-    branch, sections,
+    branch, sections, returns,
     hasReceiving: items.some(x => Number(x.received || 0) > 0),
     hasRemaining: items.some(x => x.remaining != null || x.remainingWeight != null || x.remainingSauce != null),
     hasSales: (sales || []).length > 0,
@@ -197,6 +202,22 @@ function saladDailyLine(c) {
   return `<div class="dr-cash${sum.miss.length ? " no" : ""}">🥗 السلطات: ${sum.ok} من ${sum.total} جاهز${miss}<span class="dr-cash-sub">${escHtml(s.chef_name || "")}${recv}</span></div>`;
 }
 
+// وزن الوجبة الفعلي لكل قسم (المستخدم ÷ المباع) — أحمر إذا زاد 10% عن المعيار
+function drMealWeightLine(c) {
+  const ws = c.sections.filter(s => s.gPerMeal !== null && s.gPerMeal > 0);
+  if (!ws.length) return "";
+  const over = ws.some(s => s.gPerMeal > MEAL_WEIGHT_G * 1.1);
+  return `<div class="dr-cash${over ? " no" : ""}">⚖️ وزن الوجبة الفعلي: ${ws.map(s => `${s.cat} <b>${drNum(s.gPerMeal, 0)} جم</b>`).join(" · ")}<span class="dr-cash-sub">المعيار ${MEAL_WEIGHT_G} جم · المحسوب = (المستلم − المتبقي − الهدر) ÷ الوجبات المباعة</span></div>`;
+}
+
+// الروضة: المتبقي الراجع من الشاطئ وعبداللطيف
+function drReturnsLine(c) {
+  const r = c.returns;
+  if (!r || !Object.keys(r.byBranch).length) return "";
+  const parts = Object.entries(r.byBranch).map(([b, x]) => `من ${escHtml(b)} <b>${drNum(x.confirmed, 0)}</b>${x.pending ? ` <small>(${x.pending} صنف بانتظار التأكيد — المسجَّل ${drNum(x.recorded, 0)})</small>` : ""}`);
+  return `<div class="dr-cash${r.pending ? " no" : ""}">↩️ رجع من الفروع: ${parts.join(" · ")}<span class="dr-cash-sub">${r.pending ? "الروضة لازم تأكد اللي وصلها من شاشة «المستلم المتبقي» — " : ""}اللي انأكَّد بس ينضاف على مستلم الروضة (بدون الصوص)</span></div>`;
+}
+
 // سطر الحضور والانصراف: مين حضر ومين انصرف ووقته (الوقت من السيرفر)
 function attendanceDailyLine(c) {
   if (typeof isAttendanceOffBranch === "function" && isAttendanceOffBranch(c.branch)) return "";
@@ -225,7 +246,7 @@ function dailyBranchHtml(c, date) {
   if (closed) {
     const r = custodyReconciliation({ ...c.custody, expenses: c.custody.expenses || [] }, c.pays);
     cash = c.pays.length
-      ? `<div class="dr-cash">💵 الكاش: ${diffPillHtml(r.cashDiff)} <span class="dr-cash-sub">المتوقع ${sar(r.expectedCash)} · المعدود ${sar(Number(c.custody.cash_counted || 0))}</span></div>
+      ? `<div class="dr-cash">💵 الكاش: ${diffPillHtml(r.cashDiff)} <span class="dr-cash-sub">المتوقع ${sar(r.expectedCash)} · المعدود ${sar(Number(c.custody.cash_counted || 0))}${r.handovers ? ` · مسلَّم ${sar(r.handovers)} (${(c.custody.handovers || []).map(h => escHtml(h.to || "")).join("، ")})` : ""}</span></div>
          <div class="dr-cash">💳 الشبكة: ${diffPillHtml(r.cardDiff)}</div>`
       : `<div class="dr-cash">💵 العهدة مقفولة — مبيعات تابسنس لهذا اليوم ما انسحبت للحين</div>`;
   }
@@ -241,6 +262,8 @@ function dailyBranchHtml(c, date) {
       <tbody>${rows}</tbody>
     </table></div>
     <div class="dr-note">الأرقام بالوجبات (الوجبة ${MEAL_WEIGHT_G} جم) · الفرق = المستلم − المتبقي − الهدر المسجل − المباع · الفرق حتى 10% من المستلم طبيعي، وما زاد عليه ينحسب هدر · «مباع أكثر» غالباً يعني إن الاستلام ما انسجل كامل</div>`}
+    ${drReturnsLine(c)}
+    ${drMealWeightLine(c)}
     ${cash}
     ${saladDailyLine(c)}
     ${attendanceDailyLine(c)}

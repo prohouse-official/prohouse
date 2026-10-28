@@ -8,7 +8,7 @@ const TAB_ROLE_ACCESS = {
   // تسجيل الإنتاج بالمطبخ المركزي ومطابقته مع طلبية الفروع
   production: ["owner", "chef", "kitchen", "accountant"],
   // استلام المتبقي من الفروع (الروضة بتجمعه وبترجّعه للمطبخ)
-  leftovers: ["owner", "chef", "kitchen", "accountant"],
+  leftovers: ["owner", "chef", "kitchen", "accountant", "manager", "branch_staff", "employee"],
   // ملاحظات الأصناف: انشالت (الملاحظات بشاشة الجرد) — الشاشة بتضل بالكود بدون ما تطلع لحدا
   itemnotes: [],
   // ملصقات القيم الغذائية لاشتراكات تكرار
@@ -39,6 +39,7 @@ const TAB_ROLE_ACCESS = {
 };
 
 const JUICE_STAFF_ROLES = ["branch_staff", "employee"];
+const LEFT_STAFF_ROLES = ["manager", "branch_staff", "employee"];
 function tabAllowed(tab) {
   const role = Auth.role();
   if (tab === "report" && typeof isChefReportOnlyUser === "function" && isChefReportOnlyUser()) return true;
@@ -48,6 +49,8 @@ function tabAllowed(tab) {
     const list = (typeof Juices !== "undefined" && Juices.current.length ? Juices.current : (Sync.cacheGet("juices_v1") || {}).value) || [];
     if (!list.some(j => j.active !== false && mine.some(b => String(j.branches || "").split(",").map(s => s.trim()).includes(b)))) return false;
   }
+  // موظفين الفروع: بس موظف الروضة (هو اللي بيستلم المتبقي الراجع من الشاطئ وعبداللطيف)
+  if (tab === "leftovers" && LEFT_STAFF_ROLES.includes(role) && !((Auth.branches && Auth.branches()) || []).includes(RETURN_HUB)) return false;
   // المشتريات بمرحلة التجربة: تطلع بوضع المعاينة بس
   if (tab === "purchases" && !(typeof purchasesEnabled === "function" && purchasesEnabled())) return false;
   // صور التوثيق تنشال عن الموظف إذا كل فروعه لسا ما تحددت لها مناطق تصوير
