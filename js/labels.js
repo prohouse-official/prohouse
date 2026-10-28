@@ -23,8 +23,8 @@ const LBL_SALADS = [
   { n: 3, ar: "تروبيكال سلاد", en: "Tropical Salad", w: 160, cal: 145, ar_ing: "باذنجان مكعبات مشوي، رمان، خس، جرجير، تفاح. الصوص: رانش.", ing: "Grilled eggplant cubes, pomegranate, lettuce, arugula, apple. Sauce: ranch." },
   { n: 4, ar: "جريلد بيبي كورن سلاد", en: "Grilled Baby Corn Salad", w: 170, cal: 120, ar_ing: "خس، جزر مبشور، بصل أخضر، طماطم، ذرة صفراء مشوية. الصوص: كوكتيل أو إيطالي.", ing: "Lettuce, grated carrot, green onion, tomato, grilled yellow corn. Sauce: cocktail or Italian." },
   { n: 5, ar: "بيتروت هلثي", en: "Beetroot Healthy", w: 200, cal: 120, ar_ing: "شمندر، خيار، بقدونس، خس، عنب مقطع. الصوص: إيطالي أو دبس رمان.", ing: "Beetroot, cucumber, parsley, lettuce, sliced grapes. Sauce: Italian or pomegranate molasses." },
-  { n: 7, ar: "معصوب برو هاوس", en: "Masoub Pro House", w: 0, cal: 318, simple: true },
-  { n: 8, ar: "عريكة برو هاوس", en: "Areeka Pro House", w: 0, cal: 289, simple: true },
+  { n: 7, ar: "معصوب برو هاوس", en: "Masoub Pro House", w: 0, cal: 318, pro: 10, carb: 40, fat: 10, simple: true },
+  { n: 8, ar: "عريكة برو هاوس", en: "Areeka Pro House", w: 0, cal: 289, pro: 10, carb: 42, fat: 9, simple: true },
   { n: 9, ar: "تشوكلت فادج كيك", en: "Chocolate Fudge Cake", nameOnly: true },
   { n: 10, ar: "تشيز كيك", en: "Cheesecake", nameOnly: true },
   { n: 11, ar: "ماتيلدا كيك", en: "Matilda Cake", nameOnly: true },
@@ -72,7 +72,7 @@ function lblList() {
     const any = LBL_SALADS.some(x => Number(lblCounts["salad|" + x.n]) > 0);
     LBL_SALADS.forEach(x => {
       const n = any ? Number(lblCounts["salad|" + x.n]) || 0 : 1;
-      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, nameOnly: x.nameOnly, w: x.w, extra: "", ing: x.ing, ar_ing: x.ar_ing, simple: x.simple });
+      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, nameOnly: x.nameOnly, w: x.w, extra: "", ing: x.ing, ar_ing: x.ar_ing, simple: x.simple, mac: x.pro != null ? { pro: x.pro, carb: x.carb, fat: x.fat } : null });
     });
   } else if (lblMode === "day") {
     lblBoq.forEach(b => {
@@ -102,11 +102,12 @@ function lblSaladHtml(l) {
 
 function lblSimpleHtml(l) {
   return `<div class="lbl lbl-salad lbl-simple"><div class="lbl-hd"><img src="assets/logo.png" alt=""><div class="lbl-nm"><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en)}</span></div></div>
-    <div class="lbl-cal"><span>Calories</span><b>≈ ${lblNum(l.nut.calories)} kcal</b></div></div>`;
+    <table class="lbl-t lbl-mac"><tr><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fat</th></tr>
+    <tr><td><b>${lblNum(l.nut.calories)}</b><i>kcal</i></td><td><b>${l.mac ? l.mac.pro : "–"}</b><i>g</i></td><td><b>${l.mac ? l.mac.carb : "–"}</b><i>g</i></td><td><b>${l.mac ? l.mac.fat : "–"}</b><i>g</i></td></tr></table></div>`;
 }
 
 function lblNameHtml(l) {
-  return `<div class="lbl lbl-salad lbl-nameonly"><img src="assets/logo.png" alt=""><b>${escHtml(l.p.name_ar)}</b><span>${escHtml(l.p.name_en)}</span></div>`;
+  return `<div class="lbl lbl-salad lbl-nameonly${l.p.name_en.length > 14 ? " lbl-long" : ""}"><img src="assets/logo.png" alt=""><b>${escHtml(l.p.name_ar)}</b><b class="lbl-en">${escHtml(l.p.name_en)}</b></div>`;
 }
 
 function lblHtml(l, date) {
