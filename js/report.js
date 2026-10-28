@@ -877,6 +877,8 @@ function chefTotalText(parts) {
 // الهدف بدون رقم = أول خانة شيف موجودة بالورقة بنفس الاسم (سمك الشيف 1، 2…)
 const CHEF_COMBINED_ALIASES = { "رز بخاري": "رز الشيف", "سمك فيليه": "سمك الشيف", "جمبري داينمت": "جمبري الشيف" };
 const chefNormName = (n) => String(n || "").replace(/\s*\(.*\)\s*$/, "").replace(/[ة]$/, "ه").replace(/\s+/g, " ").trim();
+// مفتاح تجميع السطور بالورقة المجمعة: فرق الإملاء بين الفروع ما يفصل الصنف (شامبنيون/شامبينيون، «ماتيلدا كيك 100 مل»/«ماتيلدا 100 مل»)
+const chefKeyName = (n) => chefNormName(n).replace(/شامبنيون/g, "شامبينيون").replace(/\s+كيك(?=\s+100\s*مل)/, "");
 
 // اسم الطبق بدون «مع رز أبيض…» وبدون فروق الهمزة — لمطابقة أصناف تكرار مع أصناف الفروع
 const chefLooseName = (n) => chefNormName(n).replace(/\s+مع\s+.*$/, "").replace(/ة/g, "ه").replace(/[أإآ]/g, "ا").trim();
@@ -910,7 +912,7 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
       // خانة الشيف اللي الفرع كتب اسم طبختها («دجاج كاري»، «داوود باشا») بتطلع باسم الطبخة؛ الفاضية «دجاج الشيف 1 ……»
       const chef = /الشيف/.test(norm) && !String(e.cookName || "").trim();
       const name = chef ? `${norm} ……` : chefReportName(it, e.cookName);
-      const key = (chef ? "chef:" : "n:") + chefNormName(chef ? norm : name);
+      const key = (chef ? "chef:" : "n:") + (chef ? chefNormName(norm) : chefKeyName(name));
       addTo(key, { category: it.category || "-", name, base: chef ? norm.replace(/\s*\d+$/, "") : "", rank: 999, sort: 9999 }, branch, e, it);
     });
   });
