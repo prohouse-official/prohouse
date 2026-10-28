@@ -3861,3 +3861,14 @@ input[type=date]{min-height:36px}
 .lbl-salad .lbl-ing:not(.lbl-ing-ar){ flex:0 0 auto; }
 .lbl-salad .lbl-hd{ gap:1mm; }
 .lbl-salad .lbl-cal{ margin-top:auto; }
+
+/* طباعة ملصق مدوّر 90° على صفحة 40×60 */
+.lbl-rot{ width:40mm; height:60mm; position:relative; overflow:hidden; background:#fff; }
+.lbl-rot .lbl{ position:absolute; top:0; left:0; transform-origin:0 0; }
+.lbl-rot-cw .lbl{ transform:translateX(40mm) rotate(90deg); }
+.lbl-rot-ccw .lbl{ transform:translateY(60mm) rotate(-90deg); }
+@media print{
+  body.lbl-printing .lbl-pages .lbl-rot{ page-break-after:always; break-after:page; height:59.5mm; }
+  body.lbl-printing .lbl-pages .lbl-rot:last-child{ page-break-after:auto; break-after:auto; }
+  body.lbl-printing .lbl-pages .lbl-rot .lbl{ height:40mm; }
+}
