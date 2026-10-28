@@ -32,9 +32,9 @@ if (PhLang !== "ar") {
   document.documentElement.lang = PhLang;
   document.documentElement.dir = "ltr";
   // القاموس بينحمّل بس لما تكون اللغة مش عربي
-  document.write('<script src="js/i18n-dict.js?v=6.4.64"><\/script>');
+  document.write('<script src="js/i18n-dict.js?v=6.4.65"><\/script>');
   // الصومالي: قاموس خاص، والناقص منه بيطلع بالإنجليزي
-  if (PhLang === "so") document.write('<script src="js/i18n-so.js?v=6.4.64"><\/script>');
+  if (PhLang === "so") document.write('<script src="js/i18n-so.js?v=6.4.65"><\/script>');
   if (PhLang === "bn") document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap">');
 }
 
