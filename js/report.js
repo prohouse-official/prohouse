@@ -1395,9 +1395,9 @@ function aljSummaryHtml(s) {
     ${row("الإجمالي", n(s.total), "main")}
     ${row("مدى", n(s.mada))}
     ${row("نقدي", n(s.cash))}
-    <div class="alj-sum-check ${s.check_ok ? "ok" : "bad"}">${s.check_ok
+    ${/^تمت إزالة/.test(String(s.check_text || "")) ? `<div class="alj-sum-adj">✏️ ${escHtml(s.check_text)}<br><small>ملف PDF الأصلي من تابسنس ما تغيّر وفيه الفاتورة.</small></div>` : `<div class="alj-sum-check ${s.check_ok ? "ok" : "bad"}">${s.check_ok
       ? "✅ مجاميع الإكسل مطابقة للملخص PDF بالهللة"
-      : "⚠ مجاميع الإكسل مو مطابقة للملخص — لا ترسله قبل ما يتراجع"}${Number(s.dropped) ? `<br><small>انحذف ${Number(s.dropped)} سطر بدون رقم فاتورة من الإكسل</small>` : ""}</div>
+      : "⚠ مجاميع الإكسل مو مطابقة للملخص — لا ترسله قبل ما يتراجع"}${Number(s.dropped) ? `<br><small>انحذف ${Number(s.dropped)} سطر بدون رقم فاتورة من الإكسل</small>` : ""}</div>`}
   </div>`;
 }
 

@@ -4006,3 +4006,5 @@ body.lang-am, body.lang-am button, body.lang-am input, body.lang-am select, body
 }
 
 .lbl-nameonly b.lbl-price{ font-size:16pt; font-weight:800; margin-top:.6mm; }
+
+.alj-sum-adj{ margin-top:8px; padding:8px 10px; border-radius:10px; background:#fff8d6; color:#7a5d00; font-size:13px; line-height:1.7; }
