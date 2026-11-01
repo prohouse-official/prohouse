@@ -1,7 +1,8 @@
 // ==================== لغات الموقع: عربي / English / বাংলা / Soomaali ====================
 // الموقع مكتوب بالعربي. إذا الموظف اختار لغة تانية، هالملف بيترجم النصوص وهي عم تنعرض
 // (من القاموس js/i18n-dict.js) وبيقلب اتجاه الصفحة لليسار. العربي ما بيتغيّر فيه شي.
-const PH_LANGS = { ar: "العربية", en: "English", bn: "বাংলা", so: "Soomaali" };
+// الصومالي انشال (حبيبة إثيوبية): القاموس js/i18n-so.js موجود بس مو مفعّل
+const PH_LANGS = { ar: "العربية", en: "English", bn: "বাংলা" };
 const PhLang = (() => {
   let l = "ar";
   try { l = localStorage.getItem("ph_lang") || "ar"; } catch (e) { /* بلا تخزين */ }
@@ -32,9 +33,9 @@ if (PhLang !== "ar") {
   document.documentElement.lang = PhLang;
   document.documentElement.dir = "ltr";
   // القاموس بينحمّل بس لما تكون اللغة مش عربي
-  document.write('<script src="js/i18n-dict.js?v=6.4.67"><\/script>');
+  document.write('<script src="js/i18n-dict.js?v=6.4.68"><\/script>');
   // الصومالي: قاموس خاص، والناقص منه بيطلع بالإنجليزي
-  if (PhLang === "so") document.write('<script src="js/i18n-so.js?v=6.4.67"><\/script>');
+  if (PhLang === "so") document.write('<script src="js/i18n-so.js?v=6.4.68"><\/script>');
   if (PhLang === "bn") document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap">');
 }
 
