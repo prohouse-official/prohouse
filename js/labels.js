@@ -32,6 +32,7 @@ const LBL_SALADS = [
   { n: 13, ar: "مهلبية", en: "Mahalabia", nameOnly: true },
   { n: 14, ar: "سلطة خضراء", en: "Green Salad", nameOnly: true, price: 3 },
   { n: 15, ar: "سلطة يونانية", en: "Greek Salad", nameOnly: true },
+  { n: 16, ar: "كاسترد", en: "Custard", nameOnly: true },
   { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", w: 180, cal: 195, ar_ing: "جرجير، تفاح، خس، توت مجفف، جبنة فيتا. الصوص: رانش أو إيطالي.", ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
 ];
 const lblNorm = (s) => String(s || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/\s+/g, " ").trim();
