@@ -16,6 +16,7 @@ let lblLoadSeq = 0;
 let lblHost = "labelsView"; // نفس الشاشة: من القائمة أو من التقارير
 
 const LBL_SIZES = { "100P - 100C": "100 جم بروتين · 100 جم كارب", "150P - 150C": "150 جم بروتين · 150 جم كارب", "200P - 200C": "200 جم بروتين · 200 جم كارب" };
+// تشيز كيك وماتيلدا وبنانا بودينق (كوب 100 مل): القيم تقدير مبدئي — يعدّلها الشيف من هون بعد ما يأكدها
 // سلطات الفرع: اسم عربي وإنجليزي، مكونات بالإنجليزي فقط، ووزن العلبة (w بالجرام) والسعرات تقدير شامل صوص 20 جم — تتعدّل من هون بعد ما الشيف يأكدها
 const LBL_SALADS = [
   { n: 1, ar: "مكسيكو سلاد", en: "Mexico Salad", w: 300, cal: 240, ar_ing: "ملفوف أبيض، ملفوف أحمر، جزر مبشور، ذرة حب، خيار، حمص مسلوق. الصوص: كوكتيل أو رانش.", ing: "White cabbage, red cabbage, grated carrot, sweet corn, cucumber, boiled chickpeas. Sauce: cocktail or ranch." },
@@ -26,9 +27,9 @@ const LBL_SALADS = [
   { n: 7, ar: "معصوب برو هاوس", en: "Masoub Pro House", w: 0, cal: 318, pro: 10, carb: 40, fat: 10, simple: true },
   { n: 8, ar: "عريكة برو هاوس", en: "Areeka Pro House", w: 0, cal: 289, pro: 10, carb: 42, fat: 9, simple: true },
   { n: 9, ar: "تشوكلت فادج كيك", en: "Chocolate Fudge Cake", nameOnly: true },
-  { n: 10, ar: "تشيز كيك", en: "Cheesecake", nameOnly: true },
-  { n: 11, ar: "ماتيلدا كيك", en: "Matilda Cake", nameOnly: true },
-  { n: 12, ar: "بودينق", en: "Pudding", nameOnly: true },
+  { n: 10, ar: "تشيز كيك", en: "Cheesecake", w: 0, cal: 320, pro: 6, carb: 28, fat: 21, simple: true },
+  { n: 11, ar: "ماتيلدا", en: "Matilda", w: 0, cal: 340, pro: 5, carb: 42, fat: 17, simple: true },
+  { n: 12, ar: "بنانا بودينق", en: "Banana Pudding", w: 0, cal: 260, pro: 4, carb: 40, fat: 9, simple: true },
   { n: 13, ar: "مهلبية", en: "Mahalabia", nameOnly: true },
   { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", w: 180, cal: 195, ar_ing: "جرجير، تفاح، خس، توت مجفف، جبنة فيتا. الصوص: رانش أو إيطالي.", ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
 ];
