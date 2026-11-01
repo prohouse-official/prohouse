@@ -4004,3 +4004,5 @@ input[type=date]{min-height:36px}
 body.lang-am, body.lang-am button, body.lang-am input, body.lang-am select, body.lang-am textarea {
   font-family: "Noto Sans Ethiopic", "Tajawal", "Segoe UI", sans-serif;
 }
+
+.lbl-nameonly b.lbl-price{ font-size:16pt; font-weight:800; margin-top:.6mm; }

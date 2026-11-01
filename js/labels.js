@@ -30,6 +30,8 @@ const LBL_SALADS = [
   { n: 11, ar: "ماتيلدا", en: "Matilda", nameOnly: true },
   { n: 12, ar: "بنانا بودينق", en: "Banana Pudding", nameOnly: true },
   { n: 13, ar: "مهلبية", en: "Mahalabia", nameOnly: true },
+  { n: 14, ar: "سلطة خضراء", en: "Green Salad", nameOnly: true, price: 3 },
+  { n: 15, ar: "سلطة يونانية", en: "Greek Salad", nameOnly: true },
   { n: 6, ar: "روكا آبل سلاد", en: "Rocca Apple Salad", w: 180, cal: 195, ar_ing: "جرجير، تفاح، خس، توت مجفف، جبنة فيتا. الصوص: رانش أو إيطالي.", ing: "Arugula, apple, lettuce, dried berries, feta cheese. Sauce: ranch or Italian." }
 ];
 const lblNorm = (s) => String(s || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/ـ/g, "").replace(/\s+/g, " ").trim();
@@ -72,7 +74,7 @@ function lblList() {
     const any = LBL_SALADS.some(x => Number(lblCounts["salad|" + x.n]) > 0);
     LBL_SALADS.forEach(x => {
       const n = any ? Number(lblCounts["salad|" + x.n]) || 0 : 1;
-      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, nameOnly: x.nameOnly, w: x.w, extra: "", ing: x.ing, ar_ing: x.ar_ing, simple: x.simple, mac: x.pro != null ? { pro: x.pro, carb: x.carb, fat: x.fat } : null });
+      for (let i = 0; i < n; i++) out.push({ p: { id: "salad" + x.n, name_ar: x.ar, name_en: x.en }, size: "", nut: { calories: x.cal }, nameOnly: x.nameOnly, price: x.price, w: x.w, extra: "", ing: x.ing, ar_ing: x.ar_ing, simple: x.simple, mac: x.pro != null ? { pro: x.pro, carb: x.carb, fat: x.fat } : null });
     });
   } else if (lblMode === "day") {
     lblBoq.forEach(b => {
@@ -107,7 +109,7 @@ function lblSimpleHtml(l) {
 }
 
 function lblNameHtml(l) {
-  return `<div class="lbl lbl-salad lbl-nameonly${l.p.name_en.length > 14 ? " lbl-long" : ""}"><img src="assets/logo.png" alt=""><b>${escHtml(l.p.name_ar)}</b><b class="lbl-en">${escHtml(l.p.name_en)}</b></div>`;
+  return `<div class="lbl lbl-salad lbl-nameonly${l.p.name_en.length > 14 ? " lbl-long" : ""}"><img src="assets/logo.png" alt=""><b>${escHtml(l.p.name_ar)}</b><b class="lbl-en">${escHtml(l.p.name_en)}</b>${l.price ? `<b class="lbl-price">${lblNum(l.price)} ريال · SAR</b>` : ""}</div>`;
 }
 
 function lblHtml(l, date) {
