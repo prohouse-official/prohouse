@@ -4000,3 +4000,7 @@ input[type=date]{min-height:36px}
 .bs-bar{ flex:1; height:7px; background:#e6e6e6; }
 .bs-bar i{ display:block; height:100%; background:#161616; }
 .bs-ft{ display:flex; justify-content:space-between; font-size:10px; color:#777; border-top:1px solid #d9d9d9; margin:0 28px; padding:6px 0 10px; }
+
+body.lang-am, body.lang-am button, body.lang-am input, body.lang-am select, body.lang-am textarea {
+  font-family: "Noto Sans Ethiopic", "Tajawal", "Segoe UI", sans-serif;
+}
