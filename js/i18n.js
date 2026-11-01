@@ -1,7 +1,8 @@
-// ==================== لغات الموقع: عربي / English / বাংলা / Soomaali ====================
+// ==================== لغات الموقع: عربي / English / বাংলা / አማርኛ ====================
 // الموقع مكتوب بالعربي. إذا الموظف اختار لغة تانية، هالملف بيترجم النصوص وهي عم تنعرض
 // (من القاموس js/i18n-dict.js) وبيقلب اتجاه الصفحة لليسار. العربي ما بيتغيّر فيه شي.
-const PH_LANGS = { ar: "العربية", en: "English", bn: "বাংলা", so: "Soomaali" };
+// الصومالي انشال (حبيبة إثيوبية): القاموس js/i18n-so.js موجود بس مو مفعّل. الأمهرية: بتنعرض وجنبها الإنجليزي
+const PH_LANGS = { ar: "العربية", en: "English", bn: "বাংলা", am: "አማርኛ" };
 const PhLang = (() => {
   let l = "ar";
   try { l = localStorage.getItem("ph_lang") || "ar"; } catch (e) { /* بلا تخزين */ }
@@ -12,7 +13,7 @@ const PhLang = (() => {
 function phLocale() {
   if (PhLang === "en") return "en-GB";
   if (PhLang === "bn") return "bn-BD-u-nu-latn";
-  if (PhLang === "so") return "so-SO";
+  if (PhLang === "am") return "en-GB";
   return "ar-SA-u-ca-gregory";
 }
 
@@ -32,9 +33,13 @@ if (PhLang !== "ar") {
   document.documentElement.lang = PhLang;
   document.documentElement.dir = "ltr";
   // القاموس بينحمّل بس لما تكون اللغة مش عربي
-  document.write('<script src="js/i18n-dict.js?v=6.4.67"><\/script>');
+  document.write('<script src="js/i18n-dict.js?v=6.4.69"><\/script>');
   // الصومالي: قاموس خاص، والناقص منه بيطلع بالإنجليزي
-  if (PhLang === "so") document.write('<script src="js/i18n-so.js?v=6.4.67"><\/script>');
+  if (PhLang === "so") document.write('<script src="js/i18n-so.js?v=6.4.69"><\/script>');
+  if (PhLang === "am") {
+    document.write('<script src="js/i18n-am.js?v=6.4.69"><\/script>');
+    document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700;800&display=swap">');
+  }
   if (PhLang === "bn") document.write('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap">');
 }
 
@@ -52,9 +57,13 @@ if (PhLang !== "ar") {
     exact = new Map(); phraseMap = new Map();
     const keys = [];
     const so = PhLang === "so" && typeof PH_I18N_SO !== "undefined" ? PH_I18N_SO : null;
-    const all = so ? { ...PH_I18N_DICT, ...Object.fromEntries(Object.keys(so).map(k => [k, null])) } : PH_I18N_DICT;
+    const am = PhLang === "am" && typeof PH_I18N_AM !== "undefined" ? PH_I18N_AM : null;
+    const all = so ? { ...PH_I18N_DICT, ...Object.fromEntries(Object.keys(so).map(k => [k, null])) }
+      : am ? { ...PH_I18N_DICT, ...Object.fromEntries(Object.keys(am).map(k => [k, null])) } : PH_I18N_DICT;
     for (const [ar, tr] of Object.entries(all)) {
-      const k = norm(ar), v = (so && so[ar]) || (tr && tr[idx]);
+      // الأمهرية: النص الأمهري وجنبه الإنجليزي. غير موجود بالقاموس الأمهري = إنجليزي بس
+      const amv = am && am[ar] ? (am[ar][1] ? am[ar][0] + " · " + am[ar][1] : am[ar][0]) : "";
+      const k = norm(ar), v = amv || (so && so[ar]) || (tr && tr[idx]);
       if (!v) continue;
       exact.set(k, v);
       // كلمات صغيرة (في، من، لا…) معناها بيتغيّر حسب الجملة — بتنترجم بس لما تكون النص كله
