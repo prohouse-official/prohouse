@@ -1355,7 +1355,8 @@ async function loadAljReports(date) {
   }
 }
 
-function renderAljDay(date, files, summary) {
+function renderAljDay(date, allFiles, summary) {
+  const files = (allFiles || []).filter(f => !/\(الأصلي\)/.test(f.name)); // نسخ الأصل المحفوظة ما بتنعرض ولا بتنرسل
   const view = document.getElementById("aljReportView");
   const label = new Date(date + "T12:00:00Z").toLocaleDateString(phLocale(), { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
   const wd = new Date(date + "T12:00:00Z").getUTCDay();
@@ -1372,11 +1373,33 @@ function renderAljDay(date, files, summary) {
     <b>${escHtml(label)}</b>
     <div class="alj-files">${sorted.map(f => `<button type="button" class="alj-file" data-path="${escHtml(f.path)}">
       ${/\.pdf$/i.test(f.name) ? "📄" : "📊"} <span>${escHtml(f.name)}</span><small>تنزيل</small></button>`).join("")}</div>
+    ${Auth.isOwner() ? `<div class="alj-replace"><button type="button" class="alj-share" id="aljReplaceBtn">♻️ استبدال ملف بنسخة معدّلة (المالك)</button><input type="file" id="aljReplaceInp" accept="application/pdf,.pdf,.xlsx" hidden></div>` : ""}
     <button type="button" class="alj-share" id="aljShareBoth">📤 أرسل الملفين (إيميل / واتساب)</button>
     ${aljSummaryHtml(summary)}
   </div>`;
   view.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => saveAljFiles([files.find(f => f.path === b.dataset.path)], b)));
   document.getElementById("aljShareBoth").addEventListener("click", (e) => shareAljFiles(sorted, e.currentTarget));
+  const rb = document.getElementById("aljReplaceBtn"), ri = document.getElementById("aljReplaceInp");
+  if (rb && ri) {
+    rb.addEventListener("click", () => ri.click());
+    ri.addEventListener("change", async () => {
+      const f = ri.files && ri.files[0]; ri.value = "";
+      if (!f) return;
+      const target = sorted.find(x => /\.pdf$/i.test(x.name) === /\.pdf$/i.test(f.name)) || null;
+      if (!target) { showToast("ما لقيت ملف من نفس النوع بهاليوم"); return; }
+      if (!confirm(`استبدال «${target.name}» بالملف «${f.name}»؟\nنسخة الأصل بتنحفظ بجنبه.`)) return;
+      rb.disabled = true;
+      try {
+        const buf = new Uint8Array(await f.arrayBuffer());
+        let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+        await SupaEngine.aljReports({ action: "replace", path: target.path, b64: btoa(bin) });
+        aljMonthCache.clear();
+        showToast("انستبدل الملف ✓");
+        loadAljReports(date);
+      } catch (e) { showToast(e.message || String(e)); }
+      finally { rb.disabled = false; }
+    });
+  }
 }
 
 // لمحة عن اليوم: أرقام الملخص (PDF) + هل مجاميع الإكسل مطابقة له
