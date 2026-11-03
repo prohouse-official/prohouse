@@ -13,7 +13,12 @@ const SUPA_URL = String(config.supabaseUrl || "https://sadtinfdwucwrxlmwxov.supa
 const ANON = config.supabaseAnonKey || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNhZHRpbmZkd3Vjd3J4bG13eG92Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NTM4MDgsImV4cCI6MjEwNTEyOTgwOH0.jMtjOIBQIuv0N0Q4ms9LJ5ys3h3lfakND4pVQXNbU2w";
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
-const riyadhToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(new Date());
+// تشغيل GitHub المجدول أحياناً بيتأخر لبعد منتصف الليل بتوقيت الرياض — لو الساعة قبل ٨ الصبح نسحب يوم أمس مو اليوم
+const riyadhToday = () => {
+  const now = new Date();
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", hour12: false }).format(now));
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Riyadh" }).format(hour < 8 ? new Date(now.getTime() - 86400000) : now);
+};
 function dateList(start, end) {
   const out = [];
   for (let t = Date.parse(start + "T00:00:00Z"); t <= Date.parse(end + "T00:00:00Z"); t += 86400000) out.push(new Date(t).toISOString().slice(0, 10));
