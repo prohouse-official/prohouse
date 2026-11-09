@@ -1064,6 +1064,17 @@ const SupaEngine = (() => {
   async function getKitchenChecks(date) {
     return (await query(`kitchen_task_checks?select=*&date=eq.${date}`)) || [];
   }
+  // أوزان الدجاج واللحم (قبل/بعد الذوبان، بعد التقطيع) لكل يوم
+  async function getKitchenWeights(date) {
+    return (await query(`kitchen_weights?select=*&date=eq.${date}`)) || [];
+  }
+  async function saveKitchenWeights(rows) {
+    await query("kitchen_weights?on_conflict=date,item", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(rows)
+    });
+  }
   async function saveKitchenChecks(row) {
     await query("kitchen_task_checks?on_conflict=date,emp", {
       method: "POST",
@@ -1214,6 +1225,8 @@ const SupaEngine = (() => {
     getSaladChecks,
     getKitchenChecks,
     saveKitchenChecks,
+    getKitchenWeights,
+    saveKitchenWeights,
     getTakrarBoq,
     getTakrarProducts,
     getCostRecipes,
