@@ -85,12 +85,31 @@ const INSPECTION_STAGES = [
   { id: "closing", name: "الجولة 3: الإغلاق واقتناع الفرع", time: "04:30 م", icon: "🔒", targetHour: 16, targetMin: 30 }
 ];
 
+// جولات خاصة بفرع (غير الثلاث الافتراضية). نفس المعرّفات (morning/closing) عشان الصور القديمة تضل بمكانها
+const BRANCH_INSPECTION_STAGES = {
+  "الروضة": [
+    { id: "morning", name: "الجولة 1: الافتتاح", time: "12:00 م", icon: "🌅", targetHour: 12, targetMin: 0 },
+    { id: "closing", name: "الجولة 2: قبل الإغلاق", time: "11:00 م", icon: "🔒", targetHour: 23, targetMin: 0 }
+  ]
+};
+function inspectionStagesFor(branch) { return (branch && BRANCH_INSPECTION_STAGES[branch]) || INSPECTION_STAGES; }
+
 let currentInspectionStage = "morning";
 
 // اختيار المرحلة التلقائي الذكي بناء على الوقت الحالي
-function getAutoInspectionStage() {
+function getAutoInspectionStage(branch) {
   const now = new Date();
   const mins = now.getHours() * 60 + now.getMinutes();
+  const custom = branch && BRANCH_INSPECTION_STAGES[branch];
+  if (custom) {
+    // الجولة اللي وقتها أقرب: نبدّل للجولة التالية بنص المسافة بين الموعدين
+    let id = custom[0].id;
+    for (let i = 1; i < custom.length; i++) {
+      const a = custom[i - 1].targetHour * 60 + custom[i - 1].targetMin, b = custom[i].targetHour * 60 + custom[i].targetMin;
+      if (mins >= (a + b) / 2) id = custom[i].id;
+    }
+    return id;
+  }
   if (mins < 11 * 60) return "morning";        // قبل 11:00 صباحاً -> الافتتاح
   if (mins < 15 * 60 + 30) return "lunch";     // بين 11:00 و 3:30 عصراً -> الغداء
   return "closing";                            // بعد 3:30 عصراً -> الإغلاق
@@ -108,7 +127,9 @@ async function renderOpeningView() {
   const isPast = date !== todayStr();
   const dateInput = document.getElementById("openingDateInput");
   if (dateInput && dateInput.value !== date) dateInput.value = date;
-  const activeStage = INSPECTION_STAGES.find(s => s.id === currentInspectionStage) || INSPECTION_STAGES[0];
+  const stages = inspectionStagesFor(branch);
+  if (!stages.some(st => st.id === currentInspectionStage)) currentInspectionStage = getAutoInspectionStage(branch);
+  const activeStage = stages.find(s => s.id === currentInspectionStage) || stages[0];
   const sessionId = "INSP-" + branch.replace(/\s+/g, "_") + "-" + date.replace(/-/g, "") + "-" + activeStage.id.toUpperCase();
 
   // كل صور اليوم بطلب واحد، وبعدين منفرزها حسب الجولة
@@ -134,7 +155,7 @@ async function renderOpeningView() {
     <div class="opening-panel">
       <div class="opening-header">
         <div>
-          <h2>📷 التوثيق البصري والمراقبة الميدانية (3 مراحل يومياً)</h2>
+          <h2>📷 التوثيق البصري والمراقبة الميدانية (${stages.length} ${stages.length === 2 ? "جولتين" : "جولات"} يومياً)</h2>
           <div class="sub-text">فرع: <strong>${branch}</strong> | التاريخ: <strong>${date}</strong></div>
         </div>
         <div class="branch-selector-wrap" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -152,7 +173,7 @@ async function renderOpeningView() {
 
       <!-- تبويبات المراحل الثلاث للتوثيق -->
       <div class="stage-nav-tabs">
-        ${INSPECTION_STAGES.map(stg => {
+        ${stages.map(stg => {
           const isAct = stg.id === currentInspectionStage;
           const count = stageStats[stg.id] || 0;
           const isDone = count >= checkpoints.length && checkpoints.length > 0;

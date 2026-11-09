@@ -665,7 +665,7 @@ function inspectionCardHtml(p) {
 function inspectionRoundsHtml(photos, branch) {
   const cps = getCheckpointsForBranch(branch);
   const order = new Map(cps.map((cp, i) => [cp.id, i]));
-  const stages = (typeof INSPECTION_STAGES !== "undefined" ? INSPECTION_STAGES : []).concat([{ id: "other", name: "صور بدون جولة", icon: "📷" }]);
+  const stages = (typeof inspectionStagesFor === "function" ? inspectionStagesFor(branch) : typeof INSPECTION_STAGES !== "undefined" ? INSPECTION_STAGES : []).concat([{ id: "other", name: "صور بدون جولة", icon: "📷" }]);
   const rounds = stages.map(st => {
     const list = photos.filter(p => photoRoundId(p) === st.id)
       .sort((a, b) => (order.get(a.checkpointId) ?? 99) - (order.get(b.checkpointId) ?? 99) || new Date(a.timestamp) - new Date(b.timestamp));

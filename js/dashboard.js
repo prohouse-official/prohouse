@@ -140,8 +140,9 @@ async function loadBranchStatus(branch, dash) {
       const prefix = "INSP-" + branch.replace(/\s+/g, "_") + "-" + today.replace(/-/g, "") + "-";
       const doneIn = (stg) => cps.filter(cp => (dayPhotos || []).some(p => p.sessionId === prefix + stg.id.toUpperCase() && p.checkpointId === cp.id)).length;
       // يوم فات: كل الجولات جا وقتها
-      const autoIdx = today < todayStr() ? INSPECTION_STAGES.length - 1 : Math.max(0, INSPECTION_STAGES.findIndex(st => st.id === getAutoInspectionStage()));
-      const due = INSPECTION_STAGES.slice(0, autoIdx + 1).map((st, i) => ({ n: i + 1, done: doneIn(st), total: cps.length }));
+      const STG = typeof inspectionStagesFor === "function" ? inspectionStagesFor(branch) : INSPECTION_STAGES;
+      const autoIdx = today < todayStr() ? STG.length - 1 : Math.max(0, STG.findIndex(st => st.id === getAutoInspectionStage(branch)));
+      const due = STG.slice(0, autoIdx + 1).map((st, i) => ({ n: i + 1, done: doneIn(st), total: cps.length }));
       // الجولة اللي جا وقتها الحين (حسب الساعة)، ونذكر إذا جولة قبلها ناقصة
       const cur = due[due.length - 1];
       const missed = due.slice(0, -1).filter(r => r.total > 0 && r.done < r.total).map(r => r.n);
