@@ -3,6 +3,8 @@
 const TAB_ROLE_ACCESS = {
   dashboard: ["owner", "manager", "chef", "branch_staff", "employee", "accountant", "kitchen"],
   // تجهيز السلطات: المطبخ يعبّي، الفرع يأكد الاستلام
+  // مهام المطبخ اليومية (رحيم، ارمان، بوبي، عبدالرحمن): الشيف والمالك يتابعوها
+  ktasks: ["owner", "chef", "kitchen"],
   salads: ["owner", "manager", "chef", "kitchen", "branch_staff", "employee", "accountant"],
   attendance: ["owner", "manager", "chef", "kitchen", "branch_staff", "employee", "accountant"],
   // تسجيل الإنتاج بالمطبخ المركزي ومطابقته مع طلبية الفروع
@@ -90,7 +92,7 @@ function setActiveTab(tab) {
 
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
 
-  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "saladsView", "attendanceView", "productionView", "leftoversView", "labelsView", "costingView", "itemnotesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
+  const views = ["dashboardView", "helpView", "assistantView", "branchesView", "openingView", "closingView", "inspectionView", "receivingView", "remainingView", "custodyView", "purchasesView", "inventoryView", "tomorrowView", "juicesView", "saladsView", "ktasksView", "attendanceView", "productionView", "leftoversView", "labelsView", "costingView", "itemnotesView", "checklistView", "wasteView", "reportContainer", "itemsView", "usersView", "auditView", "settingsView"];
   views.forEach(vId => {
     const el = document.getElementById(vId);
     if (el) el.classList.add("hidden");
@@ -156,6 +158,7 @@ function setActiveTab(tab) {
   if (tab === "purchases") { loadPurchases(); }
   if (tab === "inventory") { loadInventory(); }
   if (tab === "salads") { loadSaladsView(); }
+  if (tab === "ktasks") { loadKitchenTasksView(); }
   if (tab === "attendance") { loadAttendanceView(); }
   if (tab === "production") { loadProductionView(); }
   if (tab === "leftovers") { loadLeftoversView(); }
