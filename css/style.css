@@ -4009,3 +4009,25 @@ body.lang-am, body.lang-am button, body.lang-am input, body.lang-am select, body
 
 .alj-sum-adj{ margin-top:8px; padding:8px 10px; border-radius:10px; background:#fff8d6; color:#7a5d00; font-size:13px; line-height:1.7; }
 .alj-replace{ margin-top:8px; }
+
+/* مهام المطبخ اليومية */
+.kt-cards{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+.kt-card{ text-align:start; border:2px solid #ddd; background:#fff; border-radius:14px; padding:10px; display:flex; flex-direction:column; gap:4px; font-family:inherit; }
+.kt-card.on{ border-color:#151515; background:#FFF8CC; }
+.kt-card small{ color:#666; }
+.kt-bar{ height:8px; background:#eee; border-radius:99px; overflow:hidden; }
+.kt-bar i{ display:block; height:100%; background:#2e8b57; }
+.kt-n{ font-weight:700; font-size:13px; }
+.kt-bn{ font-family:"Noto Sans Bengali","Tajawal",sans-serif; }
+.kt-head{ display:flex; flex-direction:column; gap:2px; margin-bottom:8px; font-size:16px; }
+.kt-row{ display:flex; gap:10px; align-items:flex-start; padding:10px 4px; border-bottom:1px solid #e6e6e6; }
+.kt-row[data-kttask]{ cursor:pointer; }
+.kt-chk{ flex:0 0 34px; height:34px; border:3px solid #151515; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; }
+.kt-row.done .kt-chk{ background:#2e8b57; border-color:#2e8b57; color:#fff; }
+.kt-row.done .kt-txt{ opacity:.55; }
+.kt-body{ flex:1; display:flex; flex-direction:column; gap:3px; }
+.kt-time{ font-weight:700; background:#FFF3B0; border-radius:6px; padding:1px 8px; align-self:flex-start; font-size:14px; }
+.kt-txt{ font-size:16px; font-weight:700; line-height:1.6; }
+.kt-by{ color:#2e8b57; }
+.kt-salad{ margin-top:10px; } .kt-salad summary{ font-weight:700; cursor:pointer; }
+.kt-sal-cat{ margin:8px 0; } .kt-sal-cat b{ display:block; background:#151515; color:#F7DD3E; padding:2px 8px; border-radius:4px; font-size:13px; }

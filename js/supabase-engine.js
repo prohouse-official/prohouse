@@ -1060,6 +1060,17 @@ const SupaEngine = (() => {
     const r = (await query(`takrar_boq?select=items&date=eq.${date}`)) || [];
     return (r[0] && r[0].items) || [];
   }
+  // مهام المطبخ اليومية: صف لكل (تاريخ، موظف) فيه checks = {رقم المهمة: {t, by}}
+  async function getKitchenChecks(date) {
+    return (await query(`kitchen_task_checks?select=*&date=eq.${date}`)) || [];
+  }
+  async function saveKitchenChecks(row) {
+    await query("kitchen_task_checks?on_conflict=date,emp", {
+      method: "POST",
+      headers: { "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify(row)
+    });
+  }
   async function saveSaladCheck(row) {
     await query("salad_checks?on_conflict=date,branch", {
       method: "POST",
@@ -1201,6 +1212,8 @@ const SupaEngine = (() => {
   return {
     getSaladCheck,
     getSaladChecks,
+    getKitchenChecks,
+    saveKitchenChecks,
     getTakrarBoq,
     getTakrarProducts,
     getCostRecipes,
