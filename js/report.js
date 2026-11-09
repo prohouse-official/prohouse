@@ -1375,11 +1375,14 @@ function renderAljDay(date, allFiles, summary) {
       ${/\.pdf$/i.test(f.name) ? "📄" : "📊"} <span>${escHtml(f.name)}</span><small>تنزيل</small></button>`).join("")}</div>
     ${Auth.isOwner() ? `<div class="alj-replace"><button type="button" class="alj-share" id="aljReplaceBtn">♻️ استبدال ملف بنسخة معدّلة (المالك)</button><input type="file" id="aljReplaceInp" accept="application/pdf,.pdf,.xlsx" hidden></div>` : ""}
     <button type="button" class="alj-share" id="aljShareBoth">📤 أرسل الملفين (إيميل / واتساب)</button>
+    <button type="button" class="alj-share" id="aljMonthZip">📦 حمّل كل تقارير الشهر (ملف واحد zip)</button>
     ${aljSummaryHtml(summary)}
   </div>`;
   view.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => saveAljFiles([files.find(f => f.path === b.dataset.path)], b)));
   document.getElementById("aljShareBoth").addEventListener("click", (e) => shareAljFiles(sorted, e.currentTarget));
   aljPreload(sorted);
+  const zb = document.getElementById("aljMonthZip");
+  if (zb) zb.addEventListener("click", () => aljMonthZip(date.slice(0, 7), zb));
   const rb = document.getElementById("aljReplaceBtn"), ri = document.getElementById("aljReplaceInp");
   if (rb && ri) {
     rb.addEventListener("click", () => ri.click());
@@ -1468,6 +1471,60 @@ function aljPreload(files) {
   const entry = { list: null, err: null };
   aljBlobCache.set(k, entry);
   aljFileBlobs(files).then(l => { entry.list = l; }).catch(e => { entry.err = e; aljBlobCache.delete(k); });
+}
+
+// ---- zip بسيط (بدون ضغط) بالمتصفح: كل ملفات الشهر (PDF + إكسل) بملف واحد ----
+const ALJ_CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const aljCrc32 = (u8) => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = ALJ_CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function aljMakeZip(entries) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  let offset = 0;
+  const now = new Date(), dosT = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1), dosD = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  for (const { name, data } of entries) {
+    const nm = enc.encode(name), crc = aljCrc32(data), sz = data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, dosT, true); lh.setUint16(12, dosD, true); lh.setUint32(14, crc, true); lh.setUint32(18, sz, true); lh.setUint32(22, sz, true); lh.setUint16(26, nm.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), nm, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, dosT, true); ch.setUint16(14, dosD, true); ch.setUint32(16, crc, true); ch.setUint32(20, sz, true); ch.setUint32(24, sz, true); ch.setUint16(28, nm.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), nm);
+    offset += 30 + nm.length + sz;
+  }
+  const cdSize = central.reduce((a, x) => a + x.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true); end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: "application/zip" });
+}
+async function aljMonthZip(month, btn) {
+  aljBusy(btn, true, "⏳ جاري تجميع ملفات الشهر…");
+  try {
+    const days = (await aljMonthDays(month)).filter(d => d.files && d.files.length);
+    const entries = [];
+    for (const d of days) {
+      for (const f of d.files) {
+        if (!/\.(pdf|xlsx)$/i.test(f.name) || /\((original|الأصلي)\)/.test(f.name)) continue;
+        const { url } = await SupaEngine.aljReports({ action: "url", path: f.path });
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("ما قدرنا ننزّل " + f.name);
+        entries.push({ name: d.date + "/" + f.name, data: new Uint8Array(await res.arrayBuffer()) });
+      }
+    }
+    if (!entries.length) { showToast("ما في ملفات لهالشهر"); return; }
+    const zip = aljMakeZip(entries);
+    const fname = "ALJ-reports-" + month + ".zip";
+    const file = new File([zip], fname, { type: "application/zip" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: fname }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; /* نكمل بالتنزيل */ }
+    }
+    const a = document.createElement("a"); a.href = URL.createObjectURL(zip); a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove();
+    showToast(`✅ ${entries.length} ملف بملف واحد`);
+  } catch (e) { showToast("⚠ " + (e.message || e)); }
+  finally { aljBusy(btn, false); }
 }
 
 async function shareAljFiles(files, btn) {
