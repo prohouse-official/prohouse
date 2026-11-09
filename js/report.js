@@ -1379,6 +1379,7 @@ function renderAljDay(date, allFiles, summary) {
   </div>`;
   view.querySelectorAll("[data-path]").forEach(b => b.addEventListener("click", () => saveAljFiles([files.find(f => f.path === b.dataset.path)], b)));
   document.getElementById("aljShareBoth").addEventListener("click", (e) => shareAljFiles(sorted, e.currentTarget));
+  aljPreload(sorted);
   const rb = document.getElementById("aljReplaceBtn"), ri = document.getElementById("aljReplaceInp");
   if (rb && ri) {
     rb.addEventListener("click", () => ri.click());
@@ -1393,7 +1394,7 @@ function renderAljDay(date, allFiles, summary) {
         const buf = new Uint8Array(await f.arrayBuffer());
         let bin = ""; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
         await SupaEngine.aljReports({ action: "replace", path: target.path, b64: btoa(bin) });
-        aljMonthCache.clear();
+        aljMonthCache.clear(); aljBlobCache.clear();
         showToast("انستبدل الملف ✓");
         loadAljReports(date);
       } catch (e) { showToast(e.message || String(e)); }
@@ -1458,10 +1459,23 @@ async function saveAljFiles(files, btn) {
 }
 
 // الملفين مع بعض بنافذة المشاركة (إيميل، واتساب…) — وإذا الجهاز ما يدعمها ينزلون
+// تحميل الملفين بالخلفية أول ما تنعرض الشاشة: iOS بيرفض المشاركة لو انتظرنا التنزيل بعد الضغطة (انتهت «لمسة المستخدم»)
+const aljBlobCache = new Map();
+function aljBlobKey(files) { return files.map(f => f.path).join("|"); }
+function aljPreload(files) {
+  const k = aljBlobKey(files);
+  if (!k || aljBlobCache.has(k)) return;
+  const entry = { list: null, err: null };
+  aljBlobCache.set(k, entry);
+  aljFileBlobs(files).then(l => { entry.list = l; }).catch(e => { entry.err = e; aljBlobCache.delete(k); });
+}
+
 async function shareAljFiles(files, btn) {
+  const cached = aljBlobCache.get(aljBlobKey(files));
+  const ready = cached && cached.list;
   aljBusy(btn, true, "⏳ جاري التجهيز…");
   try {
-    const list = await aljFileBlobs(files);
+    const list = ready ? cached.list : await aljFileBlobs(files);
     if (navigator.canShare && navigator.canShare({ files: list })) {
       // نص الإيميل لكل يوم بتاريخه (التاريخ من مسار الملف: 2026-10/2026-10-01/…)
       const iso = ((files[0] && files[0].path) || "").match(/\d{4}-\d{2}-\d{2}/);
@@ -1472,9 +1486,13 @@ async function shareAljFiles(files, btn) {
       const lines = ["تحية طيبة", `مرفق التقرير اليومي لتاريخ ${iso ? `${d}/${m}/${y}` : ""}`, "مع أطيب التحيات", "حسن."];
       const text = lines.join("\r\n");
       // ونسخة بالحافظة: لو التطبيق لزّق السطور، بيمسح النص وبيلصق
-      try { if (navigator.clipboard) await navigator.clipboard.writeText(lines.join("\n")); } catch (e) { /* بدونها */ }
+      // بدون await: لازم المشاركة تنادى مباشرة من الضغطة
+      try { if (navigator.clipboard) navigator.clipboard.writeText(lines.join("\n")).catch(() => {}); } catch (e) { /* بدونها */ }
       try { await navigator.share({ files: list, title: subject, text }); }
-      catch (e) { if (!e || e.name !== "AbortError") throw e; }
+      catch (e) {
+        if (e && e.name === "NotAllowedError" && !ready) { aljBlobCache.set(aljBlobKey(files), { list, err: null }); showToast("الملفين جاهزين — اضغط الزر مرة ثانية"); }
+        else if (!e || e.name !== "AbortError") throw e;
+      }
     } else {
       for (const file of list) {
         const url = URL.createObjectURL(file);
