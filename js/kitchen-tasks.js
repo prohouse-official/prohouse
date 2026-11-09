@@ -337,6 +337,7 @@ let ktDate = ktShiftDate();
 let ktEmp = "";
 let ktRows = {};      // emp → {checks, updated_by, updated_at}
 let ktLoadSeq = 0;
+let ktWeights = {};   // chicken/meat → {before_thaw, after_thaw, after_cut, updated_by, updated_at}
 
 const ktCanTick = () => ["owner", "chef", "kitchen"].includes(Auth.role());
 const ktChecks = (id) => (ktRows[id] && ktRows[id].checks) || {};
@@ -350,9 +351,10 @@ async function loadKitchenTasksView() {
   const seq = ++ktLoadSeq;
   view.innerHTML = '<div class="loader">جاري التحميل…</div>';
   try {
-    const rows = (await SupaEngine.getKitchenChecks(ktDate)) || [];
+    const [rows, wts] = await Promise.all([SupaEngine.getKitchenChecks(ktDate), SupaEngine.getKitchenWeights(ktDate).catch(() => [])]);
+    ktWeights = {}; (wts || []).forEach(w => { ktWeights[w.item] = w; });
     if (seq !== ktLoadSeq) return;
-    ktRows = {}; rows.forEach(r => { ktRows[r.emp] = r; });
+    ktRows = {}; (rows || []).forEach(r => { ktRows[r.emp] = r; });
   } catch (e) {
     if (seq !== ktLoadSeq) return;
     view.innerHTML = `<div class="empty-state">⚠ تعذّر تحميل مهام المطبخ — ${escHtml(e.message || String(e))}</div>`;
@@ -377,6 +379,7 @@ function renderKitchenTasksView() {
           <div class="kt-bar"><i style="width:${pct}%"></i></div><span class="kt-n">${d} / ${n}</span></button>`;
       }).join("")}</div>
     </div>
+    ${ktWeightsHtml()}
     ${cur ? ktEmployeeHtml(cur) : `<div class="item-card"><div class="cust-hint">اختر موظف لتشوف مهامه.</div></div>`}`;
   bindKitchenTasksView();
 }
@@ -406,11 +409,54 @@ function ktEmployeeHtml(e) {
   </div>`;
 }
 
+// ---- أوزان الدجاج واللحم: قبل الذوبان، بعد الذوبان، بعد التقطيع (كجم) — يسجلها فريق التقطيع (رحيم وارمان) ----
+const KT_WITEMS = [{ id: "chicken", ar: "الدجاج", bn: "মুরগি" }, { id: "meat", ar: "اللحم", bn: "গরুর মাংস" }];
+const KT_WSTAGES = [{ k: "before_thaw", ar: "قبل الذوبان", bn: "বরফ গলার আগে" }, { k: "after_thaw", ar: "بعد الذوبان", bn: "বরফ গলার পরে" }, { k: "after_cut", ar: "بعد التقطيع", bn: "কাটার পরে" }];
+const ktPct = (a, b) => (Number(a) > 0 && Number(b) > 0) ? Math.round((Number(b) - Number(a)) / Number(a) * 1000) / 10 : null;
+function ktWeightsHtml() {
+  const can = ktCanTick();
+  return `<div class="item-card kt-w">
+    <div class="kt-head"><b>⚖️ أوزان الدجاج واللحم · <span class="kt-bn">মুরগি ও মাংসের ওজন</span></b><small>بالكيلو · <span class="kt-bn">কেজিতে</span></small></div>
+    ${KT_WITEMS.map(it => {
+      const w = ktWeights[it.id] || {};
+      const l1 = ktPct(w.before_thaw, w.after_thaw), l2 = ktPct(w.after_thaw, w.after_cut), lt = ktPct(w.before_thaw, w.after_cut);
+      return `<div class="kt-wrow"><div class="kt-wname">${it.ar} · <span class="kt-bn">${it.bn}</span></div>
+        <div class="kt-wins">${KT_WSTAGES.map(st => `<label><span>${st.ar}<br><span class="kt-bn">${st.bn}</span></span>
+          <input type="number" inputmode="decimal" step="0.01" min="0" data-ktw="${it.id}" data-kts="${st.k}" value="${w[st.k] ?? ""}" ${can ? "" : "disabled"}></label>`).join("")}</div>
+        ${(l1 !== null || l2 !== null) ? `<div class="kt-wloss">${l1 !== null ? `الذوبان: ${l1 > 0 ? "+" : ""}${l1}%` : ""}${l2 !== null ? ` · التقطيع: ${l2 > 0 ? "+" : ""}${l2}%` : ""}${lt !== null ? ` · الإجمالي: ${lt > 0 ? "+" : ""}${lt}%` : ""}</div>` : ""}
+        ${w.updated_by ? `<small class="kt-by">${escHtml(w.updated_by)} · ${ktTime(w.updated_at)}</small>` : ""}
+      </div>`;
+    }).join("")}
+    ${can ? `<button type="button" class="btn gold" id="ktWSave">💾 حفظ الأوزان · <span class="kt-bn">ওজন সেভ করুন</span></button>` : ""}
+  </div>`;
+}
+async function ktSaveWeights(btn) {
+  const who = (Auth.getEmployee() || {}).name || "";
+  const rows = KT_WITEMS.map(it => {
+    const r = { date: ktDate, item: it.id, updated_by: who, updated_at: new Date().toISOString() };
+    KT_WSTAGES.forEach(st => {
+      const el = document.querySelector(`[data-ktw="${it.id}"][data-kts="${st.k}"]`);
+      const v = el && el.value.trim() !== "" ? Number(el.value) : null;
+      r[st.k] = v !== null && isFinite(v) && v >= 0 ? v : null;
+    });
+    return r;
+  }).filter(r => KT_WSTAGES.some(st => r[st.k] !== null) || ktWeights[r.item]);
+  if (!rows.length) { showToast("اكتب وزن واحد على الأقل"); return; }
+  btn.disabled = true;
+  try {
+    await SupaEngine.saveKitchenWeights(rows);
+    rows.forEach(r => { ktWeights[r.item] = r; });
+    showToast("✅ انحفظت الأوزان");
+    renderKitchenTasksView();
+  } catch (e) { showToast("ما انحفظت الأوزان: " + (e.message || e)); btn.disabled = false; }
+}
+
 function bindKitchenTasksView() {
   const $ = (id) => document.getElementById(id);
   if ($("ktDateInput")) $("ktDateInput").addEventListener("change", (e) => { if (e.target.value) { ktDate = e.target.value; loadKitchenTasksView(); } });
   document.querySelectorAll("[data-ktemp]").forEach(b => b.addEventListener("click", () => { ktEmp = ktEmp === b.dataset.ktemp ? "" : b.dataset.ktemp; renderKitchenTasksView(); }));
   document.querySelectorAll("[data-kttask]").forEach(r => r.addEventListener("click", () => ktToggle(Number(r.dataset.kttask))));
+  if ($("ktWSave")) $("ktWSave").addEventListener("click", (e) => ktSaveWeights(e.currentTarget));
 }
 
 async function ktToggle(i) {

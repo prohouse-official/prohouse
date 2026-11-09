@@ -4031,3 +4031,11 @@ body.lang-am, body.lang-am button, body.lang-am input, body.lang-am select, body
 .kt-by{ color:#2e8b57; }
 .kt-salad{ margin-top:10px; } .kt-salad summary{ font-weight:700; cursor:pointer; }
 .kt-sal-cat{ margin:8px 0; } .kt-sal-cat b{ display:block; background:#151515; color:#F7DD3E; padding:2px 8px; border-radius:4px; font-size:13px; }
+
+/* أوزان الدجاج واللحم */
+.kt-wrow{ border-top:1px solid #e6e6e6; padding:8px 0; }
+.kt-wname{ font-weight:800; font-size:16px; margin-bottom:6px; }
+.kt-wins{ display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.kt-wins label{ display:flex; flex-direction:column; gap:3px; font-size:12px; font-weight:700; }
+.kt-wins input{ font-size:18px; font-weight:700; text-align:center; padding:8px 4px; border:2px solid #ccc; border-radius:10px; width:100%; }
+.kt-wloss{ margin-top:6px; font-weight:700; color:#8a5a00; font-size:13px; }
