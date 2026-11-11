@@ -423,6 +423,8 @@ const ADD_ITEM_BRANCH = "عبداللطيف جميل", ADD_ITEM_CAT = "فطور"
 // المالك بس بيقدر يضيف بكل الأقسام والفروع
 const canAddToCategory = (cat, branch) => (typeof Auth !== "undefined" && Auth.role && Auth.role() === "owner")
   || (String(cat || "").trim() === ADD_ITEM_CAT && String(branch || "").trim() === ADD_ITEM_BRANCH);
+// شاشة الاستلام: زر «إضافة صنف» مفتوح لكل الموظفين بكل الأقسام والفروع (بأمر المالك)
+const canAddOnReceiving = (cat, branch) => true;
 // الأقسام الأساسية (دجاج/لحم/بحري) تضل ظاهرة حتى لو كل أصنافها انشالت أو ما انطلب منها شي —
 // قبل كان القسم يختفي ويختفي معه زر «إضافة صنف»، فما يقدر الموظف يسجّل طبخات الشيف
 function ensureCoreCategories(byCat, branch) {
