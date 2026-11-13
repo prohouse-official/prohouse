@@ -160,7 +160,13 @@ const Auth = (() => {
   function canSeeAllBranches() { return role() === "owner" || role() === "chef" || isReadOnly(); }
   function canEditBranch(branch) { return canSeeAllBranches() || branches().includes(branch); }
   function isViewOnlyEntry() { return role() === "chef" || isReadOnly(); }
-  function isViewOnlyTomorrow() { return role() === "chef" || isReadOnly(); }
+  // موظفين ممنوعين من تعديل طلبية بكرة بأمر المالك (الاستلام بس) — القائمة بإعداد tomorrow_locked_employees
+  function isTomorrowLocked() {
+    const e = getEmployee(); if (!e) return false;
+    const raw = (typeof currentSettings !== "undefined" && currentSettings.tomorrow_locked_employees) || "emp_5,emp_7";
+    return raw.split(",").map(x => x.trim()).includes(e.id);
+  }
+  function isViewOnlyTomorrow() { return role() === "chef" || isReadOnly() || isTomorrowLocked(); }
   function canSeeReports() { return role() === "owner" || role() === "chef" || isReadOnly(); }
   function canSeeFinancials() { return role() === "owner" || isReadOnly(); }
   function canManageItems() { return role() === "owner"; }
@@ -177,7 +183,7 @@ const Auth = (() => {
   return {
     getToken, getEmployee, isLoggedIn, login, logout, changePin, verify, clearSessionAndReload,
     role, branches, isOwner, isBranchStaff, canSeeAllBranches, canEditBranch,
-    isViewOnlyEntry, isViewOnlyTomorrow, isReadOnly, canSeeReports, canSeeFinancials, canManageItems, canManageSettings,
+    isViewOnlyEntry, isViewOnlyTomorrow, isTomorrowLocked, isReadOnly, canSeeReports, canSeeFinancials, canManageItems, canManageSettings,
     canSeeSales
   };
 })();
