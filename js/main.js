@@ -60,6 +60,8 @@ function tabAllowed(tab) {
     const mine = (Auth.branches && Auth.branches()) || [];
     if (mine.length && mine.every(isPhotoOffBranch)) return false;
   }
+  // طلبية بكرة تنشال عن الموظف الممنوع منها (العامودي وغالب بأمر المالك) — يضل عنده الاستلام بس
+  if (tab === "tomorrow" && Auth.isTomorrowLocked && Auth.isTomorrowLocked()) return false;
   if (tab === "attendance" && role !== "owner" && typeof isAttendanceOffBranch === "function") {
     const mine = (Auth.branches && Auth.branches()) || [];
     if (mine.length && mine.every(isAttendanceOffBranch)) return false;
