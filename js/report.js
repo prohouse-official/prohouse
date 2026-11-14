@@ -797,6 +797,8 @@ async function runTomorrowReport() {
   // الاشتراكات تنطبخ قبل يوم: طلبية الأحد فيها اشتراكات الاثنين
   let boq = [];
   if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(addDaysStr(date, 1)); } catch (e) { /* بدونها */ } }
+  // بأمر المالك (14/11): طلبية الغد فيها اشتراكات التوصيل بس — الاستلام ما ينحسب
+  boq = takrarDeliveryOnly(boq);
   if (run !== tomorrowReportRun) return;
 
   // ورقة مجمعة (اختيار لحاله): الصنف، إجمالي المطلوب، وكم طالب كل فرع (+ الاشتراكات مدموجة مع أصناف الفروع)
@@ -1563,4 +1565,14 @@ async function shareAljFiles(files, btn) {
   } catch (e) {
     showToast("⚠ " + (e.message || e));
   } finally { aljBusy(btn, false); }
+}
+
+// اشتراكات تكرار: نخلي التوصيل بس (البيانات القديمة بدون تقسيم بتضل مثل ما هي)
+function takrarDeliveryOnly(boq) {
+  return (boq || []).map(r => {
+    if (r.delivery == null && r.pickup == null) return r;
+    const d = Number(r.delivery) || 0;
+    const variants = (r.variants || []).map(v => (v.delivery == null ? v : { ...v, qty: Number(v.delivery) || 0, pickup: 0 })).filter(v => Number(v.qty) > 0);
+    return { ...r, qty: d, pickup: 0, variants };
+  }).filter(r => Number(r.qty) > 0);
 }
