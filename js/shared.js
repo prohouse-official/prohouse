@@ -468,7 +468,28 @@ function chefNameDatalistHtml(category) {
   const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   return `<datalist id="${id}">${chefDishOptions(category).map(n => `<option value="${esc(n)}"></option>`).join("")}</datalist>`;
 }
-function usesChefSlots(category) { return CHEF_SLOT_CATS.includes(String(category || "").trim()); }
+// خانات الشيف انشالت مع المنيو الجديد — إذا ما ضل خانات بالقسم، «إضافة صنف» يفتح الإضافة العادية
+function usesChefSlots(category) {
+  const cat = String(category || "").trim();
+  return CHEF_SLOT_CATS.includes(cat) && chefSlotsFor(cat).length > 0;
+}
+
+// أسماء أصناف المنيو الأسبوعي المعتمد (إعداد weekly_menu) ليوم تاريخ معيّن
+const WM_DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+function weeklyMenuNamesFor(dateStr) {
+  const out = new Set();
+  try {
+    const raw = typeof currentSettings !== "undefined" && currentSettings.weekly_menu;
+    const wm = typeof raw === "string" ? JSON.parse(raw) : raw;
+    if (!wm || !dateStr) return out;
+    const day = WM_DAYS[new Date(dateStr + "T12:00:00").getDay()];
+    Object.keys(wm).forEach(k => {
+      const v = wm[k];
+      if (v && typeof v === "object" && !Array.isArray(v) && Array.isArray(v[day])) v[day].forEach(n => out.add(String(n).trim()));
+    });
+  } catch (e) { /* إعداد تالف: ما نعرض شي إضافي */ }
+  return out;
+}
 
 function chefSlotsFor(category, branch) {
   return (Items.current || [])
