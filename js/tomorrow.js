@@ -16,6 +16,7 @@ let currentTomorrowAddedIds = new Set(); // خانات الشيف/الطبخات
 
 function getAllTomorrowActiveItems() {
   const branch = currentTomorrowBranch || Branch.get();
+  const tomorrowMenuNames = weeklyMenuNamesFor(typeof currentTomorrowDate !== "undefined" ? currentTomorrowDate : "");
   const itemsMap = new Map();
 
   // 1. الأصناف الأساسية من Items.current
@@ -26,7 +27,8 @@ function getAllTomorrowActiveItems() {
     // الصنف الاختياري بيطلع بس لو انطلب فعلاً (كمية) أو إلو اسم طبخة — الصف اللي كميته فاضية (انشال من الطلبية) ما بيطلع
     const ord = currentTomorrowOrder[it.id];
     const hasEntry = ord && ((ord.qty !== "" && ord.qty != null) || ord.cookName);
-    if (isOptionalItem(it) && !currentTomorrowAddedIds.has(it.id) && !hasEntry) return;
+    // أصناف منيو هاليوم (المنيو الأسبوعي المعتمد) بتطلع دايماً حتى لو لسا ما انطلبت
+    if (isOptionalItem(it) && !currentTomorrowAddedIds.has(it.id) && !hasEntry && !tomorrowMenuNames.has(String(it.name).trim())) return;
     itemsMap.set(it.id, isChefItem(it) && ord && ord.cookName ? { ...it, name: chefSlotName(it, ord.cookName) } : { ...it });
   });
 

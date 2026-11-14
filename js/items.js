@@ -18,23 +18,7 @@ const Items = (() => {
       }
     });
 
-    const meatNames = ['لحم الشيف 1', 'لحم الشيف 2', 'لحم الشيف 3'];
-    meatNames.forEach((mName, idx) => {
-      const exists = list.some(it => it && (it.name === mName || (it.category === 'لحم' && it.sortOrder === idx + 1)));
-      if (!exists) {
-        list.push({
-          id: 'it_meat_' + (idx + 1),
-          category: 'لحم',
-          name: mName,
-          unit: '1/3',
-          hasCustomName: true,
-          branches: '',
-          active: true,
-          sortOrder: idx + 1
-        });
-        modified = true;
-      }
-    });
+    // ما عاد نضيف خانات «لحم الشيف» تلقائياً — المنيو الجديد هو المعتمد (14/11)
 
     if (modified) {
       Sync.cacheSet("items_v2", list);
