@@ -604,13 +604,17 @@ async function confirmPhotoSnap() {
 }
 
 // ---- شاشة معرض المراقبة الميدانية والـ Timeline ----
+let inspectionDate = ""; // فاضي = اليوم
+function setInspectionDate(d) { inspectionDate = d || ""; renderInspectionGalleryView(); }
 async function renderInspectionGalleryView() {
   const view = document.getElementById("inspectionView");
   if (!view) return;
 
   view.innerHTML = '<div class="loader">جاري تحميل صور المراقبة الميدانية وسجل الساعات…</div>';
   const branch = Branch.get() || allowedBranchList()[0] || "";
-  const date = todayStr();
+  const today = todayStr();
+  const date = inspectionDate || today;
+  const yest = addDaysStr(today, -1);
 
   const photos = await getAllPhotos(branch, date);
 
@@ -629,6 +633,11 @@ async function renderInspectionGalleryView() {
             ${branchOptionsHtml(branch)}
           </select>
         </div>
+      </div>
+      <div class="ph-branch-pills insp-date-pills" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 10px;">
+        <button type="button" class="${date === today ? "active" : ""}" onclick="setInspectionDate('')">اليوم</button>
+        <button type="button" class="${date === yest ? "active" : ""}" onclick="setInspectionDate('${yest}')">مبارح</button>
+        <input type="date" value="${date}" max="${today}" onchange="setInspectionDate(this.value)" style="padding:8px 10px;border-radius:12px;border:1.5px solid #ddd;font:inherit;">
       </div>
 
       ${inspectionRoundsHtml(photos, branch)}
