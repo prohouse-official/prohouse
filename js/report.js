@@ -605,6 +605,7 @@ async function exportExcel() {
 // نفس عرض الأعمدة وارتفاع الصفوف والخطوط تبع ملف الإكسل، وتطلع Excel أو PDF جاهز للطباعة وينرسل واتساب.
 
 let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
+let tomorrowReportSubSameDay = false; // اشتراكات نفس يوم الطلبية بدل اليوم اللي بعده (لما ما انجهزت قبل يوم)
 let tomorrowReportCombined = false; // ورقة مجمعة لكل الفروع (اختيار لحاله — أوراق الفروع ما تتغير)
 let lastTomorrowReportDate = "";
 let lastSaladChecks = {};   // {فرع: صف salad_checks} لصفحة السلطات
@@ -670,6 +671,12 @@ function initTomorrowReportControls() {
   document.getElementById("tomorrowReportPdfBtn").addEventListener("click", () => shareTomorrowReportPdf(false));
   const bnBtn = document.getElementById("tomorrowReportPdfBnBtn");
   if (bnBtn) bnBtn.addEventListener("click", () => shareTomorrowReportPdf(true));
+  const saveBtn = document.getElementById("tomorrowReportSaveBtn");
+  if (saveBtn) saveBtn.addEventListener("click", () => shareTomorrowReportPdf(false, "save"));
+  const printBtn = document.getElementById("tomorrowReportPrintBtn");
+  if (printBtn) printBtn.addEventListener("click", () => shareTomorrowReportPdf(false, "print"));
+  const subDayBtn = document.getElementById("tomorrowReportSubDayBtn");
+  if (subDayBtn) subDayBtn.addEventListener("click", () => { tomorrowReportSubSameDay = !tomorrowReportSubSameDay; runTomorrowReport(); });
   document.getElementById("tomorrowReportCombinedBtn").addEventListener("click", () => {
     tomorrowReportCombined = !tomorrowReportCombined;
     const sel = document.getElementById("tomorrowReportBranch");
@@ -798,7 +805,10 @@ async function runTomorrowReport() {
   // اشتراكات تكرار (تقرير BoQ): تطلع كأنها فرع (كميات تصنيع) — التوزيع بعدين على الموظف المسؤول
   // الاشتراكات تنطبخ قبل يوم: طلبية الأحد فيها اشتراكات الاثنين
   let boq = [];
-  if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(addDaysStr(date, 1)); } catch (e) { /* بدونها */ } }
+  const subDate = addDaysStr(date, tomorrowReportSubSameDay ? 0 : 1);
+  const sdBtn = document.getElementById("tomorrowReportSubDayBtn");
+  if (sdBtn) { sdBtn.textContent = `🔁 الاشتراكات: ${chefDayName(subDate)} ${subDate.slice(8)}/${subDate.slice(5, 7)} — اضغط للتبديل`; sdBtn.classList.toggle("hidden", !!branchFilter); }
+  if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(subDate); } catch (e) { /* بدونها */ } }
   // بأمر المالك (14/11): طلبية الغد فيها اشتراكات التوصيل بس — الاستلام ما ينحسب
   boq = takrarDeliveryOnly(boq);
   if (run !== tomorrowReportRun) return;
@@ -1247,10 +1257,12 @@ async function buildTomorrowReportPdf(bn = false) {
   return pdf.output("blob");
 }
 
-async function shareTomorrowReportPdf(bn = false) {
+async function shareTomorrowReportPdf(bn = false, mode = "share") {
   if (!lastTomorrowReportSheets.length) { showToast("اضغط «عرض» أول"); return; }
   if (typeof markProductionPrinted === "function" && lastTomorrowReportDate && !document.getElementById("tomorrowReportBranch").value) markProductionPrinted(lastTomorrowReportDate);
-  const btn = document.getElementById(bn ? "tomorrowReportPdfBnBtn" : "tomorrowReportPdfBtn");
+  const btn = document.getElementById(mode === "save" ? "tomorrowReportSaveBtn" : mode === "print" ? "tomorrowReportPrintBtn" : bn ? "tomorrowReportPdfBnBtn" : "tomorrowReportPdfBtn");
+  // الطباعة: نفتح نافذة قبل التجهيز (المتصفح بيمنع النوافذ اللي بتنفتح بعد انتظار)
+  const printWin = mode === "print" ? window.open("", "_blank") : null;
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = "⏳ جاري تجهيز PDF…";
   try {
@@ -1258,8 +1270,14 @@ async function shareTomorrowReportPdf(bn = false) {
     const suffix = (lastTomorrowReportSheets.length === 1 ? "_" + lastTomorrowReportSheets[0].branch : "") + (bn ? "_bn" : "");
     const name = `طلبية_${chefDayName(lastTomorrowReportDate)}_${lastTomorrowReportDate}${suffix}.pdf`.replace(/\s+/g, "_");
     const file = new File([blob], name, { type: "application/pdf" });
-    // بالجوال: نافذة المشاركة (واتساب ← الشيف). بالكمبيوتر: ينزل الملف
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (mode === "print") {
+      const purl = URL.createObjectURL(blob);
+      if (printWin) printWin.location.href = purl; else window.open(purl, "_blank");
+      setTimeout(() => URL.revokeObjectURL(purl), 120000);
+      return;
+    }
+    // بالجوال: نافذة المشاركة (واتساب ← الشيف). بالكمبيوتر أو زر «حفظ»: ينزل الملف
+    if (mode !== "save" && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: "طلبية الغد", text: `طلبية ${chefDayName(lastTomorrowReportDate)} ${chefDateText(lastTomorrowReportDate)}` });
         return;
@@ -1271,6 +1289,7 @@ async function shareTomorrowReportPdf(bn = false) {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     showToast("✅ نزل الـ PDF — أرسله للشيف بالواتساب");
   } catch (e) {
+    if (printWin) printWin.close();
     showToast("⚠ " + (e.message || e));
   } finally { btn.disabled = false; btn.textContent = label; }
 }
