@@ -605,6 +605,7 @@ async function exportExcel() {
 // نفس عرض الأعمدة وارتفاع الصفوف والخطوط تبع ملف الإكسل، وتطلع Excel أو PDF جاهز للطباعة وينرسل واتساب.
 
 let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
+let tomorrowReportSubSameDay = false; // اشتراكات نفس يوم الطلبية بدل اليوم اللي بعده (لما ما انجهزت قبل يوم)
 let tomorrowReportCombined = false; // ورقة مجمعة لكل الفروع (اختيار لحاله — أوراق الفروع ما تتغير)
 let lastTomorrowReportDate = "";
 let lastSaladChecks = {};   // {فرع: صف salad_checks} لصفحة السلطات
@@ -674,6 +675,8 @@ function initTomorrowReportControls() {
   if (saveBtn) saveBtn.addEventListener("click", () => shareTomorrowReportPdf(false, "save"));
   const printBtn = document.getElementById("tomorrowReportPrintBtn");
   if (printBtn) printBtn.addEventListener("click", () => shareTomorrowReportPdf(false, "print"));
+  const subDayBtn = document.getElementById("tomorrowReportSubDayBtn");
+  if (subDayBtn) subDayBtn.addEventListener("click", () => { tomorrowReportSubSameDay = !tomorrowReportSubSameDay; runTomorrowReport(); });
   document.getElementById("tomorrowReportCombinedBtn").addEventListener("click", () => {
     tomorrowReportCombined = !tomorrowReportCombined;
     const sel = document.getElementById("tomorrowReportBranch");
@@ -802,7 +805,10 @@ async function runTomorrowReport() {
   // اشتراكات تكرار (تقرير BoQ): تطلع كأنها فرع (كميات تصنيع) — التوزيع بعدين على الموظف المسؤول
   // الاشتراكات تنطبخ قبل يوم: طلبية الأحد فيها اشتراكات الاثنين
   let boq = [];
-  if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(addDaysStr(date, 1)); } catch (e) { /* بدونها */ } }
+  const subDate = addDaysStr(date, tomorrowReportSubSameDay ? 0 : 1);
+  const sdBtn = document.getElementById("tomorrowReportSubDayBtn");
+  if (sdBtn) { sdBtn.textContent = `🔁 الاشتراكات: ${chefDayName(subDate)} ${subDate.slice(8)}/${subDate.slice(5, 7)} — اضغط للتبديل`; sdBtn.classList.toggle("hidden", !!branchFilter); }
+  if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(subDate); } catch (e) { /* بدونها */ } }
   // بأمر المالك (14/11): طلبية الغد فيها اشتراكات التوصيل بس — الاستلام ما ينحسب
   boq = takrarDeliveryOnly(boq);
   if (run !== tomorrowReportRun) return;
