@@ -667,7 +667,9 @@ function initTomorrowReportControls() {
   document.getElementById("tomorrowReportDate").value = addDaysStr(todayStr(), 1);
   document.getElementById("tomorrowReportGoBtn").addEventListener("click", runTomorrowReport);
   document.getElementById("tomorrowReportExportBtn").addEventListener("click", exportTomorrowReportExcel);
-  document.getElementById("tomorrowReportPdfBtn").addEventListener("click", shareTomorrowReportPdf);
+  document.getElementById("tomorrowReportPdfBtn").addEventListener("click", () => shareTomorrowReportPdf(false));
+  const bnBtn = document.getElementById("tomorrowReportPdfBnBtn");
+  if (bnBtn) bnBtn.addEventListener("click", () => shareTomorrowReportPdf(true));
   document.getElementById("tomorrowReportCombinedBtn").addEventListener("click", () => {
     tomorrowReportCombined = !tomorrowReportCombined;
     const sel = document.getElementById("tomorrowReportBranch");
@@ -1159,7 +1161,45 @@ function loadPdfLibs() {
   ]);
 }
 
-async function buildTomorrowReportPdf() {
+// ترجمة ورقة الطلبية للبنقالي (لفريق المطبخ) — بتشتغل حتى لو لغة التطبيق عربي
+let chefBnTr = null;
+async function loadChefBnTranslator() {
+  if (chefBnTr) return chefBnTr;
+  if (typeof PH_I18N_DICT === "undefined") {
+    await new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "js/i18n-dict.js?v=" + (window.PH_VERSION || Date.now()); sc.onload = res; sc.onerror = () => rej(new Error("القاموس ما تحمّل — تأكد من النت")); document.head.appendChild(sc); });
+  }
+  if (!document.getElementById("phBnFont")) {
+    const l = document.createElement("link"); l.id = "phBnFont"; l.rel = "stylesheet";
+    l.href = "https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;600;700;800&display=swap";
+    document.head.appendChild(l);
+  }
+  try { await document.fonts.load('700 16px "Noto Sans Bengali"', "ক"); } catch (e) { /* بالخط الافتراضي */ }
+  const norm = (x) => String(x).replace(/\s+/g, " ").trim();
+  const map = new Map();
+  Object.entries(PH_I18N_DICT).forEach(([k, v]) => { if (v && v[1]) map.set(norm(k), v[1]); });
+  const keys = [...map.keys()].filter(k => k.length > 2).sort((a, b) => b.length - a.length);
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const L = "\\u0621-\\u064A";
+  const re = new RegExp(`(^|[^${L}])(${keys.map(esc).join("|")})(?=[^${L}]|$)`, "g");
+  chefBnTr = (t) => {
+    t = t.replace(/(\d)\s*جم(?![\u0600-\u06FF])/g, "$1 গ্রাম");
+    if (!/[\u0600-\u06FF]/.test(t)) return t;
+    const core = norm(t);
+    const hit = map.get(core) || map.get(core.replace(/\s*…+\s*$/, ""));
+    if (hit) return hit;
+    return t.replace(re, (m, pre, key) => pre + (map.get(key) || key)).replace(/،\s*/g, ", ");
+  };
+  return chefBnTr;
+}
+function translateChefSheetBn(root, tr) {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = []; while (w.nextNode()) nodes.push(w.currentNode);
+  nodes.forEach(n => { const v = tr(n.nodeValue); if (v !== n.nodeValue) n.nodeValue = v; });
+  root.style.fontFamily = '"Noto Sans Bengali", ' + (getComputedStyle(root).fontFamily || "sans-serif");
+}
+
+async function buildTomorrowReportPdf(bn = false) {
+  const bnTr = bn ? await loadChefBnTranslator() : null;
   await loadPdfLibs();
   if (!window.html2canvas || !window.jspdf) throw new Error("مكتبة PDF ما تحمّلت — تأكد من النت");
   const { jsPDF } = window.jspdf;
@@ -1180,6 +1220,7 @@ async function buildTomorrowReportPdf() {
     for (let i = 0; i < lastTomorrowReportSheets.length; i++) {
       stage.innerHTML = chefSheetHtml(lastTomorrowReportSheets[i], lastTomorrowReportDate);
       const el = stage.firstElementChild;
+      if (bnTr) translateChefSheetBn(el, bnTr);
       fitChefCells(el);
       const canvas = await html2canvas(el, { scale: 1.5, backgroundColor: "#ffffff", logging: false });
       const img = canvas.toDataURL("image/jpeg", 0.92);
@@ -1206,15 +1247,15 @@ async function buildTomorrowReportPdf() {
   return pdf.output("blob");
 }
 
-async function shareTomorrowReportPdf() {
+async function shareTomorrowReportPdf(bn = false) {
   if (!lastTomorrowReportSheets.length) { showToast("اضغط «عرض» أول"); return; }
   if (typeof markProductionPrinted === "function" && lastTomorrowReportDate && !document.getElementById("tomorrowReportBranch").value) markProductionPrinted(lastTomorrowReportDate);
-  const btn = document.getElementById("tomorrowReportPdfBtn");
+  const btn = document.getElementById(bn ? "tomorrowReportPdfBnBtn" : "tomorrowReportPdfBtn");
   const label = btn.textContent;
   btn.disabled = true; btn.textContent = "⏳ جاري تجهيز PDF…";
   try {
-    const blob = await buildTomorrowReportPdf();
-    const suffix = lastTomorrowReportSheets.length === 1 ? "_" + lastTomorrowReportSheets[0].branch : "";
+    const blob = await buildTomorrowReportPdf(bn);
+    const suffix = (lastTomorrowReportSheets.length === 1 ? "_" + lastTomorrowReportSheets[0].branch : "") + (bn ? "_bn" : "");
     const name = `طلبية_${chefDayName(lastTomorrowReportDate)}_${lastTomorrowReportDate}${suffix}.pdf`.replace(/\s+/g, "_");
     const file = new File([blob], name, { type: "application/pdf" });
     // بالجوال: نافذة المشاركة (واتساب ← الشيف). بالكمبيوتر: ينزل الملف
