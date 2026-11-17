@@ -252,7 +252,52 @@ async function boqProbe() {
   }
 }
 
+// طلبات الاشتراكات اليومية لكل مشترك (sub-orders): الوجبات، المندوب، الموقع → جدول takrar_suborders (للمالك بس)
+// منها بتطلع تقارير التغليف والستيكرات وفاتورة الكمية. السجل ما بيطبع غير أعداد (بلا أسماء ولا أرقام عملاء).
+const SO_PATH = "/public-api/v1/sub-orders/";
+async function soCount(qs) {
+  const { status, j } = await getJson(BASE + SO_PATH + "?" + qs + "&page_size=1");
+  return status === 200 && j ? (typeof j.count === "number" ? j.count : (Array.isArray(j) ? j.length : -1)) : -status;
+}
+// بنشيل بيانات المندوب الحساسة (الهوية، الميلاد، السيارة) — بيكفينا اسمه ورقمه
+function slimSubOrder(o) {
+  const c = o.captain;
+  if (c && typeof c === "object") o.captain = { id: c.id, name: (c.user && c.user.name) || c.name || "", mobile_number: c.mobile_number || "", reference_code: c.reference_code || null };
+  return o;
+}
+const soQs = (p, d) => (p.includes("{d}") ? p.replace("{d}", d) + "=" + d : p + "=" + d);
+async function syncSubOrders(days) {
+  const base = await soCount("x=1");
+  let param = null;
+  for (const p of ["date", "delivery_date", "from_date={d}&to_date", "start_date={d}&end_date", "date_from={d}&date_to", "delivery_date__gte={d}&delivery_date__lte"]) {
+    const n = await soCount(soQs(p, days[1]));
+    console.log("SUBORDERS_PARAM", p.replace("={d}", ""), n >= 0 ? (n < base ? "filtered" : "same-as-all") : "status " + (-n));
+    if (n >= 0 && n < base) { param = p; break; }
+  }
+  if (!param) { console.log("SUBORDERS_NO_DATE_FILTER"); return; }
+  for (const day of days) {
+    let url = BASE + SO_PATH + "?" + soQs(param, day) + "&page_size=200";
+    const out = [];
+    while (url) {
+      const { status, j } = await getJson(url);
+      if (status !== 200 || !j) throw new Error("sub-orders فشل [" + status + "]");
+      if (Array.isArray(j)) { out.push(...j); url = null; } else { out.push(...(j.results || [])); url = j.next || null; }
+    }
+    const rows = out.map(slimSubOrder);
+    const up = await fetch(SUPA_URL + "/functions/v1/tabsense-ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: ANON, Authorization: "Bearer " + ANON, "x-github-oidc": await oidcToken() },
+      body: JSON.stringify({ rpc: "import_takrar_suborders", date: day, branch: BRANCH, rows })
+    });
+    console.log("SUBORDERS_DAY", day, "count", rows.length, "upload", up.status);
+  }
+}
+
 (async () => {
+  if (MODE === "suborders") {
+    const now = Date.now();
+    return syncSubOrders([0, 1, 2].map(i => riyadh(now + i * 86400000)));
+  }
   if (MODE === "boqprobe") return boqProbe();
   if (MODE === "fields") return fields();
   if (MODE === "docs") return docs();
