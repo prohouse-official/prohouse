@@ -15,7 +15,7 @@
     "دجاج فلورنتينا": "চিকেন ফ্লোরেন্টিনা", "دجاج تندر": "চিকেন টেন্ডার", "دجاج تيرياكي": "তেরিয়াকি চিকেন", "دجاج بيستو": "পেস্তো চিকেন",
     "دجاج 65": "চিকেন ৬৫", "شيش طاووق": "শিশ তাউক চিকেন", "تورتيلا روستد تشيكن": "রোস্টেড চিকেন টর্টিলা র‍্যাপ",
     "سمك فيليه كلاسيك": "ক্লাসিক ফিশ ফিলে", "سمك فيليه سبيشال": "স্পেশাল ফিশ ফিলে", "سالمون مشوي": "গ্রিল স্যামন মাছ",
-    "جمبري تبنياكي": "টেপানিয়াকি চিংড়ি", "باربكيو ستيك": "বিবিকিউ স্টেক (গরুর মাংস)", "ستيك مشوي بدون صوص": "গ্রিল স্টেক — সস ছাড়া",
+    "جمبري تبنياكي": "টেপানিয়াকি চিংড়ি", "باربكيو ستيك": "বিবিকিউ স্টেক (গরুর মাংস)", "ستيك مشوي بدون صوص": "গ্রিল স্টেক — সস ছাড়া", "ستيك مشوي": "গ্রিল স্টেক",
     "كاساديا لحم": "বিফ কেসাডিয়া", "سلطة سيزر": "সিজার সালাদ", "سلطة فتوش": "ফাত্তুশ সালাদ", "سلطة روكا": "রোকা সালাদ",
     "سلطة خضراء": "গ্রিন সালাদ", "سلطة ملفوف": "বাঁধাকপির সালাদ", "سلطة كينوا": "কিনোয়া সালাদ", "سلطة كيل بالدجاج": "চিকেন কেল সালাদ",
     "قلابة مع مربى وجبنة": "কাল্লাবা — জ্যাম আর পনির", "ساندويتش تونا": "টুনা স্যান্ডউইচ", "شوربة القرع": "কুমড়ার সুপ",
@@ -64,7 +64,9 @@
     const out = list.map(s => {
       const st = active(standing[s.sid], date) ? standing[s.sid] : null;
       const { p, c } = planNums(s.plan);
-      const items = (s.meals || []).map(m => {
+      // تعديل وجبات زبون ليوم معيّن (standing[sid].days[date].meals) — بيحل محل اختياره بتكرار
+      const dayOv = st && st.days && st.days[date] && st.days[date].meals;
+      const items = dayOv ? dayOv.map(m => ({ dish: m.ar, en: m.en, kind: m.kind || "main", grams: m.protein || null, carb: m.carb || "", carbG: m.carb_g || null })) : (s.meals || []).map(m => {
         const sp = splitDish(m.ar, m.en);
         const kind = kindOf(m.cat);
         const protein = kind === "main" && !NO_GRAMS.test(sp.dish);
@@ -214,10 +216,10 @@ h2{font-size:18px;margin:0 0 1px;text-align:center}h3{font-size:15px;margin:10px
 table{width:100%;border-collapse:collapse}
 .inv th{font-size:13px;border-bottom:1.5px solid #000;padding:4px}
 .inv td{border-bottom:1px solid #bbb;padding:1px 6px;font-size:13px;text-align:center}
-.inv td{border-bottom:1px solid #888;vertical-align:top}.inv td.nm{text-align:start;font-weight:700;font-size:13.5px;line-height:1.25}
+.inv td{border-bottom:1px solid #888;vertical-align:top;padding-top:0;padding-bottom:0}.inv td.nm{text-align:start;font-weight:700;font-size:13.5px;line-height:1.25}
 .inv td.det{text-align:start}.dl{font-size:12.5px;line-height:1.3}.x{display:inline-block;min-width:30px;font-family:Arial;font-weight:700}.inv td.q{font-weight:700;font-family:Arial;font-size:14px}.inv td.ar{text-align:end}
 .inv tr.t td{border-top:1.5px solid #000;font-weight:700;font-size:15px}
-.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:1px 6mm;font-size:12.5px;border:1px solid #999;border-radius:6px;padding:4px 8px}.sum b{font-family:Arial}.sum .cb{font-weight:700}
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:0 4mm;font-size:11px;line-height:1.25;border:1px solid #999;border-radius:6px;padding:4px 8px}.sum b{font-family:Arial}.sum .cb{font-weight:700}
 .yz{display:inline-block;width:49%;vertical-align:top;padding:0 1%;margin-top:0!important;border-top:0!important}.yz h2{font-size:16px}.yz .card.big .it{font-size:15px}.yz .nm{font-size:18px}`;
 
   // days: [{date, subs}] — يرجّع صفحة HTML كاملة جاهزة للطباعة
