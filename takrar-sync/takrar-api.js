@@ -302,5 +302,8 @@ async function syncSubOrders(days) {
   if (MODE === "fields") return fields();
   if (MODE === "docs") return docs();
   if (MODE === "probe") return probe();
-  return sync();
+  await sync();
+  // طلبات المشتركين (للتغليف والفاتورة المفصّلة بالتطبيق) لليوم وبكرا وبعده — مع كل سحب عادي
+  try { const now = Date.now(); await syncSubOrders([0, 1, 2].map(i => riyadh(now + i * 86400000))); }
+  catch (e) { console.log("SUBORDERS_FAIL", String(e.message || e).slice(0, 120)); }
 })().catch(e => { console.error("ERROR:", e.message); process.exit(1); });
