@@ -28,7 +28,7 @@ function getAllTomorrowActiveItems() {
     const ord = currentTomorrowOrder[it.id];
     const hasEntry = ord && ((ord.qty !== "" && ord.qty != null) || ord.cookName);
     // أصناف منيو هاليوم (المنيو الأسبوعي المعتمد) بتطلع دايماً حتى لو لسا ما انطلبت
-    if (isOptionalItem(it) && !currentTomorrowAddedIds.has(it.id) && !hasEntry && !tomorrowMenuNames.has(String(it.name).trim())) return;
+    if (isOptionalItem(it) && !currentTomorrowAddedIds.has(it.id) && !hasEntry && !tomorrowMenuNames.has(String(it.category || "").trim() + "|" + String(it.name).trim())) return;
     itemsMap.set(it.id, isChefItem(it) && ord && ord.cookName ? { ...it, name: chefSlotName(it, ord.cookName) } : { ...it });
   });
 

@@ -475,6 +475,7 @@ function usesChefSlots(category) {
 }
 
 // أسماء أصناف المنيو الأسبوعي المعتمد (إعداد weekly_menu) ليوم تاريخ معيّن
+const WM_CAT = { "دجاج": "دجاج", "لحم": "لحم", "بحري": "بحري", "حلى": "الحلويات", "سلطة": "السلطات", "فطور": "فطور" };
 const WM_DAYS = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 function weeklyMenuNamesFor(dateStr) {
   const out = new Set();
@@ -485,7 +486,8 @@ function weeklyMenuNamesFor(dateStr) {
     const day = WM_DAYS[new Date(dateStr + "T12:00:00").getDay()];
     Object.keys(wm).forEach(k => {
       const v = wm[k];
-      if (v && typeof v === "object" && !Array.isArray(v) && Array.isArray(v[day])) v[day].forEach(n => out.add(String(n).trim()));
+      // «القسم|الاسم» — عشان صنف بنفس الاسم بقسم تاني (مثلاً «دجاج مشوي» بالفطور) ما يطلع زيادة
+      if (v && typeof v === "object" && !Array.isArray(v) && Array.isArray(v[day])) v[day].forEach(n => out.add((WM_CAT[k] || k) + "|" + String(n).trim()));
     });
   } catch (e) { /* إعداد تالف: ما نعرض شي إضافي */ }
   return out;
