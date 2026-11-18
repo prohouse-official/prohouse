@@ -18,6 +18,19 @@ async function useArabic(page) {
   if (await ar.isVisible().catch(() => false)) { await ar.click().catch(() => {}); await page.waitForTimeout(2000); }
 }
 
+// تابسنس صار يطلع جولة تعريفية (driver.js) تغطي الصفحة وتمنع الضغط على زر PDF — نسكّرها ونشيلها
+async function dismissTour(page) {
+  await page.keyboard.press("Escape").catch(() => {});
+  await page.evaluate(() => {
+    document.querySelectorAll(".driver-popover-close-btn").forEach(b => { try { b.click(); } catch (e) {} });
+    document.querySelectorAll(".driver-overlay, .driver-popover, .driver-active-element").forEach(el => {
+      if (el.classList.contains("driver-active-element")) el.classList.remove("driver-active-element"); else el.remove();
+    });
+    document.body.classList.remove("driver-active", "driver-fade", "driver-simple");
+  }).catch(() => {});
+  await page.waitForTimeout(300);
+}
+
 async function setDate(page, iso) {
   await page.evaluate((d) => {
     const el = window.$ && $('input[name="datefilter"]');
@@ -115,8 +128,9 @@ async function downloadSummaryPdf(page, iso, dir) {
   await useArabic(page);
   await selectAllBranches(page);
   await setDate(page, iso);
+  await dismissTour(page);
   const out = path.join(dir, `summary-${iso}.pdf`);
-  const name = await exportViaHistory(page, () => page.click("#downloadPdfDaily"), /ملخص|summary/i, out);
+  const name = await exportViaHistory(page, async () => { await dismissTour(page); await page.click("#downloadPdfDaily", { force: true }); }, /ملخص|summary/i, out);
   // تابسنس يحفظ اختيار الفروع ويطبقه على صفحة الطلبات — نرجّعه فاضي (= الكل) بعد التصدير
   await page.goto(SUMMARY_URL, { waitUntil: "networkidle" }).catch(() => {});
   await page.waitForTimeout(1500);
@@ -142,7 +156,8 @@ async function downloadOrdersExcel(page, iso, dir) {
   });
   await page.waitForTimeout(3000);
   const out = path.join(dir, `orders-${iso}.xlsx`);
-  const name = await exportViaHistory(page, () => page.locator("button.buttons-excel").first().click(), /الطلبات|orders/i, out);
+  await dismissTour(page);
+  const name = await exportViaHistory(page, async () => { await dismissTour(page); await page.locator("button.buttons-excel").first().click({ force: true }); }, /الطلبات|orders/i, out);
   return { path: out, name };
 }
 
