@@ -21,7 +21,9 @@
     "قلابة مع مربى وجبنة": "কাল্লাবা — জ্যাম আর পনির", "ساندويتش تونا": "টুনা স্যান্ডউইচ", "شوربة القرع": "কুমড়ার সুপ",
     "كوكيز": "কুকিজ", "ماتيلدا كيك": "মাটিল্ডা কেক", "رز بالحليب": "রাইস পুডিং (দুধ-ভাত)", "تشيز كيك": "চিজ কেক", "براوني": "ব্রাউনি",
     "براونيز": "ব্রাউনি", "وجبة يحددها الشيف": "শেফের পছন্দের খাবার", "دقوس (سلطة حمراء شبه حارة)": "দাকুস — লাল ঝাল সালাদ",
-    "سلطة بروكلي مع زهرة وفلفل رومي ملون": "ব্রকলি, ফুলকপি আর রঙিন ক্যাপসিকামের সালাদ"
+    "سلطة بروكلي مع زهرة وفلفل رومي ملون": "ব্রকলি, ফুলকপি আর রঙিন ক্যাপসিকামের সালাদ",
+    "دجاج بالبامية — صوص طماطم خفيف، والبامية تتبدل بالفلفل الحلو": "চিকেন — হালকা টমেটো সস, ঢেঁড়সের বদলে মিষ্টি ক্যাপসিকাম",
+    "دجاج مع فلفل حلو وزهرة وبروكلي وباذنجان وكوسا — بدون رز": "চিকেন + মিষ্টি ক্যাপসিকাম, ফুলকপি, ব্রকলি, বেগুন আর জুকিনি — ভাত ছাড়া"
   };
   const BN_CARB = { "رز أبيض": "সাদা ভাত", "رز برياني": "বিরিয়ানি ভাত", "بطاطس ودجز": "আলুর ওয়েজেস", "بطاطا حلوة": "মিষ্টি আলু", "بطاطس مهروسة": "আলু ভর্তা" };
   const EN_CARB = { "رز أبيض": "White rice", "رز برياني": "Biryani rice", "بطاطس ودجز": "Potato wedges", "بطاطا حلوة": "Sweet potato", "بطاطس مهروسة": "Mashed potato" };
@@ -116,13 +118,13 @@
     const per = r.days.map(d => r.items.filter(it => it.day === d));
     const key = (arr) => JSON.stringify(arr.map(it => [it.dish, it.grams, it.carb, it.carbG]));
     if (per.every(a => key(a) === key(per[0])))
-      return `<div class="dsep">${r.days.map(dn).join(" + ")} — ${bn ? "প্রতিদিন একই (প্রতিদিনের আলাদা ব্যাগ)" : "نفس الطلب لكل يوم (كيس لكل يوم)"}</div>` + per[0].map(line).join("");
+      return `<div class="dsep">${r.days.map(dn).join(" + ")} — ${bn ? "একই — প্রতিদিন আলাদা ব্যাগ" : "نفس الطلب، كيس لكل يوم"}</div>` + per[0].map(line).join("");
     return per.map((a, k) => `<div class="dsep">${dn(r.days[k])}</div>` + a.map(line).join("")).join("");
   }
   function packingSection(day, rows, bn, label) {
     const w = dayIdx(day);
     const cards = rows.map((r, i) => `
-      <div class="card"><div class="hd"><span class="no">${i + 1}</span><div class="nm">${esc(r.name)}${r.nick && bn ? ` (${esc(r.nick)})` : ""}<span class="id">#${esc(r.sid)}${r.days ? ` · <b>${r.days.map(d => bn ? DAYS_BN[dayIdx(d)] : DAYS_AR[dayIdx(d)]).join(" + ")}</b>` : ""}</span></div><span class="cnt">${r.items.length}</span></div>
+      <div class="card"><div class="hd"><span class="no">${i + 1}</span><div class="nm">${esc(r.name)}${r.nick && bn ? ` (${esc(r.nick)})` : ""}<span class="id">#${esc(r.sid)}${r.days ? ` <small>${r.days.map(d => bn ? DAYS_BN[dayIdx(d)] : DAYS_AR[dayIdx(d)]).join(" + ")}</small>` : ""}</span></div><span class="cnt">${r.items.length}</span></div>
       <div class="pl">${bn ? planBn(r.plan) : esc(r.plan)}</div>
       ${cardItems(r, bn)}
       ${r.notes ? `<div class="nt">${bn ? "নোট" : "ملاحظة"}: ${esc(r.notes)}</div>` : ""}</div>`).join("");
@@ -198,15 +200,15 @@ h2{font-size:18px;margin:0 0 1px;text-align:center}h3{font-size:15px;margin:10px
 .card{break-inside:avoid;border:1.2px solid #555;border-radius:8px;overflow:hidden}
 .hd{display:flex;align-items:center;gap:5px;padding:3px 6px;border-bottom:1.2px solid #555}
 .no{border:1.4px solid #000;border-radius:50%;min-width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;font-family:Arial}
-.nm{flex:1;font-weight:700;font-size:13.5px;line-height:1.15}.id{display:block;font-weight:400;font-family:Arial;font-size:10px}
-.dsep{font-weight:700;font-size:12px;padding:1px 6px;border-top:1.2px solid #555;text-decoration:underline}
+.nm{flex:1;font-weight:700;font-size:13.5px;line-height:1.15}.id{display:block;font-weight:700;font-family:Arial;font-size:13px;letter-spacing:.3px;line-height:1.2}.id small{font-family:"Noto Sans Arabic","Noto Sans Bengali",sans-serif;font-size:9.5px;font-weight:400;letter-spacing:0}
+.dsep{font-weight:700;font-size:11.5px;line-height:1.25;padding:1px 6px;border-top:1.2px solid #555;text-decoration:underline}
 .dy{border:1px solid #000;border-radius:4px;padding:0 5px;font-size:11px;font-weight:700}
 .cnt{border:1px solid #555;border-radius:9px;padding:0 6px;font-family:Arial;font-size:11px;font-weight:700}
 .pl{font-size:10.5px;padding:2px 6px;border-bottom:1px dashed #999;line-height:1.3}
 .it{display:flex;gap:5px;padding:2px 6px;border-top:1px dashed #ccc;font-size:12.5px;line-height:1.2}
 .pl+.it{border-top:0}.bx{flex:none;width:13px;height:13px;border:1.3px solid #000;border-radius:2px;margin-top:3px}
 .dn{font-weight:700}.sp{font-size:11.5px;line-height:1.15}.en{font-family:Arial;font-size:9.5px}
-[lang=bn] .it{font-size:11.5px;line-height:1.15}[lang=bn] .sp{font-size:10.5px}[lang=bn] .pl{font-size:9.5px}[lang=bn] .en{font-size:8.5px;line-height:1.1}[lang=bn] .inv td.nm{font-size:12.5px;line-height:1.1}
+[lang=bn] .it{font-size:11px;line-height:1.12}[lang=bn] .nm{font-size:12.5px}[lang=bn] .sp{font-size:10.5px}[lang=bn] .pl{font-size:9.5px}[lang=bn] .en{font-size:8.5px;line-height:1.1}[lang=bn] .inv td.nm{font-size:12.5px;line-height:1.1}
 .tag{font-size:10px;font-weight:400;white-space:nowrap}
 .nt{font-size:12px;padding:4px 7px;border-top:1px solid #999}.bnl{font-size:11px;padding:0 26px 4px}
 table{width:100%;border-collapse:collapse}
