@@ -675,6 +675,10 @@ function initTomorrowReportControls() {
   if (saveBtn) saveBtn.addEventListener("click", () => shareTomorrowReportPdf(false, "save"));
   const printBtn = document.getElementById("tomorrowReportPrintBtn");
   if (printBtn) printBtn.addEventListener("click", () => shareTomorrowReportPdf(false, "print"));
+  const ssBtn = document.getElementById("subsSheetsBtn");
+  if (ssBtn) ssBtn.addEventListener("click", openSubsSheets);
+  const ssFrom = document.getElementById("subsSheetsFrom");
+  if (ssFrom) ssFrom.addEventListener("change", () => { const t = document.getElementById("subsSheetsTo"); if (!t.value || t.value < ssFrom.value) t.value = ssFrom.value; });
   const subDayBtn = document.getElementById("tomorrowReportSubDayBtn");
   if (subDayBtn) subDayBtn.addEventListener("click", () => { tomorrowReportSubSameDay = !tomorrowReportSubSameDay; runTomorrowReport(); });
   document.getElementById("tomorrowReportCombinedBtn").addEventListener("click", () => {
@@ -1635,4 +1639,39 @@ function takrarDeliveryOnly(boq) {
     const variants = (r.variants || []).map(v => (v.delivery == null ? v : { ...v, qty: Number(v.delivery) || 0, pickup: 0 })).filter(v => Number(v.qty) > 0);
     return { ...r, qty: d, pickup: 0, variants };
   }).filter(r => Number(r.qty) > 0);
+}
+
+// ---- أوراق اشتراكات التوصيل: تغليف بالمربعات + فاتورة كمية مفصّلة (عربي/بنقالي) + ورقة ابو يزيد ----
+// تنفتح بصفحة لحالها جاهزة للطباعة (حبر خفيف). أكتر من يوم = كل مشترك مربع واحد وفاتورة وحدة مجموعة.
+function subsSheetsDefaults() {
+  const f = document.getElementById("subsSheetsFrom"), t = document.getElementById("subsSheetsTo");
+  if (!f || f.value) return;
+  const base = (document.getElementById("tomorrowReportDate") || {}).value || addDaysStr(todayStr(), 1);
+  f.value = t.value = addDaysStr(base, tomorrowReportSubSameDay ? 0 : 1);
+}
+async function openSubsSheets() {
+  subsSheetsDefaults();
+  const from = document.getElementById("subsSheetsFrom").value, to = document.getElementById("subsSheetsTo").value || from;
+  if (!from || to < from) { alert("اختار التاريخ"); return; }
+  const dates = [];
+  for (let d = from; d <= to && dates.length < 7; d = addDaysStr(d, 1)) dates.push(d);
+  // الصفحة لازم تنفتح فوراً مع الضغطة (وإلا المتصفح بيمنعها)
+  const w = window.open("", "_blank");
+  if (w) w.document.write('<p dir="rtl" style="font:20px sans-serif;padding:20px">جاري تجهيز الأوراق…</p>');
+  try {
+    const days = [];
+    for (const d of dates) days.push({ date: d, subs: (await SupaEngine.rpc("takrar_suborders_slim", { p_date: d })) || [] });
+    if (!days.some(d => d.subs.length)) throw new Error("ما في طلبات اشتراكات من تكرار لهالتاريخ لسا — بتنسحب العصر وبالليل");
+    const raw = typeof currentSettings !== "undefined" && currentSettings.takrar_standing_orders;
+    const standing = (typeof raw === "string" ? JSON.parse(raw || "{}") : raw) || {};
+    const html = SubsSheets.buildDocument(days, standing, { merge: days.length > 1 });
+    if (w) { w.document.open(); w.document.write(html); w.document.close(); }
+    else {
+      const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+      location.assign(url);
+    }
+  } catch (e) {
+    if (w) w.close();
+    alert("ما قدرت طلّع الأوراق: " + (e.message || e));
+  }
 }
