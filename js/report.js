@@ -606,7 +606,9 @@ async function exportExcel() {
 
 let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
 let tomorrowReportSubSameDay = false; // اشتراكات نفس يوم الطلبية بدل اليوم اللي بعده (لما ما انجهزت قبل يوم)
-let tomorrowReportSubBoth = false;    // اشتراكات اليومين (نفس اليوم + اللي بعده) مع بعض — مثلاً السبت لما ما في طلبية الجمعة
+let tomorrowReportSubBoth = false;
+let tomorrowReportSubTouched = false; // السبت: افتراضياً اشتراكات السبت + الأحد (ما في طلبية الجمعة) لين المستخدم يبدّل
+// اشتراكات اليومين (نفس اليوم + اللي بعده) مع بعض — مثلاً السبت لما ما في طلبية الجمعة
 let tomorrowReportCombined = false; // ورقة مجمعة لكل الفروع (اختيار لحاله — أوراق الفروع ما تتغير)
 let lastTomorrowReportDate = "";
 let lastSaladChecks = {};   // {فرع: صف salad_checks} لصفحة السلطات
@@ -683,6 +685,7 @@ function initTomorrowReportControls() {
   const subDayBtn = document.getElementById("tomorrowReportSubDayBtn");
   // التبديل: اليوم اللي بعده ← نفس اليوم ← اليومين مع بعض ← ...
   if (subDayBtn) subDayBtn.addEventListener("click", () => {
+    tomorrowReportSubTouched = true;
     if (tomorrowReportSubBoth) { tomorrowReportSubBoth = false; tomorrowReportSubSameDay = false; }
     else if (tomorrowReportSubSameDay) { tomorrowReportSubBoth = true; }
     else tomorrowReportSubSameDay = true;
@@ -816,6 +819,7 @@ async function runTomorrowReport() {
   // اشتراكات تكرار (تقرير BoQ): تطلع كأنها فرع (كميات تصنيع) — التوزيع بعدين على الموظف المسؤول
   // الاشتراكات تنطبخ قبل يوم: طلبية الأحد فيها اشتراكات الاثنين
   let boq = [];
+  if (!tomorrowReportSubTouched) { const sat = new Date(date + "T12:00:00Z").getUTCDay() === 6; tomorrowReportSubBoth = sat; tomorrowReportSubSameDay = sat; }
   const subDate = addDaysStr(date, tomorrowReportSubSameDay && !tomorrowReportSubBoth ? 0 : 1);
   const subDates = tomorrowReportSubBoth ? [date, addDaysStr(date, 1)] : [subDate];
   const sdBtn = document.getElementById("tomorrowReportSubDayBtn");
@@ -824,7 +828,10 @@ async function runTomorrowReport() {
   if (!branchFilter) {
     try {
       const lists = await Promise.all(subDates.map(d => SupaEngine.getTakrarBoq(d).catch(() => [])));
-      boq = mergeBoqDays(lists);
+      // اليومين مع بعض: كل يوم بعمود لحاله — اليوم الأول خلايا غامقة والتاني خلايا مفرغة (بأمر المالك 21/11)
+      boq = subDates.length > 1
+        ? [].concat(...lists.map((l, k) => (l || []).map(r => ({ ...r, _col: "اشتراكات " + chefDayName(subDates[k]), _shade: k === 0 ? "dark" : "empty" }))))
+        : mergeBoqDays(lists);
     } catch (e) { /* بدونها */ }
   }
   // بأمر المالك (14/11): طلبية الغد فيها اشتراكات التوصيل بس — الاستلام ما ينحسب
@@ -920,6 +927,7 @@ const SUB_DELIVERY = "اشتراكات توصيل", SUB_PICKUP = "اشتراكا
 
 function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null) {
   const rows = new Map();
+  const shades = {}; // عمود اشتراكات يوم → "dark" | "empty"
   const orderBranches = branches.length; // أعمدة الفروع الحقيقية (قبل ما نضيف أعمدة الاشتراكات)
   const aliased = []; // [{ base, branch, e, it }]
   const addTo = (key, init, branch, e, it) => {
@@ -959,10 +967,12 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
   // الاشتراكات: كل طبق ينجمع (كل الأحجام) — البروتين بالجرام (150P × العدد) وينضاف لسطر نفس الطبق عند الفروع،
   // والرز الأبيض (الكارب C) ينضاف لسطر «رز أبيض». الطبق اللي مو موجود عند الفروع سطر جديد بالعدد.
   if (boq.length) {
-    branches = branches.concat(SUB_BRANCH, SUB_DELIVERY);  // اشتراكات الاستلام ما بيجهزها الشيف: المشترك بيجي يستلم
+    const dayCols = [...new Set(boq.filter(r => r._col).map(r => r._col))];
+    branches = branches.concat(SUB_BRANCH, SUB_DELIVERY, dayCols);  // اشتراكات الاستلام ما بيجهزها الشيف: المشترك بيجي يستلم
+    boq.forEach(r => { if (r._col) shades[r._col] = r._shade; });
     // كل كمية بتنقسم على أعمدة الاشتراكات: [[عمود، نسبة من الكمية]]
     const splitOf = (r) => r.delivery != null || r.pickup != null
-      ? [[SUB_DELIVERY, Number(r.delivery) || 0]] : [[SUB_BRANCH, Number(r.qty) || 0]];
+      ? [[r._col || SUB_DELIVERY, Number(r.delivery) || 0]] : [[r._col || SUB_BRANCH, Number(r.qty) || 0]];
     // أصناف الفروع: بالاسم، وكمان باسم الفئة قدّامه (فرع: «بخاري مع الكشنة» = تكرار: «دجاج بخاري»، «مندي» = «دجاج مندي»)
     const byLoose = new Map();
     [...rows.entries()].filter(([k]) => k.startsWith("n:")).forEach(([k, r]) => {
@@ -991,11 +1001,11 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
         const rice = vs.length ? vs.map(v => [v.name, v]) : /(رز|أرز|ارز)\s+(أبيض|ابيض)/.test(r.name) ? [["رز أبيض", r]] : [];
         rice.forEach(([vn, src]) => {
           const rk = byLoose.get(chefLooseName(vn)) || "sub:" + chefLooseName(vn);
-          splitOf(src).forEach(([col, vq]) => { if (vq) add(rk, { category: SUB_BRANCH, name: chefNormName(vn), base: "", rank: 9999, sort: 9999 }, { key: "g", qty: Number(m[2]) * vq }, 0, col); });
+          splitOf({ ...src, _col: r._col }).forEach(([col, vq]) => { if (vq) add(rk, { category: SUB_BRANCH, name: chefNormName(vn), base: "", rank: 9999, sort: 9999 }, { key: "g", qty: Number(m[2]) * vq }, 0, col); });
         });
       }
     });
-    meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
+    meals.forEach((n, key) => { if ([SUB_BRANCH, SUB_DELIVERY, ...dayCols].some(c => (rows.get(key).parts[c] || []).some(p => p.key === "g"))) rows.get(key).notes.push(`اشتراكات: ${n} وجبة`); });
   }
   // المتبقي اليوم (متبقي الروضة): لو الصنف بالطلبية بينكتب بنفس سطره (مطابقة باسم الطبق مو برقم الخانة)،
   // ولو مو بالطلبية (بيستو، كاري…) بياخد سطر لحاله باسمه تحت تصنيفه
@@ -1026,7 +1036,7 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
   })).sort((a, b) => a.rank - b.rank || a.sort - b.sort);
   const used = branches.filter((b, i) => list.some(r => r.byBranch[i]));
   const idx = used.map(b => branches.indexOf(b));
-  return { combined: true, hasRem: !!(remItems && remItems.length), branch: "كل الفروع", branches: used, rows: list.map(r => ({ ...r, byBranch: idx.map(i => r.byBranch[i]) })) };
+  return { combined: true, hasRem: !!(remItems && remItems.length), branch: "كل الفروع", branches: used, shades, rows: list.map(r => ({ ...r, byBranch: idx.map(i => r.byBranch[i]) })) };
 }
 
 // أعمدة ورقة كل الفروع: استلام | الفئة | تسليم | اسم الصنف | حجم السفنديش | إجمالي المطلوب | فرع، فرع…
@@ -1055,7 +1065,9 @@ function chefSheetHtml(sheet, date) {
   sheet.rows.forEach(r => { const g = groups[groups.length - 1]; if (g && g.category === r.category) g.rows.push(r); else groups.push({ category: r.category, rows: [r] }); });
   const box = (bg) => cell("□", `font-size:${chefPtPx(S.boxFont)}px;background:#${bg}`);
   const tail = (r, bg) => { const cb = (t, x = "") => cell(t, `background:#${bg};${x}`); return sheet.combined
-    ? cb(r.total, "font-weight:700;filter:brightness(.93)") + (sheet.hasRem ? cb(r.remToday || "") : "") + r.byBranch.map(t => cb(t)).join("") + cb(r.notes || "")
+    ? cb(r.total, "font-weight:700;filter:brightness(.93)") + (sheet.hasRem ? cb(r.remToday || "") : "")
+      + r.byBranch.map((t, j) => { const sh = sheet.shades && sheet.shades[sheet.branches[j]];
+          return sh === "dark" ? cell(t, "background:#c8c8c8;font-weight:700") : sh === "empty" ? cell(t, "background:#ffffff") : cb(t); }).join("") + cb(r.notes || "")
     : `${cb(r.qty)}${cb(r.rec || "")}${cb(r.rem || "")}${cb(r.notes)}`; };
   const body = groups.map(g => { const bg = chefCatColor(g.category); return g.rows.map((r, i) => `<tr style="height:${chefPtPx(S.rowH)}px">
       ${box(bg)}
@@ -1702,7 +1714,7 @@ async function openSubsSheets() {
     if (!days.some(d => d.subs.length)) throw new Error("ما في طلبات اشتراكات من تكرار لهالتاريخ لسا — بتنسحب العصر وبالليل");
     const raw = typeof currentSettings !== "undefined" && currentSettings.takrar_standing_orders;
     const standing = (typeof raw === "string" ? JSON.parse(raw || "{}") : raw) || {};
-    const html = SubsSheets.buildDocument(days, standing, { merge: days.length > 1 });
+    const html = SubsSheets.buildDocument(days, standing, { merge: false });
     if (w) { w.document.open(); w.document.write(html); w.document.close(); }
     else {
       const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
