@@ -14,7 +14,8 @@
     "دجاج ديناميت": "ডায়নামাইট চিকেন", "دجاج تندوري": "তান্দুরি চিকেন", "دجاج كاري أمريكي": "আমেরিকান কারি চিকেন", "دجاج كاجون": "কাজুন চিকেন",
     "دجاج فلورنتينا": "চিকেন ফ্লোরেন্টিনা", "دجاج تندر": "চিকেন টেন্ডার", "دجاج تيرياكي": "তেরিয়াকি চিকেন", "دجاج بيستو": "পেস্তো চিকেন",
     "دجاج 65": "চিকেন ৬৫", "توست دجاج": "চিকেন টোস্ট", "صن رايز ديك رومي": "সানরাইজ টার্কি স্যান্ডউইচ", "كيك الشوكولاتة الصحي": "হেলদি চকলেট কেক",
-    "سلطة يونانية": "গ্রিক সালাদ", "سلطة ذرة": "ভুট্টার সালাদ", "شوكلت كيك": "চকলেট কেক", "شيش طاووق": "শিশ তাউক চিকেন", "تورتيلا روستد تشيكن": "রোস্টেড চিকেন টর্টিলা র‍্যাপ",
+    "سلطة يونانية": "গ্রিক সালাদ", "سلطة تونا": "টুনা সালাদ", "شكشوكة مع مربى وجبنة": "শাকশুকা — জ্যাম আর পনির", "شوفان أوفر نايت": "ওভারনাইট ওটস",
+    "دجاج ترياكي": "তেরিয়াকি চিকেন", "دجاج فلورنتينا بالسبانخ": "চিকেন ফ্লোরেন্টিনা — পালং শাক দিয়ে", "سلطة ذرة": "ভুট্টার সালাদ", "شوكلت كيك": "চকলেট কেক", "شيش طاووق": "শিশ তাউক চিকেন", "تورتيلا روستد تشيكن": "রোস্টেড চিকেন টর্টিলা র‍্যাপ",
     "سمك فيليه كلاسيك": "ক্লাসিক ফিশ ফিলে", "سمك فيليه سبيشال": "স্পেশাল ফিশ ফিলে", "سالمون مشوي": "গ্রিল স্যামন মাছ",
     "جمبري تبنياكي": "টেপানিয়াকি চিংড়ি", "باربكيو ستيك": "বিবিকিউ স্টেক (গরুর মাংস)", "ستيك مشوي بدون صوص": "গ্রিল স্টেক — সস ছাড়া", "ستيك مشوي": "গ্রিল স্টেক",
     "كاساديا لحم": "বিফ কেসাডিয়া", "سلطة سيزر": "সিজার সালাদ", "سلطة فتوش": "ফাত্তুশ সালাদ", "سلطة روكا": "রোকা সালাদ",
@@ -74,10 +75,13 @@
         const protein = kind === "main" && !NO_GRAMS.test(sp.dish);
         let carb = normCarb(m.variant) || sp.carb;
         if (protein && st && st.carb) carb = st.carb;
+        // بأمر المالك (21/11): ما في وجبة بدون كارب — إذا تكرار ما حدد كارب، رز أبيض بنفس كمية البروتين
+        const noCarb = protein && !carb;
+        if (noCarb) carb = "رز أبيض";
         return {
           dish: sp.dish, en: sp.en, kind,
           grams: protein ? ((st && st.protein) || p) : null,
-          carb: protein || carb ? carb : "", carbG: carb ? ((st && st.carb_g) || c) : null
+          carb: protein || carb ? carb : "", carbG: carb ? (noCarb ? ((st && st.protein) || p) : ((st && st.carb_g) || c)) : null
         };
       });
       const meta = { day: date, so: s.so || "", captain: s.captain || "", ordering: s.ordering, window: s.window || "", district: s.district || "", city: s.city || "" };
@@ -86,7 +90,8 @@
     Object.keys(standing).forEach(sid => {
       const st = standing[sid];
       if (!st.add || !active(st, date)) return;
-      const items = (st.meals || []).map(m => ({ dish: m.ar, en: m.en, kind: "main", grams: m.protein || null, carb: m.carb || "", carbG: m.carb_g || null }))
+      const meals = (st.days && st.days[date] && st.days[date].meals) || st.meals || [];
+      const items = meals.map(m => ({ dish: m.ar, en: m.en, kind: "main", grams: m.protein || null, carb: m.carb || "", carbG: m.carb_g || null }))
         .concat((st.extras || []).map(x => ({ dish: x.ar, en: x.en, kind: "side", grams: null, carb: "", carbG: null })));
       const meta = { day: date, so: "", captain: st.captain || "", ordering: null, window: st.window || "", district: "", city: st.city || "" };
       out.push({ sid, name: st.name, nick: st.nick || "", plan: st.plan || "", notes: "", items, meta, special: "طلب ثابت — مو بتكرار", standing: st });
@@ -137,7 +142,9 @@
     const count = rows.reduce((a, r) => a + r.items.length, 0);
     const title = bn ? `প্যাকিং লিস্ট — ${label ? label.bn : DAYS_BN[w] + " " + dmy(day)}` : `تقرير التغليف — ${label ? label.ar : DAYS_AR[w] + " " + dmy(day)}`;
     const sub = bn ? `${rows.length} জন কাস্টমার · ${count}টা আইটেম · প্রতিটা বক্স = একজনের ব্যাগ` : `${rows.length} عميل · ${count} صنف · كل مربع = كيس عميل`;
-    return `<section class="day"><h2>${title}</h2><div class="sub">${sub}</div><div class="grid">${cards}</div></section>`;
+    // كتير زباين/أصناف (يومين مدموجين) = خط أصغر شوي مشان تضل الورقة وحدة
+    const tight = count > 70 ? " xtight" : count > 50 ? " tight" : "";
+    return `<section class="day${tight}"><h2>${title}</h2><div class="sub">${sub}</div><div class="grid">${cards}</div></section>`;
   }
 
   // ---------- فاتورة الكمية المفصّلة ----------
@@ -175,7 +182,8 @@
       + [...carbTot.entries()].map(([c, g]) => `<div class="cb">${bn ? esc(BN_CARB[c] || c) : esc(c)}: <b>${kg(g)}</b></div>`).join("");
     const title = bn ? `কোন খাবার কত পিস (বিস্তারিত) — ${label ? label.bn : DAYS_BN[w] + " " + dmy(day)}` : `فاتورة الكمية المفصّلة — ${label ? label.ar : DAYS_AR[w] + " " + dmy(day)}`;
     const head = bn ? "<th>#</th><th>খাবার</th><th>বিস্তারিত: কয়টা × মাংস + কার্ব</th><th>কত পিস</th>" : "<th>#</th><th>الصنف</th><th>التفصيل: كم وجبة × البروتين + الكارب</th><th>العدد</th>";
-    return `<section class="day"><h2>${title}</h2><div class="sub">${bn ? "প্রতিটা খাবারের নিচে: কত গ্রাম মাংস আর কোন কার্ব কত গ্রাম" : "تحت كل صنف: كم جرام بروتين وأي كارب وكم جرام"}</div>
+    const lineCount = arr.reduce((a, g) => a + Math.max(1, g.lines.size), 0);
+    return `<section class="day${lineCount > 36 ? " tight xinv" : lineCount > 28 ? " tight" : ""}"><h2>${title}</h2><div class="sub">${bn ? "প্রতিটা খাবারের নিচে: কত গ্রাম মাংস আর কোন কার্ব কত গ্রাম" : "تحت كل صنف: كم جرام بروتين وأي كارب وكم جرام"}</div>
       <table class="inv"><thead><tr>${head}</tr></thead><tbody>${body}<tr class="t"><td></td><td>${bn ? "মোট" : "المجموع"}</td><td></td><td class="q">${total}</td></tr></tbody></table>
       ${sumRows ? `<h3>${bn ? "মোট ওজন (রান্নার জন্য)" : "إجمالي الأوزان (للطبخ)"}</h3><div class="sum">${sumRows}</div>` : ""}</section>`;
   }
@@ -235,6 +243,10 @@ table{width:100%;border-collapse:collapse}
 .lcodes{margin-top:1.5mm}.lb{position:relative}.lb svg{display:block;width:100%;height:14mm}.lbl.multi .lb svg{height:9mm}
 .lbt{text-align:center;font-family:Arial;font-size:8px}.lbd{font-size:9px;font-weight:700}.lnone{text-align:center;font-weight:700;font-size:12px;padding:4mm 0}
 @media screen{.lbl{border:1px dashed #999;margin:4mm auto}}
+.tight .it{font-size:11px;line-height:1.12;padding:1px 5px}.tight .sp{font-size:10px}.tight .pl{font-size:9px;padding:1px 5px}.tight .nm{font-size:12px}.tight .id{font-size:11.5px}.tight .en{font-size:8px;line-height:1.05}.tight .dsep{font-size:10px}.tight .hd{padding:2px 5px}
+.xtight .it{font-size:10px;line-height:1.08;padding:1px 4px}.xtight .sp{font-size:9px}.xtight .pl{font-size:8.5px;padding:0 4px}.xtight .nm{font-size:11px}.xtight .id{font-size:10.5px}.xtight .en{font-size:7.5px;line-height:1}.xtight .dsep{font-size:9.5px;padding:0 4px}.xtight .hd{padding:1px 4px}.xtight .grid .card{margin-bottom:1.5mm}
+.tight .inv td{font-size:11.5px}.tight .inv td.nm{font-size:12px;line-height:1.1}.tight .dl{font-size:11px;line-height:1.2}.tight .sum{font-size:9.5px;grid-template-columns:repeat(5,1fr);line-height:1.15}.tight h3{margin:4px 0 2px;font-size:13px}.tight .inv th{padding:2px;font-size:11.5px}
+.xinv .inv td{font-size:10.5px;line-height:1.05}.xinv .inv td.nm{font-size:11px;line-height:1.05}.xinv .dl{font-size:10px;line-height:1.1}.xinv .inv td.q{font-size:12px}.xinv .sum{font-size:9px}.xinv h2{font-size:16px}.xinv .sub{margin-bottom:2px}
 .yz{display:inline-block;width:49%;vertical-align:top;padding:0 1%;margin-top:0!important;border-top:0!important}.yz h2{font-size:16px}.yz .card.big .it{font-size:15px}.yz .nm{font-size:18px}`;
 
   // days: [{date, subs}] — يرجّع صفحة HTML كاملة جاهزة للطباعة
