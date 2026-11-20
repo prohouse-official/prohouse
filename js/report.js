@@ -606,6 +606,7 @@ async function exportExcel() {
 
 let lastTomorrowReportSheets = []; // [{ branch, rows: [{category, name, size, qty, notes}] }]
 let tomorrowReportSubSameDay = false; // اشتراكات نفس يوم الطلبية بدل اليوم اللي بعده (لما ما انجهزت قبل يوم)
+let tomorrowReportSubBoth = false;    // اشتراكات اليومين (نفس اليوم + اللي بعده) مع بعض — مثلاً السبت لما ما في طلبية الجمعة
 let tomorrowReportCombined = false; // ورقة مجمعة لكل الفروع (اختيار لحاله — أوراق الفروع ما تتغير)
 let lastTomorrowReportDate = "";
 let lastSaladChecks = {};   // {فرع: صف salad_checks} لصفحة السلطات
@@ -680,7 +681,13 @@ function initTomorrowReportControls() {
   const ssFrom = document.getElementById("subsSheetsFrom");
   if (ssFrom) ssFrom.addEventListener("change", () => { const t = document.getElementById("subsSheetsTo"); if (!t.value || t.value < ssFrom.value) t.value = ssFrom.value; });
   const subDayBtn = document.getElementById("tomorrowReportSubDayBtn");
-  if (subDayBtn) subDayBtn.addEventListener("click", () => { tomorrowReportSubSameDay = !tomorrowReportSubSameDay; runTomorrowReport(); });
+  // التبديل: اليوم اللي بعده ← نفس اليوم ← اليومين مع بعض ← ...
+  if (subDayBtn) subDayBtn.addEventListener("click", () => {
+    if (tomorrowReportSubBoth) { tomorrowReportSubBoth = false; tomorrowReportSubSameDay = false; }
+    else if (tomorrowReportSubSameDay) { tomorrowReportSubBoth = true; }
+    else tomorrowReportSubSameDay = true;
+    runTomorrowReport();
+  });
   document.getElementById("tomorrowReportCombinedBtn").addEventListener("click", () => {
     tomorrowReportCombined = !tomorrowReportCombined;
     const sel = document.getElementById("tomorrowReportBranch");
@@ -809,10 +816,17 @@ async function runTomorrowReport() {
   // اشتراكات تكرار (تقرير BoQ): تطلع كأنها فرع (كميات تصنيع) — التوزيع بعدين على الموظف المسؤول
   // الاشتراكات تنطبخ قبل يوم: طلبية الأحد فيها اشتراكات الاثنين
   let boq = [];
-  const subDate = addDaysStr(date, tomorrowReportSubSameDay ? 0 : 1);
+  const subDate = addDaysStr(date, tomorrowReportSubSameDay && !tomorrowReportSubBoth ? 0 : 1);
+  const subDates = tomorrowReportSubBoth ? [date, addDaysStr(date, 1)] : [subDate];
   const sdBtn = document.getElementById("tomorrowReportSubDayBtn");
-  if (sdBtn) { sdBtn.textContent = `🔁 الاشتراكات: ${chefDayName(subDate)} ${subDate.slice(8)}/${subDate.slice(5, 7)} — اضغط للتبديل`; sdBtn.classList.toggle("hidden", !!branchFilter); }
-  if (!branchFilter) { try { boq = await SupaEngine.getTakrarBoq(subDate); } catch (e) { /* بدونها */ } }
+  const dLabel = (d) => `${chefDayName(d)} ${d.slice(8)}/${d.slice(5, 7)}`;
+  if (sdBtn) { sdBtn.textContent = `🔁 الاشتراكات: ${subDates.map(dLabel).join(" + ")} — اضغط للتبديل`; sdBtn.classList.toggle("hidden", !!branchFilter); }
+  if (!branchFilter) {
+    try {
+      const lists = await Promise.all(subDates.map(d => SupaEngine.getTakrarBoq(d).catch(() => [])));
+      boq = mergeBoqDays(lists);
+    } catch (e) { /* بدونها */ }
+  }
   // بأمر المالك (14/11): طلبية الغد فيها اشتراكات التوصيل بس — الاستلام ما ينحسب
   boq = takrarDeliveryOnly(boq);
   if (run !== tomorrowReportRun) return;
@@ -1632,6 +1646,29 @@ async function shareAljFiles(files, btn) {
 }
 
 // اشتراكات تكرار: نخلي التوصيل بس (البيانات القديمة بدون تقسيم بتضل مثل ما هي)
+// جمع كميات تكرار لأكتر من يوم: نفس الصنف والحجم والقسم بينجمع (الكمية والتوصيل والاستلام والخيارات)
+function mergeBoqDays(lists) {
+  if (lists.length === 1) return lists[0] || [];
+  const map = new Map();
+  const n = (x) => Number(x) || 0;
+  lists.forEach(list => (list || []).forEach(r => {
+    const k = [r.name, r.size || "", r.category || ""].join("|");
+    if (!map.has(k)) { map.set(k, { ...r, variants: (r.variants || []).map(v => ({ ...v })) }); return; }
+    const m = map.get(k);
+    m.qty = n(m.qty) + n(r.qty);
+    if (m.delivery != null || r.delivery != null) m.delivery = n(m.delivery) + n(r.delivery);
+    if (m.pickup != null || r.pickup != null) m.pickup = n(m.pickup) + n(r.pickup);
+    (r.variants || []).forEach(v => {
+      const mv = m.variants.find(x => x.name === v.name);
+      if (!mv) { m.variants.push({ ...v }); return; }
+      mv.qty = n(mv.qty) + n(v.qty);
+      if (mv.delivery != null || v.delivery != null) mv.delivery = n(mv.delivery) + n(v.delivery);
+      if (mv.pickup != null || v.pickup != null) mv.pickup = n(mv.pickup) + n(v.pickup);
+    });
+  }));
+  return [...map.values()];
+}
+
 function takrarDeliveryOnly(boq) {
   return (boq || []).map(r => {
     if (r.delivery == null && r.pickup == null) return r;
@@ -1647,7 +1684,8 @@ function subsSheetsDefaults() {
   const f = document.getElementById("subsSheetsFrom"), t = document.getElementById("subsSheetsTo");
   if (!f || f.value) return;
   const base = (document.getElementById("tomorrowReportDate") || {}).value || addDaysStr(todayStr(), 1);
-  f.value = t.value = addDaysStr(base, tomorrowReportSubSameDay ? 0 : 1);
+  f.value = addDaysStr(base, tomorrowReportSubSameDay || tomorrowReportSubBoth ? 0 : 1);
+  t.value = addDaysStr(base, tomorrowReportSubSameDay && !tomorrowReportSubBoth ? 0 : 1);
 }
 async function openSubsSheets() {
   subsSheetsDefaults();
