@@ -135,7 +135,7 @@
   function packingSection(day, rows, bn, label) {
     const w = dayIdx(day);
     const cards = rows.map((r, i) => `
-      <div class="card"><div class="hd"><span class="no">${i + 1}</span><div class="nm">${esc(r.name)}${r.nick && bn ? ` (${esc(r.nick)})` : ""}<span class="id">#${esc(r.sid)}${r.days ? ` <small>${r.days.map(d => bn ? DAYS_BN[dayIdx(d)] : DAYS_AR[dayIdx(d)]).join(" + ")}</small>` : ""}</span></div><span class="cnt">${r.items.length}</span></div>
+      <div class="card"><div class="hd"><span class="no">${i + 1}</span><div class="nm">${esc(r.name)}${r.nick && bn ? ` (${esc(r.nick)})` : ""}<span class="id">#${esc(r.sid)}${r.days ? ` <small>${r.days.map(d => bn ? DAYS_BN[dayIdx(d)] : DAYS_AR[dayIdx(d)]).join(" + ")}</small>` : ""}</span></div></div>
       <div class="pl">${bn ? planBn(r.plan) : esc(r.plan)}</div>
       ${cardItems(r, bn)}
       ${r.notes ? `<div class="nt">${bn ? "নোট" : "ملاحظة"}: ${esc(r.notes)}</div>` : ""}</div>`).join("");
@@ -195,7 +195,7 @@
       const st = r.standing;
       return `<section class="day yz"><h2>طلب ${esc(r.name)} — ${DAYS_AR[w]} ${dmy(day)}</h2>
         <div class="sub">${esc(r.special)} · ${esc(st.plan || "")}</div>
-        <div class="card big"><div class="hd"><div class="nm">${esc(r.name)}${r.nick ? ` (${esc(r.nick)})` : ""}<span class="id">#${esc(r.sid)}</span></div><span class="cnt">${r.items.length}</span></div>
+        <div class="card big"><div class="hd"><div class="nm">${esc(r.name)}${r.nick ? ` (${esc(r.nick)})` : ""}<span class="id">#${esc(r.sid)}</span></div></div>
         ${r.items.map(it => itemLineAr(it) + `<div class="bnl">${esc(BN[it.dish] || "")}${it.carb ? " + " + esc(BN_CARB[it.carb] || it.carb) + (it.carbG ? " " + it.carbG + " গ্রাম" : "") : ""}</div>`).join("")}
         <div class="nt">المندوب: <b>${esc(st.captain || "—")}</b> · وقت التوصيل: <b dir="ltr">${esc(st.window || "—")}</b> · المدينة: <b>${esc(st.city || "—")}</b></div></div></section>`;
     }).join("");
@@ -207,7 +207,7 @@
 .bar{position:sticky;top:0;background:#fff;border-bottom:1px solid #999;padding:8px;text-align:center;z-index:2}
 .bar button{font:inherit;font-size:16px;padding:8px 18px;border:1.5px solid #000;border-radius:8px;background:#fff;cursor:pointer}
 @media print{.bar{display:none}}
-.day{margin:0 0 6mm}.day+.day{margin-top:8mm;border-top:2px solid #000;padding-top:4mm}
+.day{margin:0 0 6mm}.day:not(.yz)+.day:not(.yz){page-break-before:always;break-before:page}
 h2{font-size:18px;margin:0 0 1px;text-align:center}h3{font-size:15px;margin:10px 0 4px}
 .sub{text-align:center;font-size:12px;margin-bottom:4px}
 .grid{columns:4;column-gap:2.5mm}.grid .card{display:inline-block;width:100%;margin:0 0 2mm}
@@ -234,7 +234,7 @@ table{width:100%;border-collapse:collapse}
 .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:0 4mm;font-size:11px;line-height:1.25;border:1px solid #999;border-radius:6px;padding:4px 8px}.sum b{font-family:Arial}.sum .cb{font-weight:700}
 @page lbl{size:100mm 100mm;margin:0}
 .lbl{page:lbl;width:100mm;height:100mm;padding:4mm 5mm;display:flex;flex-direction:column;page-break-after:always;break-after:page;overflow:hidden;font-size:11px;line-height:1.3}
-.lh{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm}.logo{font-family:Arial;font-weight:900;font-size:10px;line-height:1;text-align:center;border:1.2px solid #000;padding:2px 3px}
+.lh{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm}.lser{border:1.6px solid #000;font-family:Arial;font-weight:900;font-size:22px;min-width:12mm;text-align:center;line-height:1.3}.logo{font-family:Arial;font-weight:900;font-size:10px;line-height:1;text-align:center;border:1.2px solid #000;padding:2px 3px}
 .lp{font-size:11px}.ln{font-size:14px;font-weight:700}
 .lm{flex:1;overflow:hidden;margin-top:1.5mm}.li{font-size:11px}.ld{font-weight:700;text-decoration:underline;font-size:11px;margin-top:1mm}
 .lbl.multi .li,.lbl.dense .li{font-size:9.5px;line-height:1.2}.lbl.multi .ld{font-size:10px;margin-top:.5mm}
@@ -269,7 +269,7 @@ table{width:100%;border-collapse:collapse}
     return `<div class="li">• <b>${esc(it.dish)}</b>${parts.length ? ` — ${parts.join(" + ")}` : ""}${it.kind === "snack" ? " (سناك)" : it.kind === "side" ? " (جانبي)" : ""}</div>`;
   }
   function labelsSection(day, rows) {
-    return rows.map(r => {
+    return rows.map((r, idx) => {
       const days = r.days || [day], metas = r.metas || [r.meta || { day }];
       const multi = days.length > 1;
       const dn = (d) => DAYS_AR[dayIdx(d)] + ` <bdi>${d.slice(8)}/${d.slice(5, 7)}</bdi>`;
@@ -283,7 +283,7 @@ table{width:100%;border-collapse:collapse}
       }).join("");
       const n = r.items.length;
       return `<div class="lbl${multi ? " multi" : ""}${n > 6 ? " dense" : ""}">
-        <div class="lh"><div><div class="lp">${esc(r.plan)} - <bdi>${esc(r.sid)}</bdi></div><div class="ln">${esc(r.name)}</div></div><div class="logo">PRO<br>HOUSE</div></div>
+        <div class="lh"><div><div class="lp">${esc(r.plan)} - <bdi>${esc(r.sid)}</bdi></div><div class="ln">${esc(r.name)}</div></div><div class="lser">${idx + 1}</div><div class="logo">PRO<br>HOUSE</div></div>
         <div class="lm">${items}</div>
         <div class="lmeta"><span>🚚 ${cap}</span><span dir="ltr">🕘 ${esc(m0.window || "—")}</span><span>📍 ${place || "—"}</span><span>📅 ${days.map(dn).join(" + ")}</span></div>
         ${r.notes ? `<div class="lnote">ملاحظات العميل: ${esc(r.notes)}</div>` : ""}
@@ -295,6 +295,12 @@ table{width:100%;border-collapse:collapse}
   function buildDocument(days, standing, opts) {
     opts = opts || {};
     let built = days.map(d => ({ date: d.date, rows: buildDay(d.date, d.subs, standing) }));
+    // ترتيب الزباين نفس ترتيب ملصقات تكرار (opts.order[date] = أرقام الاشتراكات بالترتيب) — الرقم على المربع = رقم الملصق
+    if (opts.order) built.forEach(b => {
+      const ord = opts.order[b.date] || [];
+      const pos = (sid) => { const i = ord.indexOf(String(sid)); return i < 0 ? 1e6 : i; };
+      b.rows.sort((a, c) => pos(a.sid) - pos(c.sid));
+    });
     let label = null;
     // دمج الأيام بورقة وحدة: كل الزباين بمربعات (على كل مربع اسم اليوم) وفاتورة وحدة مجموعة
     if (opts.merge && built.length > 1) {
