@@ -78,14 +78,16 @@
           carb: protein || carb ? carb : "", carbG: carb ? ((st && st.carb_g) || c) : null
         };
       });
-      return { sid: s.sid, name: s.name, nick: (st && st.nick) || "", plan: s.plan, notes: s.notes || "", items, special: st && st.note ? st.note : "" };
+      const meta = { day: date, so: s.so || "", captain: s.captain || "", ordering: s.ordering, window: s.window || "", district: s.district || "", city: s.city || "" };
+      return { sid: s.sid, name: s.name, nick: (st && st.nick) || "", plan: s.plan, notes: s.notes || "", items, meta, special: st && st.note ? st.note : "" };
     });
     Object.keys(standing).forEach(sid => {
       const st = standing[sid];
       if (!st.add || !active(st, date)) return;
       const items = (st.meals || []).map(m => ({ dish: m.ar, en: m.en, kind: "main", grams: m.protein || null, carb: m.carb || "", carbG: m.carb_g || null }))
         .concat((st.extras || []).map(x => ({ dish: x.ar, en: x.en, kind: "side", grams: null, carb: "", carbG: null })));
-      out.push({ sid, name: st.name, nick: st.nick || "", plan: st.plan || "", notes: "", items, special: "طلب ثابت — مو بتكرار", standing: st });
+      const meta = { day: date, so: "", captain: st.captain || "", ordering: null, window: st.window || "", district: "", city: st.city || "" };
+      out.push({ sid, name: st.name, nick: st.nick || "", plan: st.plan || "", notes: "", items, meta, special: "طلب ثابت — مو بتكرار", standing: st });
     });
     return out;
   }
@@ -220,9 +222,62 @@ table{width:100%;border-collapse:collapse}
 .inv td.det{text-align:start}.dl{font-size:12.5px;line-height:1.3}.x{display:inline-block;min-width:30px;font-family:Arial;font-weight:700}.inv td.q{font-weight:700;font-family:Arial;font-size:14px}.inv td.ar{text-align:end}
 .inv tr.t td{border-top:1.5px solid #000;font-weight:700;font-size:15px}
 .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:0 4mm;font-size:11px;line-height:1.25;border:1px solid #999;border-radius:6px;padding:4px 8px}.sum b{font-family:Arial}.sum .cb{font-weight:700}
+@page lbl{size:100mm 100mm;margin:0}
+.lbl{page:lbl;width:100mm;height:100mm;padding:4mm 5mm;display:flex;flex-direction:column;page-break-after:always;break-after:page;overflow:hidden;font-size:11px;line-height:1.3}
+.lh{display:flex;justify-content:space-between;align-items:flex-start;gap:3mm}.logo{font-family:Arial;font-weight:900;font-size:10px;line-height:1;text-align:center;border:1.2px solid #000;padding:2px 3px}
+.lp{font-size:11px}.ln{font-size:14px;font-weight:700}
+.lm{flex:1;overflow:hidden;margin-top:1.5mm}.li{font-size:11px}.ld{font-weight:700;text-decoration:underline;font-size:11px;margin-top:1mm}
+.lbl.multi .li,.lbl.dense .li{font-size:9.5px;line-height:1.2}.lbl.multi .ld{font-size:10px;margin-top:.5mm}
+.lmeta{display:grid;grid-template-columns:1fr 1fr;gap:.5mm 3mm;border-top:1px solid #000;padding-top:1.5mm;font-size:10.5px}
+.lnote{font-size:10px;border:1px solid #000;padding:1mm 2mm;margin-top:1mm}
+.lcodes{margin-top:1.5mm}.lb{position:relative}.lb svg{display:block;width:100%;height:14mm}.lbl.multi .lb svg{height:9mm}
+.lbt{text-align:center;font-family:Arial;font-size:8px}.lbd{font-size:9px;font-weight:700}.lnone{text-align:center;font-weight:700;font-size:12px;padding:4mm 0}
+@media screen{.lbl{border:1px dashed #999;margin:4mm auto}}
 .yz{display:inline-block;width:49%;vertical-align:top;padding:0 1%;margin-top:0!important;border-top:0!important}.yz h2{font-size:16px}.yz .card.big .it{font-size:15px}.yz .nm{font-size:18px}`;
 
   // days: [{date, subs}] — يرجّع صفحة HTML كاملة جاهزة للطباعة
+  // ---------- الملصقات (10×10 سم) ----------
+  // ملصق واحد لكل مشترك: إذا عنده أكتر من يوم، وجبات كل يوم تحت اسمه + باركود لكل يوم.
+  // الباركود Code128 بنفس محتوى باركود تكرار: «رقم الاشتراك - رقم طلب اليوم».
+  const C128 = ["212222","222122","222221","121223","121322","131222","122213","122312","132212","221213","221312","231212","112232","122132","122231","113222","123122","123221","223211","221132","221231","213212","223112","312131","311222","321122","321221","312212","322112","322211","212123","212321","232121","111323","131123","131321","112313","132113","132311","211313","231113","231311","112133","112331","132131","113123","113321","133121","313121","211331","231131","213113","213311","213131","311123","311321","331121","312113","312311","332111","314111","221411","431111","111224","111422","121124","121421","141122","141221","112214","112412","122114","122411","142112","142211","241211","221114","413111","241112","134111","111242","121142","121241","114212","124112","124211","411212","421112","421211","212141","214121","412121","111143","111341","131141","114113","114311","411113","411311","113141","114131","311141","411131","211412","211214","211232","2331112"];
+  function barcodeSvg(text) {
+    const vals = [104].concat([...text].map(c => c.charCodeAt(0) - 32));
+    const chk = vals.reduce((a, v, i) => a + (i ? v * i : v), 0) % 103;
+    const pat = vals.concat([chk, 106]).map(v => C128[v]).join("");
+    let x = 10, rects = "";
+    for (let i = 0; i < pat.length; i++) { const w = +pat[i]; if (i % 2 === 0) rects += `<rect x="${x}" y="0" width="${w}" height="40"/>`; x += w; }
+    return `<svg viewBox="0 0 ${x + 10} 40" preserveAspectRatio="none">${rects}</svg>`;
+  }
+  function labelItem(it) {
+    const parts = [];
+    if (it.grams) parts.push(`بروتين ${it.grams}`);
+    if (it.carb) parts.push(`${esc(it.carb)}${it.carbG ? " " + it.carbG : ""}`);
+    return `<div class="li">• <b>${esc(it.dish)}</b>${parts.length ? ` — ${parts.join(" + ")}` : ""}${it.kind === "snack" ? " (سناك)" : it.kind === "side" ? " (جانبي)" : ""}</div>`;
+  }
+  function labelsSection(day, rows) {
+    return rows.map(r => {
+      const days = r.days || [day], metas = r.metas || [r.meta || { day }];
+      const multi = days.length > 1;
+      const dn = (d) => DAYS_AR[dayIdx(d)] + ` <bdi>${d.slice(8)}/${d.slice(5, 7)}</bdi>`;
+      const items = multi ? days.map(d => `<div class="ld">${dn(d)}</div>` + r.items.filter(it => it.day === d).map(labelItem).join("")).join("") : r.items.map(labelItem).join("");
+      const m0 = metas[0] || {};
+      const cap = m0.captain ? `${esc(m0.captain)}${metas.some(m => m.ordering != null) ? ` (${metas.map(m => m.ordering).join(" / ")})` : ""}` : "—";
+      const place = [m0.district, m0.city].filter(Boolean).map(esc).join(" - ");
+      const codes = metas.filter(m => m.so).map(m => {
+        const t = `${r.sid} - ${m.so}`;
+        return `<div class="lb">${multi ? `<span class="lbd">${dn(m.day)}</span>` : ""}${barcodeSvg(t)}<div class="lbt" dir="ltr">${t}</div></div>`;
+      }).join("");
+      const n = r.items.length;
+      return `<div class="lbl${multi ? " multi" : ""}${n > 6 ? " dense" : ""}">
+        <div class="lh"><div><div class="lp">${esc(r.plan)} - <bdi>${esc(r.sid)}</bdi></div><div class="ln">${esc(r.name)}</div></div><div class="logo">PRO<br>HOUSE</div></div>
+        <div class="lm">${items}</div>
+        <div class="lmeta"><span>🚚 ${cap}</span><span dir="ltr">🕘 ${esc(m0.window || "—")}</span><span>📍 ${place || "—"}</span><span>📅 ${days.map(dn).join(" + ")}</span></div>
+        ${r.notes ? `<div class="lnote">ملاحظات العميل: ${esc(r.notes)}</div>` : ""}
+        <div class="lcodes">${codes || `<div class="lnone">${r.standing ? "طلب ثابت — مو بتكرار (بدون باركود)" : "بدون باركود"}</div>`}</div>
+      </div>`;
+    }).join("");
+  }
+
   function buildDocument(days, standing, opts) {
     opts = opts || {};
     let built = days.map(d => ({ date: d.date, rows: buildDay(d.date, d.subs, standing) }));
@@ -234,9 +289,9 @@ table{width:100%;border-collapse:collapse}
       // كل مشترك مربع واحد: طلباته للأيام كلها مع بعض (وجنب كل مجموعة اسم يومها)
       const bySid = new Map();
       built.forEach(b => b.rows.forEach(r => {
-        if (!bySid.has(r.sid)) bySid.set(r.sid, { ...r, items: [], days: [] });
+        if (!bySid.has(r.sid)) bySid.set(r.sid, { ...r, items: [], days: [], metas: [] });
         const m = bySid.get(r.sid);
-        m.days.push(b.date);
+        m.days.push(b.date); m.metas.push(r.meta);
         if (r.notes && !m.notes.includes(r.notes)) m.notes = m.notes ? m.notes + " · " + r.notes : r.notes;
         r.items.forEach(it => m.items.push({ ...it, day: b.date }));
       }));
@@ -249,7 +304,8 @@ table{width:100%;border-collapse:collapse}
       ["ltr", "bn", built.map(b => packingSection(b.date, b.rows, true, b.label)).join("")],
       ["rtl", "ar", built.map(b => invoiceSection(b.date, b.rows, false, b.label)).join("")],
       ["ltr", "bn", built.map(b => invoiceSection(b.date, b.rows, true, b.label)).join("")],
-      ["rtl", "ar", built.map(b => (b.yz || [b]).map(x => standingSection(x.date, x.rows)).join("")).join("")]
+      ["rtl", "ar", built.map(b => (b.yz || [b]).map(x => standingSection(x.date, x.rows)).join("")).join("")],
+      ["rtl", "ar", built.map(b => labelsSection(b.date, b.rows)).join("")]
     ].filter(p => p[2]);
     const fonts = opts.fontCss || '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;700&family=Noto+Sans+Bengali:wght@400;700&display=swap">';
     const bar = opts.noBar ? "" : '<div class="bar"><button onclick="window.print()">🖨️ طباعة / حفظ PDF</button></div>';
