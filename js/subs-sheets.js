@@ -194,7 +194,7 @@
     return rows.filter(r => r.standing).map(r => {
       const st = r.standing;
       return `<section class="day yz"><h2>طلب ${esc(r.name)} — ${DAYS_AR[w]} ${dmy(day)}</h2>
-        <div class="sub">${esc(r.special)} · ${esc(st.plan || "")}</div>
+        <div class="sub">${esc(st.plan || "")}</div>
         <div class="card big"><div class="hd"><div class="nm">${esc(r.name)}${r.nick ? ` (${esc(r.nick)})` : ""}<span class="id">#${esc(r.sid)}</span></div></div>
         ${r.items.map(it => itemLineAr(it) + `<div class="bnl">${esc(BN[it.dish] || "")}${it.carb ? " + " + esc(BN_CARB[it.carb] || it.carb) + (it.carbG ? " " + it.carbG + " গ্রাম" : "") : ""}</div>`).join("")}
         <div class="nt">المندوب: <b>${esc(st.captain || "—")}</b> · وقت التوصيل: <b dir="ltr">${esc(st.window || "—")}</b> · المدينة: <b>${esc(st.city || "—")}</b></div></div></section>`;
@@ -241,7 +241,7 @@ table{width:100%;border-collapse:collapse}
 .lmeta{display:grid;grid-template-columns:1fr 1fr;gap:.5mm 3mm;border-top:1px solid #000;padding-top:1.5mm;font-size:10.5px}
 .lnote{font-size:10px;border:1px solid #000;padding:1mm 2mm;margin-top:1mm}
 .lcodes{margin-top:1.5mm}.lb{position:relative}.lb svg{display:block;width:100%;height:14mm}.lbl.multi .lb svg{height:9mm}
-.lbt{text-align:center;font-family:Arial;font-size:8px}.lbd{font-size:9px;font-weight:700}.lnone{text-align:center;font-weight:700;font-size:12px;padding:4mm 0}
+.lbt{text-align:center;font-family:Arial;font-size:8px}.lbd{font-size:9px;font-weight:700}.lnone{height:16mm}
 @media screen{.lbl{border:1px dashed #999;margin:4mm auto}}
 .tight .it{font-size:11px;line-height:1.12;padding:1px 5px}.tight .sp{font-size:10px}.tight .pl{font-size:9px;padding:1px 5px}.tight .nm{font-size:12px}.tight .id{font-size:11.5px}.tight .en{font-size:8px;line-height:1.05}.tight .dsep{font-size:10px}.tight .hd{padding:2px 5px}
 .xtight .it{font-size:10px;line-height:1.08;padding:1px 4px}.xtight .sp{font-size:9px}.xtight .pl{font-size:8.5px;padding:0 4px}.xtight .nm{font-size:11px}.xtight .id{font-size:10.5px}.xtight .en{font-size:7.5px;line-height:1}.xtight .dsep{font-size:9.5px;padding:0 4px}.xtight .hd{padding:1px 4px}.xtight .grid .card{margin-bottom:1.5mm}
@@ -287,7 +287,7 @@ table{width:100%;border-collapse:collapse}
         <div class="lm">${items}</div>
         <div class="lmeta"><span>🚚 ${cap}</span><span dir="ltr">🕘 ${esc(m0.window || "—")}</span><span>📍 ${place || "—"}</span><span>📅 ${days.map(dn).join(" + ")}</span></div>
         ${r.notes ? `<div class="lnote">ملاحظات العميل: ${esc(r.notes)}</div>` : ""}
-        <div class="lcodes">${codes || `<div class="lnone">${r.standing ? "طلب ثابت — مو بتكرار (بدون باركود)" : "بدون باركود"}</div>`}</div>
+        <div class="lcodes">${codes || '<div class="lnone"></div>'}</div>
       </div>`;
     }).join("");
   }
