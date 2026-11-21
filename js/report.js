@@ -987,21 +987,38 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
       (rows.get(key).parts[col] = rows.get(key).parts[col] || []).push(part);
       if (count) meals.set(key, (meals.get(key) || 0) + count);
     };
+    // مطابقة صنف تكرار مع صنف الفروع: نفس الاسم، أو بدون «دجاج/لحم» قدّامه (شيش طاووق = دجاج شيش طاووق)،
+    // أو اسم الفرع أطول بكلمة (دجاج تكا = دجاج تكا بالفرن)، أو بالأسماء البديلة
+    const SUB_ALIAS = { "دجاج زبده": "دجاج بالزبده", "زبده": "دجاج بالزبده" };
+    const findKey = (loose) => {
+      loose = SUB_ALIAS[loose] || loose;
+      if (byLoose.has(loose)) return byLoose.get(loose);
+      const bare = loose.replace(/^(دجاج|لحم)\s+/, "");
+      for (const [l, k] of byLoose) if (l.replace(/^(دجاج|لحم)\s+/, "") === bare) return k;
+      if (loose.split(" ").length >= 2) {
+        const cands = [...byLoose.entries()].filter(([l]) => l.startsWith(loose + " "));
+        if (cands.length === 1) return cands[0][1];
+      }
+      return null;
+    };
+    // الكارب: رز أبيض/ويدجز/مهروسة… بينضاف لسطر نفس الكارب عند الفروع (فرق إملاء ودجز/ويدجز ما بيفرق)
+    const carbLoose = (n) => chefLooseName(String(n).replace(/^ال/, "")).replace(/ـ/g, "").replace(/ودجز|الويدجز|ويدجز/g, "ويدجز").replace(/^ارز\s+/, "رز ").replace(/\sال(ابيض|برياني)$/, " $1").replace(/^ويدجز$/, "بطاطس ويدجز");
     boq.forEach(r => {
       const qty = Number(r.qty) || 0;
       if (!qty) return;
       const m = /(\d+)\s*P\s*-\s*(\d+)\s*C/i.exec(String(r.size || ""));
-      const loose = chefLooseName(r.name);
-      const key = byLoose.get(loose) || "sub:" + loose;
+      const loose = chefLooseName(String(r.name).replace(/ـ/g, ""));
+      const key = findKey(loose) || "sub:" + loose;
       const init = { category: SUB_BRANCH, name: chefNormName(r.name).replace(/\s+مع\s+.*$/, ""), base: "", rank: 9999, sort: 9999 };
       splitOf(r).forEach(([col, q]) => { if (q) add(key, init, m ? { key: "g", qty: Number(m[1]) * q } : { key: "n:", qty: q }, q, col); });
-      // الرز: «مع رز أبيض» بالاسم أو اختيار رز أبيض — الكارب بالجرام لسطر الرز الأبيض
-      if (m) {
-        const vs = (r.variants || []).filter(v => /رز|ارز|أرز/.test(v.name));
-        // إذا الزبون اختار كارب (ودجز، بطاطا…) الرز اللي بالاسم ما بينحسب — بس الخيارات اللي هي رز
-        const rice = vs.length ? vs.map(v => [v.name, v]) : (r.variants || []).length ? [] : /(رز|أرز|ارز)\s+(أبيض|ابيض)/.test(r.name) ? [["رز أبيض", r]] : [];
-        rice.forEach(([vn, src]) => {
-          const rk = byLoose.get(chefLooseName(vn)) || "sub:" + chefLooseName(vn);
+      // الكارب بالجرام (C × العدد): الخيارات اللي اختارها الزبون، وإذا ما في خيار فالكارب اللي باسم الطبق («مع رز أبيض»، «مع الويدجز»)
+      if (m && Number(m[2])) {
+        const vs = r.variants || [];
+        const nameCarb = (/\s+مع\s+(.*)$/.exec(String(r.name).replace(/ـ/g, "")) || [])[1] || "";
+        const carbs = vs.length ? vs.map(v => [v.name, v]) : /رز|ارز|أرز|ويدجز|ودجز|بطاطس|بطاطا/.test(nameCarb) ? [[nameCarb, r]] : [];
+        carbs.forEach(([vn, src]) => {
+          const cl = carbLoose(vn);
+          const rk = findKey(cl) || "sub:" + cl;
           splitOf({ ...src, _col: r._col }).forEach(([col, vq]) => { if (vq) add(rk, { category: SUB_BRANCH, name: chefNormName(vn), base: "", rank: 9999, sort: 9999 }, { key: "g", qty: Number(m[2]) * vq }, 0, col); });
         });
       }
