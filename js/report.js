@@ -998,7 +998,8 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
       // الرز: «مع رز أبيض» بالاسم أو اختيار رز أبيض — الكارب بالجرام لسطر الرز الأبيض
       if (m) {
         const vs = (r.variants || []).filter(v => /رز|ارز|أرز/.test(v.name));
-        const rice = vs.length ? vs.map(v => [v.name, v]) : /(رز|أرز|ارز)\s+(أبيض|ابيض)/.test(r.name) ? [["رز أبيض", r]] : [];
+        // إذا الزبون اختار كارب (ودجز، بطاطا…) الرز اللي بالاسم ما بينحسب — بس الخيارات اللي هي رز
+        const rice = vs.length ? vs.map(v => [v.name, v]) : (r.variants || []).length ? [] : /(رز|أرز|ارز)\s+(أبيض|ابيض)/.test(r.name) ? [["رز أبيض", r]] : [];
         rice.forEach(([vn, src]) => {
           const rk = byLoose.get(chefLooseName(vn)) || "sub:" + chefLooseName(vn);
           splitOf({ ...src, _col: r._col }).forEach(([col, vq]) => { if (vq) add(rk, { category: SUB_BRANCH, name: chefNormName(vn), base: "", rank: 9999, sort: 9999 }, { key: "g", qty: Number(m[2]) * vq }, 0, col); });
