@@ -94,7 +94,7 @@
       if (!st.add || !active(st, date)) return;
       const meals = (st.days && st.days[date] && st.days[date].meals) || st.meals || [];
       const items = meals.map(m => ({ dish: m.ar, en: m.en, kind: "main", grams: m.protein || null, carb: m.carb || "", carbG: m.carb_g || null }))
-        .concat((st.extras || []).map(x => ({ dish: x.ar, en: x.en, kind: "side", grams: null, carb: "", carbG: null })));
+        .concat((((st.days && st.days[date] && st.days[date].extras) || st.extras) || []).map(x => ({ dish: x.ar, en: x.en, kind: "side", grams: null, carb: "", carbG: null })));
       const meta = { day: date, so: "", captain: st.captain || "", ordering: null, window: st.window || "", district: "", city: st.city || "" };
       out.push({ sid, name: st.name, nick: st.nick || "", plan: st.plan || "", notes: "", items, meta, special: "طلب ثابت — مو بتكرار", standing: st });
     });
