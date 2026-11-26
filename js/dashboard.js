@@ -199,8 +199,8 @@ function dayStepsFor(s) {
     }
   }
   steps.push({ tab: "remaining", icon: "📊", title: "جرد المتبقي", state: state(s.remainingCounted, s.remainingTotal), note: fraction(s.remainingCounted, s.remainingTotal) });
-  // جرد الثلاجة (بروتين بار ومشروبات) — عبداللطيف جميل
-  if (s.branch === "عبداللطيف جميل" && tabAllowed("juices") && s.juicesTotal > 0) {
+  // جرد الثلاجة (بروتين بار ومشروبات) — عبداللطيف جميل والروضة
+  if ((s.branch === "عبداللطيف جميل" || s.branch === "الروضة") && tabAllowed("juices") && s.juicesTotal > 0) {
     steps.push({ tab: "juices", icon: "🧊", title: "جرد الثلاجة", state: state(s.juicesCounted, s.juicesTotal), note: fraction(s.juicesCounted, s.juicesTotal) });
   }
   if (tabAllowed("itemnotes")) {
