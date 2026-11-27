@@ -38,7 +38,7 @@ if (boqByDay) {
       const st = standing[sid];
       if (!st.add || (st.from && st.from > d) || (st.to && st.to < d)) return;
       const day = (st.days && st.days[d]) || {};
-      (day.meals || st.meals || []).forEach(ml => add({ qty: 1, delivery: 1, name: `${ml.ar.split(" — ")[0]} (${st.name})`, size: `${ml.protein || 0}P - ${ml.carb ? ml.carb_g || 0 : 0}C`, category: "الوجبات الرئيسية الجديدة", variants: ml.carb ? [{ name: ml.carb, qty: 1, delivery: 1 }] : [] }));
+      (day.meals || st.meals || []).forEach(ml => add({ qty: 1, delivery: 1, name: `${ml.short || (ml.carb ? ml.ar.split(" — ")[0] : ml.ar.split(" — ")[0].replace(/^(\S+) مع .*/, "$1 بالخضار") + " بدون رز")} (${st.name})`, size: `${ml.protein || 0}P - ${ml.carb ? ml.carb_g || 0 : 0}C`, category: "الوجبات الرئيسية الجديدة", variants: ml.carb ? [{ name: ml.carb, qty: 1, delivery: 1 }] : [] }));
       (day.extras || st.extras || []).forEach(x => add({ qty: 1, delivery: 1, name: `${x.ar.replace(/\s*\(.*\)$/, "")} (${st.name})`, size: "", category: "السناك", variants: [] }));
     });
   });
