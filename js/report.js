@@ -989,7 +989,7 @@ function chefCombinedSheet(branches, perBranch, order, boq = [], remItems = null
     };
     // مطابقة صنف تكرار مع صنف الفروع: نفس الاسم، أو بدون «دجاج/لحم» قدّامه (شيش طاووق = دجاج شيش طاووق)،
     // أو اسم الفرع أطول بكلمة (دجاج تكا = دجاج تكا بالفرن)، أو بالأسماء البديلة
-    const SUB_ALIAS = { "دجاج زبده": "دجاج بالزبده", "زبده": "دجاج بالزبده" };
+    const SUB_ALIAS = { "دجاج زبده": "دجاج بالزبده", "زبده": "دجاج بالزبده", "دجاج ترياكي": "دجاج تيرياكي", "ترياكي": "دجاج تيرياكي" };
     const findKey = (loose) => {
       loose = SUB_ALIAS[loose] || loose;
       if (byLoose.has(loose)) return byLoose.get(loose);
