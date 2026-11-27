@@ -15,6 +15,10 @@ for i, p in enumerate(s):
     runs[-1][1].append(i)
 for k in [2, 3, 0, 1, 4]:
     for i in (runs[k][1] if k < len(runs) else []): o.insert_pdf(s, from_page=i, to_page=i)
+# الملصقات: من ملفات تكرار (labels.pdf) إذا موجودة، وإلا ملصقات التطبيق نفسه (بالباركود والرقم التسلسلي = رقم المربع)
+if not os.path.exists(P('labels.pdf')):
+    for i, p in enumerate(s):
+        if p.rect.width < 400: o.insert_pdf(s, from_page=i, to_page=i)
 for f in ['labels.pdf', 'chef_ar.pdf', 'chef_bn.pdf']:
     if os.path.exists(P(f)): o.insert_pdf(fitz.open(P(f)))
 o.save(P(NAME), garbage=3, deflate=True); print(NAME, len(o), 'صفحة')
