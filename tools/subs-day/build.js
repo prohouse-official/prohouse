@@ -25,7 +25,9 @@ if (boqByDay) {
   const add = (r) => { add1(all, r); add1(m, r); };
   const add1 = (m, r) => {
     const q = r.delivery != null ? n(r.delivery) : n(r.qty); if (!q) return;
-    const vs = (r.variants || []).map(v => ({ name: v.name, q: v.delivery != null ? n(v.delivery) : n(v.qty) })).filter(v => v.q);
+    let vs = (r.variants || []).map(v => ({ name: v.name, q: v.delivery != null ? n(v.delivery) : n(v.qty) })).filter(v => v.q);
+    // قاعدة المالك: وجبة بروتين بدون كارب → رز أبيض بنفس الجرامات (متل الفاتورة) — إلا اللي اسمها فيه "مع…" أو "بدون رز"
+    if (!vs.length && /^\d+P - [1-9]/.test(r.size || "") && !/\sمع\s|بدون رز/.test(r.name)) vs = [{ name: "رز أبيض", q }];
     const k = r.name + "|" + (r.size || "");
     if (!m.has(k)) m.set(k, { qty: 0, name: r.name, size: r.size || "", pickup: 0, category: r.category || "", delivery: 0, variants: [] });
     const x = m.get(k); x.qty += q; x.delivery += q;
